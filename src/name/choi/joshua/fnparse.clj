@@ -1,7 +1,7 @@
 (ns name.choi.joshua.fnparse)
 
 ; A rule is a function that:
-; - Takes a collection of tokens.
+; - Takes a sequential collection of tokens.
 ; - If the token sequence is valid, it returns a vector containing the (0) consumed symbols'
 ;   products and (1) a sequence of the remaining symbols or nil. In all documentation here,
 ;   "a rule's products" is the first element of a valid result from the rule.
