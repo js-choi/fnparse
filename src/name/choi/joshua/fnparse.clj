@@ -17,8 +17,8 @@
   [validator]
   (fn [tokens]
     (let [first-token (first tokens)]
-         (if (validator first-token),
-             [first-token (rest tokens)]))))
+      (if (validator first-token),
+          [first-token (rest tokens)]))))
 
 (defn semantics
   "Creates a rule function from attaching a semantic hook function to the given subrule--that
@@ -27,8 +27,8 @@
   [subrule semantic-hook]
   (fn [tokens]
       (let [subrule-result (subrule tokens)]
-           (if (not (nil? subrule-result))
-               [(semantic-hook (subrule-result 0)) (subrule-result 1)]))))
+        (if (not (nil? subrule-result))
+            [(semantic-hook (subrule-result 0)) (subrule-result 1)]))))
 
 (defn constant-semantics
   "Creates a rule function from attaching a constant semantic hook function to the given
@@ -66,14 +66,14 @@
   the subrules don't match in the right place, the new rule simply returns nil."
   [& subrules]
   (fn [tokens]
-      (loop [products [], token-queue tokens, rule-queue subrules]
-            (if (nil? rule-queue),
-                [products token-queue],
-                (let [curr-result ((first rule-queue) token-queue)]
-                     (if (not (nil? curr-result))
-                         (recur (conj products (curr-result 0))
-                               (curr-result 1)
-                               (rest rule-queue))))))))
+    (loop [products [], token-queue tokens, rule-queue subrules]
+      (if (nil? rule-queue),
+          [products token-queue],
+          (let [curr-result ((first rule-queue) token-queue)]
+            (if (not (nil? curr-result))
+                (recur (conj products (curr-result 0))
+                       (curr-result 1)
+                       (rest rule-queue))))))))
 
 (defn alt
   "Creates a rule function that is the alternative of the given subrules--that is, any one
@@ -86,7 +86,7 @@
   simply returns nil."
   [& subrules]
   (fn [tokens]
-      (some #(% tokens) subrules)))
+    (some #(% tokens) subrules)))
 
 (defn opt
   "Creates a rule function that is the optional form of the given subrule--that is, either
@@ -98,7 +98,7 @@
   [nil tokens]. The new rule can never simply return nil."
   [subrule]
   (fn [tokens]
-      (or (subrule tokens) [nil tokens])))
+    (or (subrule tokens) [nil tokens])))
 
 (defn rep*
   "Creates a rule function that is the zero-or-more repetition of the given subrule--that
@@ -111,12 +111,12 @@
   can never simply return nil."
   [subrule]
   (fn [tokens]
-      (loop [products [], token-queue tokens]
-            (let [cur-result (subrule token-queue)]
-                 (if (or (nil? cur-result) (= cur-result [nil nil])),
-                     [products token-queue],
-                     (recur (conj products (cur-result 0))
-                            (cur-result 1)))))))
+    (loop [products [], token-queue tokens]
+      (let [cur-result (subrule token-queue)]
+        (if (or (nil? cur-result) (= cur-result [nil nil])),
+            [products token-queue],
+            (recur (conj products (cur-result 0))
+                   (cur-result 1)))))))
 
 (defn rep+
   "Creates a rule function that is the one-or-more repetition of the given rule--that
@@ -127,8 +127,8 @@
   were found. If there were zero matches, then nil is simply returned."
   [subrule]
   (fn [tokens]
-      (let [product ((rep* subrule) tokens)]
-           (if (not (empty? (product 0))), product))))
+    (let [product ((rep* subrule) tokens)]
+       (if (not (empty? (product 0))), product))))
 
 (defn lit-seq
   "Creates a rule function that is the concatenation of the literals of the sequence of the
