@@ -118,22 +118,3 @@
       "emptyiness rule matches emptiness"))
 
 (run-tests)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
