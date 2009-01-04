@@ -138,11 +138,14 @@
     a = \"A\", \"B\", \"C\", \"D\";
   The new rule's products would be the result of the concatenation rule."
   [token-seq]
-  (semantics (apply conc (map lit token-seq)) seq))
+  (apply conc (map lit token-seq)))
 
 (defn emptiness
   "A rule function that matches emptiness--that is, it always matches with every given token
-  sequence, and it always returns [nil tokens]."
+  sequence, and it always returns [nil tokens].
+  (def a emptiness) would be equivalent to the EBNF
+    a = ε;
+  This rule's product is always nil, and it therefore always returns [nil tokens]."
   [tokens]
   [nil tokens])
 

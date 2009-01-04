@@ -108,7 +108,7 @@
 (deftest test-lit-seq
   ; Parse the first four symbols in the program "THEN"
   (is (= ((p/lit-seq "THEN") (seq "THEN print 42;"))
-         [(seq "THEN") (seq " print 42;")])
+         [(vec "THEN") (seq " print 42;")])
       "created literal-sequence rule is based on sequence of given token sequencible"))
 
 (deftest test-emptiness
