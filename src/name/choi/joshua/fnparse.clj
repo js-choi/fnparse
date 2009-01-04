@@ -2,8 +2,8 @@
 
 ; A rule is a function that:
 ; - Takes a sequential collection of tokens.
-; - If the token sequence is valid, it returns a vector containing the (0) consumed symbols'
-;   products and (1) a sequence of the remaining symbols or nil. In all documentation here,
+; - If the token sequence is valid, it returns a vector containing the (0) consumed tokens'
+;   products and (1) a sequence of the remaining tokens or nil. In all documentation here,
 ;   "a rule's products" is the first element of a valid result from the rule.
 ; - If the given token sequence is invalid and the rule fails, it simply returns nil.
 
