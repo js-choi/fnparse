@@ -7,6 +7,8 @@ fnparse's distribution has src and test folders. To use fnparse, download this
 distribution and include its src folder in your program's classpath—for instance,
   java -cp $CLOJURE_PATH:path-to-fnparse/fnparse/src/ ...
 
+fnparse's namespace is name.choi.joshua.fnparse. 
+
 fnparse's unit tests are stored in the tests folder and require the test-is library
 from clojure-contrib, the Clojure standard library.
 
