@@ -1,6 +1,6 @@
 (ns name.choi.joshua.fnparse.json
   (:refer-clojure)
-  (:use clojure.parse))
+  (:use name.choi.joshua.fnparse))
 
 (defstruct node :kind :content)
 
