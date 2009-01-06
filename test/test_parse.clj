@@ -105,6 +105,15 @@
     (is (nil? ((p/rep+ literal-true) (list "THEN")))
         "created one-or-more-repetition rule fails when symbol absent")))
 
+(deftest test-except
+  (let [except-rule (p/except (p/alt (p/lit "A") (p/lit "B")) (p/lit "B"))]
+    (is (= (except-rule (list "A" "B" "C")) ["A" (list "B" "C")])
+        "created exception rule works when symbol is not the syntatic exception")
+    (is (= (except-rule (list "B" "A" "C")) nil)
+        "created exception rule fails when symbol is the syntactic exception")
+    (is (= (except-rule (list "C" "A" "B")) nil)
+        "created exception rule fails when symbol does not fulfill subrule")))
+
 (deftest test-lit-seq
   ; Parse the first four symbols in the program "THEN"
   (is (= ((p/lit-seq "THEN") (seq "THEN print 42;"))

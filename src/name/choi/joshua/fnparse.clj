@@ -93,7 +93,7 @@
   the presence of the absence of the subrule.
   (def a (opt b)) would be equivalent to the EBNF
     a = [b];
-  The new rule's product would be either a-product, if a accepts it, or else nil. Note
+  The new rule's product would be either b-product, if b accepts it, or else nil. Note
   that the latter actually means that the new rule would then return the vector
   [nil tokens]. The new rule can never simply return nil."
   [subrule]
@@ -113,14 +113,14 @@
   (fn [tokens]
     (loop [products [], token-queue tokens]
       (let [cur-result (subrule token-queue)]
-        (if (or (nil? cur-result) (= cur-result [nil nil])),
+        (if (or (nil? cur-result) (= cur-result [nil nil]))
             [products token-queue],
             (recur (conj products (cur-result 0))
                    (cur-result 1)))))))
 
 (defn rep+
-  "Creates a rule function that is the one-or-more repetition of the given rule--that
-  is, either one or more of the rule.
+  "Creates a rule function that is the one-or-more repetition of the given subrule--that
+  is, either one or more of the subrule.
   (def a (rep+ b)) would be equivalent to the EBNF
     a = {b}-;
   The new rule's products would be the vector [b-product ...] for how many matches of b
@@ -129,6 +129,19 @@
   (fn [tokens]
     (let [product ((rep* subrule) tokens)]
        (if (not (empty? (product 0))), product))))
+
+(defn except
+  "Creates a rule function that is the exception between the two given subrules--that is,
+  it accepts only tokens that fulfill the first subrule but fail the second subrule.
+  (def a (except b c)) would be equivalent to the EBNF
+    a = b - c;
+  The new rule's products would be b-product. If b fails or c succeeds, then nil is simply
+  returned."
+  [minuend subtrahend]
+  (fn [tokens]
+    (let [product (minuend tokens)]
+      (if (and (not (nil? product)) (nil? (subtrahend tokens)))
+          product))))
 
 (defn lit-seq
   "Creates a rule function that is the concatenation of the literals of the sequence of the
