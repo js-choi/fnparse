@@ -121,6 +121,14 @@
          [(vec "THEN") (seq " print 42;")])
       "created literal-sequence rule is based on sequence of given token sequencible"))
 
+(deftest test-lit-alt-seq
+  ; Parse the first four symbols in the program "B 2"
+  (is (= ((p/lit-alt-seq "ABCD") (seq "B 2"))
+         [\B (seq " 2")])
+      "created literal-alternative-sequence rule works when literal symbol present in sequence")
+  (is (= ((p/lit-alt-seq "ABCD") (seq "E 2")) nil)
+      "created literal-alternative-sequence rule fails when literal symbol not present in sequence"))
+
 (deftest test-emptiness
   ; Parse the emptiness before the first symbol
   (is (= (p/emptiness (list "A" "B" "C"))

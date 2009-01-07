@@ -154,6 +154,16 @@
   [token-seq]
   (apply conc (map lit token-seq)))
 
+(defn lit-alt-seq
+  "Creates a rule function that is the alternative of the literals of the sequence of the
+  given sequenceable object--that is, it accepts only a series of tokens that matches any
+  of the token sequence.
+  (def a (lit-seq \"ABCD\")) would be equivalent to the EBNF
+    a = \"A\" | \"B\" | \"C\" | \"D\";
+  The new rule's products would be the result of the concatenation rule."
+  [token-seq]
+  (apply alt (map lit token-seq)))
+
 (defn emptiness
   "A rule function that matches emptiness--that is, it always matches with every given token
   sequence, and it always returns [nil tokens].
