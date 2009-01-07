@@ -144,7 +144,7 @@
       (if (and (not (nil? product)) (every? #(nil? (% tokens)) subtrahends))
           product))))
 
-(defn lit-seq
+(defn lit-conc-seq
   "Creates a rule function that is the concatenation of the literals of the sequence of the
   given sequenceable object--that is, it accepts only a series of tokens that matches the
   sequence of the token sequence.

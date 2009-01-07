@@ -115,9 +115,9 @@
     (is (= (except-rule (list "D" "A" "B")) nil)
         "created exception rule fails when symbol does not fulfill subrule")))
 
-(deftest test-lit-seq
+(deftest test-lit-conc-seq
   ; Parse the first four symbols in the program "THEN"
-  (is (= ((p/lit-seq "THEN") (seq "THEN print 42;"))
+  (is (= ((p/lit-conc-seq "THEN") (seq "THEN print 42;"))
          [(vec "THEN") (seq " print 42;")])
       "created literal-sequence rule is based on sequence of given token sequencible"))
 

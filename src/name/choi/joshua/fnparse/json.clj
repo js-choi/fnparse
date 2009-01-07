@@ -6,9 +6,9 @@
 
 (def string-delimiter (lit \"))
 (def escape-indicator (lit \\))
-(def false-lit (constant-semantics (lit-seq "false") (struct node :scalar false)))
-(def true-lit (constant-semantics (lit-seq "true") (struct node :scalar true)))
-(def null-lit (constant-semantics (lit-seq "null") (struct node :scalar nil)))
+(def false-lit (constant-semantics (lit-conc-seq "false") (struct node :scalar false)))
+(def true-lit (constant-semantics (lit-conc-seq "true") (struct node :scalar true)))
+(def null-lit (constant-semantics (lit-conc-seq "null") (struct node :scalar nil)))
 (def keyword-lit (alt false-lit true-lit null-lit))
 
 (def ws (rep* (apply alt (map lit [\space \tab \newline \return]))))
