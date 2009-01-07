@@ -131,16 +131,17 @@
        (if (not (empty? (product 0))), product))))
 
 (defn except
-  "Creates a rule function that is the exception between the two given subrules--that is,
-  it accepts only tokens that fulfill the first subrule but fail the second subrule.
-  (def a (except b c)) would be equivalent to the EBNF
-    a = b - c;
-  The new rule's products would be b-product. If b fails or c succeeds, then nil is simply
-  returned."
-  [minuend subtrahend]
+  "Creates a rule function that is the exception from the first given subrules with the
+  rest of the given subrules--that is, it accepts only tokens that fulfill the first
+  subrule but fail the second subrule.
+  (def a (except b c d)) would be equivalent to the EBNF
+    a = b - c - d;
+  The new rule's products would be b-product. If b fails or either c or d succeeds, then
+  nil is simply returned."
+  [minuend & subtrahends]
   (fn [tokens]
     (let [product (minuend tokens)]
-      (if (and (not (nil? product)) (nil? (subtrahend tokens)))
+      (if (and (not (nil? product)) (every? #(nil? (% tokens)) subtrahends))
           product))))
 
 (defn lit-seq
