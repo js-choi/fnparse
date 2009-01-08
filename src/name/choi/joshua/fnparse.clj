@@ -26,9 +26,9 @@
   subrule fails and returns nil, the new rule will return nil."
   [subrule semantic-hook]
   (fn [tokens]
-    (let [subrule-result (subrule tokens)]
-      (if (not (nil? subrule-result))
-          [(semantic-hook (subrule-result 0)) (subrule-result 1)]))))
+    (let [[product remainder :as result] (subrule tokens)]
+      (if (not (nil? result))
+          [(semantic-hook product) remainder]))))
 
 (defn constant-semantics
   "Creates a rule function from attaching a constant semantic hook function to the given
