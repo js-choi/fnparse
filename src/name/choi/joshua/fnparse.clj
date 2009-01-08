@@ -156,17 +156,40 @@
       (if (and (not (nil? product)) (every? #(nil? (% tokens)) subtrahends))
           product))))
 
-(defn factor
+(defn factor-rule
+  "Creates a rule function that is the repetition of the given subrule whose valid size is
+  determined by a predicate."
+  [factor-predicate subrule]
+  (validate (rep* subrule) (comp factor-predicate count)))
+
+(defn factor=
   "Creates a rule function that is the multiple of the given subrule by the given positive
   integer factor--that is, it accepts only a certain number of tokens that fulfill the
   subrule, no more and no less.
-  (def a (multiple n b)) would be equivalent to the EBNF
+  (def a (factor= n b)) would be equivalent to the EBNF
     a = n * b;
   The new rule's products would be b-product. If b fails below n times, then nil is simply
   returned."
   [factor subrule]
   (validate (rep* subrule) #(= (count %) factor)))
-;  (apply conc (replicate factor subrule)))
+
+(defn factor<
+  "Creates a rule function that is the multiple or less of the given subrule by the given
+  positive integer factor--that is, it accepts a certain range number of tokens that fulfill
+  the subrule, less than but not equal to the limiting factor.
+  The new rule's products would be b-product. If b fails below n times, then nil is simply
+  returned."
+  [limit subrule]
+  (validate (rep* subrule) #(< (count %) limit)))
+
+(defn factor<=
+  "Creates a rule function that is the multiple or less of the given subrule by the given
+  positive integer factor--that is, it accepts a certain range number of tokens that fulfill
+  the subrule, less than but not equal to the limiting factor.
+  The new rule's products would be b-product. If b fails below n times, then nil is simply
+  returned."
+  [limit subrule]
+  (validate (rep* subrule) #(<= (count %) limit)))
 
 (defn lit-conc-seq
   "Creates a rule function that is the concatenation of the literals of the sequence of the

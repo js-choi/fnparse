@@ -115,17 +115,48 @@
     (is (= (except-rule (list "D" "A" "B")) nil)
         "created exception rule fails when symbol does not fulfill subrule")))
 
-(deftest test-factor
-  ; factor-rule = 3 * "A";
-  (let [factor-rule (p/factor 3 (p/lit "A"))]
-    (is (= (factor-rule (list "A" "A" "A" "C")) [["A" "A" "A"] (list "C")])
-        "created factor rule works when symbol only fulfills all subrule multiples")
-    (is (= (factor-rule (list "A" "A" "A" "A")) nil)
-        "created factor rule works when symbol exceeds subrule multiples")
-    (is (= (factor-rule (list "A" "A" "C")) nil)
-        "created factor rule fails when symbol does not fulfill all subrule multiples")
-    (is (= (factor-rule (list "D" "A" "B")) nil)
-        "created factor rule fails when symbol does not fulfill subrule at all")))
+(deftest test-factor-rule
+  (let [tested-rule (p/factor-rule (partial > 3) (p/lit "A"))]
+    (is (= (tested-rule (list "A" "A" "C")) [["A" "A"] (list "C")])
+        "created factor rule works when predicate returns true")
+    (is (= (tested-rule (list "A" "A" "A")) nil)
+        "created factor rule fails when predicate returns false")
+    (is (= (tested-rule (list "D" "A" "B")) [[] (list "D" "A" "B")])
+        "created factor rule succeeds when symbol does not fulfill subrule at all")))
+
+(deftest test-factor=
+  ; factor=-rule = 3 * "A";
+  (let [tested-rule (p/factor= 3 (p/lit "A"))]
+    (is (= (tested-rule (list "A" "A" "A" "C")) [["A" "A" "A"] (list "C")])
+        "created factor= rule works when symbol only fulfills all subrule multiples")
+    (is (= (tested-rule (list "A" "A" "A" "A")) nil)
+        "created factor= rule fails when symbol exceeds subrule multiples")
+    (is (= (tested-rule (list "A" "A" "C")) nil)
+        "created factor= rule fails when symbol does not fulfill all subrule multiples")
+    (is (= (tested-rule (list "D" "A" "B")) nil)
+        "created factor= rule fails when symbol does not fulfill subrule at all")))
+
+(deftest test-factor<
+  (let [tested-rule (p/factor< 3 (p/lit "A"))]
+    (is (= (tested-rule (list "A" "A" "C")) [["A" "A"] (list "C")])
+        "created factor< rule works when number of fulfilled rules is less than limit")
+    (is (= (tested-rule (list "A" "A" "A")) nil)
+        "created factor< rule fails when number of fulfilled rules is equal to limit")
+    (is (= (tested-rule (list "A" "A" "A" "A" "C")) nil)
+        "created factor< rule fails when symbol of fulfilled rules is more than limit")
+    (is (= (tested-rule (list "D" "A" "B")) [[] (list "D" "A" "B")])
+        "created factor< rule succeeds when symbol does not fulfill subrule at all")))
+
+(deftest test-factor<=
+  (let [tested-rule (p/factor<= 3 (p/lit "A"))]
+    (is (= (tested-rule (list "A" "A" "C")) [["A" "A"] (list "C")])
+        "created factor< rule works when number of fulfilled rules is less than limit")
+    (is (= (tested-rule (list "A" "A" "A" "C")) [["A" "A" "A"] (list "C")])
+        "created factor< rule works when number of fulfilled rules is equal to limit")
+    (is (= (tested-rule (list "A" "A" "A" "A" "C")) nil)
+        "created factor< rule fails when symbol of fulfilled rules is more than limit")
+    (is (= (tested-rule (list "D" "A" "B")) [[] (list "D" "A" "B")])
+        "created factor< rule succeeds when symbol does not fulfill subrule at all")))
 
 (deftest test-validate
   (is (= ((p/validate (p/lit "hi") #(= "hi" %)) ["hi" "THEN"])
