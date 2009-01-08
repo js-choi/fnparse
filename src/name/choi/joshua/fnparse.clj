@@ -144,6 +144,16 @@
       (if (and (not (nil? product)) (every? #(nil? (% tokens)) subtrahends))
           product))))
 
+(defn factor
+  "Creates a rule function that is the multiple of the given subrule by the given positive
+  integer factor--that is, the concatenation of the subrule factor-times in a row.
+  (def a (multiple n b)) would be equivalent to the EBNF
+    a = n * b;
+  The new rule's products would be b-product. If b fails below n times, then nil is simply
+  returned."
+  [factor subrule]
+  (apply conc (replicate factor subrule)))
+
 (defn lit-conc-seq
   "Creates a rule function that is the concatenation of the literals of the sequence of the
   given sequenceable object--that is, it accepts only a series of tokens that matches the

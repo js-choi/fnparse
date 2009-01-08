@@ -106,7 +106,7 @@
         "created one-or-more-repetition rule fails when symbol absent")))
 
 (deftest test-except
-  ; except-rule = ("A" | "B" | "C") - "B" - "C"
+  ; except-rule = ("A" | "B" | "C") - "B" - "C";
   (let [except-rule (p/except (p/alt (p/lit "A") (p/lit "B") (p/lit "C")) (p/lit "B") (p/lit "C"))]
     (is (= (except-rule (list "A" "B" "C")) ["A" (list "B" "C")])
         "created exception rule works when symbol is not one of the syntatic exceptions")
@@ -114,6 +114,16 @@
         "created exception rule fails when symbol is one of the syntactic exceptions")
     (is (= (except-rule (list "D" "A" "B")) nil)
         "created exception rule fails when symbol does not fulfill subrule")))
+
+(deftest test-factor
+  ; factor-rule = 3 * "A";
+  (let [factor-rule (p/factor 3 (p/lit "A"))]
+    (is (= (factor-rule (list "A" "A" "A" "A")) [["A" "A" "A"] (list "A")])
+        "created factor rule works when symbol fulfills all subrule multiples")
+    (is (= (factor-rule (list "A" "A" "C")) nil)
+        "created factor rule fails when symbol does not fulfill all subrule multiples")
+    (is (= (factor-rule (list "D" "A" "B")) nil)
+        "created factor rule fails when symbol does not fulfill subrule at all")))
 
 (deftest test-lit-conc-seq
   ; Parse the first four symbols in the program "THEN"
