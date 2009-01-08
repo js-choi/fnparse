@@ -125,6 +125,15 @@
     (is (= (factor-rule (list "D" "A" "B")) nil)
         "created factor rule fails when symbol does not fulfill subrule at all")))
 
+(deftest test-validate
+  (is (= ((p/validate (p/lit "hi") #(= "hi" %)) ["hi" "THEN"])
+         ["hi" (list "THEN")])
+      "created validator rule succeeds when given subrule and validator succeed")
+  (is (= ((p/validate (p/lit "hi") #(= "RST" %)) "RST") nil)
+      "created validator rule fails when given subrule fails")
+  (is (= ((p/validate (p/lit "hi") #(= "hi" %)) "hi") nil)
+      "created validator rule fails when given validator fails"))
+
 (deftest test-lit-conc-seq
   ; Parse the first four symbols in the program "THEN"
   (is (= ((p/lit-conc-seq "THEN") (seq "THEN print 42;"))

@@ -26,9 +26,9 @@
   subrule fails and returns nil, the new rule will return nil."
   [subrule semantic-hook]
   (fn [tokens]
-      (let [subrule-result (subrule tokens)]
-        (if (not (nil? subrule-result))
-            [(semantic-hook (subrule-result 0)) (subrule-result 1)]))))
+    (let [subrule-result (subrule tokens)]
+      (if (not (nil? subrule-result))
+          [(semantic-hook (subrule-result 0)) (subrule-result 1)]))))
 
 (defn constant-semantics
   "Creates a rule function from attaching a constant semantic hook function to the given
@@ -153,6 +153,18 @@
   returned."
   [factor subrule]
   (apply conc (replicate factor subrule)))
+
+(defn validate
+  "Creates a rule function from attaching a validator function to the given subrule--that is,
+  any products of the subrule must fulfill the validator function.
+  (def a (validate b validator)) says that the rule a succeeds only when b succeeds and when
+  (validator b-product) is true. The new rule's product would be b-product. If b fails or
+  (validator b-product) is false, then nil is simply returned."
+  [subrule validator]
+  (fn [tokens]
+    (let [[product remainder :as result] (subrule tokens)]
+      (if (and (not (nil? result)) (validator product))
+          result))))
 
 (defn lit-conc-seq
   "Creates a rule function that is the concatenation of the literals of the sequence of the
