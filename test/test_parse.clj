@@ -118,8 +118,10 @@
 (deftest test-factor
   ; factor-rule = 3 * "A";
   (let [factor-rule (p/factor 3 (p/lit "A"))]
-    (is (= (factor-rule (list "A" "A" "A" "A")) [["A" "A" "A"] (list "A")])
-        "created factor rule works when symbol fulfills all subrule multiples")
+    (is (= (factor-rule (list "A" "A" "A" "C")) [["A" "A" "A"] (list "C")])
+        "created factor rule works when symbol only fulfills all subrule multiples")
+    (is (= (factor-rule (list "A" "A" "A" "A")) nil)
+        "created factor rule works when symbol exceeds subrule multiples")
     (is (= (factor-rule (list "A" "A" "C")) nil)
         "created factor rule fails when symbol does not fulfill all subrule multiples")
     (is (= (factor-rule (list "D" "A" "B")) nil)

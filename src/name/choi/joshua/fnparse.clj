@@ -20,6 +20,18 @@
       (if (validator first-token),
           [first-token (rest tokens)]))))
 
+(defn validate
+  "Creates a rule function from attaching a validator function to the given subrule--that is,
+  any products of the subrule must fulfill the validator function.
+  (def a (validate b validator)) says that the rule a succeeds only when b succeeds and when
+  (validator b-product) is true. The new rule's product would be b-product. If b fails or
+  (validator b-product) is false, then nil is simply returned."
+  [subrule validator]
+  (fn [tokens]
+    (let [[product remainder :as result] (subrule tokens)]
+      (if (and (not (nil? result)) (validator product))
+          result))))
+
 (defn semantics
   "Creates a rule function from attaching a semantic hook function to the given subrule--that
   is, its products are from applying the semantic hook to the subrule's products. When the
@@ -146,25 +158,15 @@
 
 (defn factor
   "Creates a rule function that is the multiple of the given subrule by the given positive
-  integer factor--that is, the concatenation of the subrule factor-times in a row.
+  integer factor--that is, it accepts only a certain number of tokens that fulfill the
+  subrule, no more and no less.
   (def a (multiple n b)) would be equivalent to the EBNF
     a = n * b;
   The new rule's products would be b-product. If b fails below n times, then nil is simply
   returned."
   [factor subrule]
-  (apply conc (replicate factor subrule)))
-
-(defn validate
-  "Creates a rule function from attaching a validator function to the given subrule--that is,
-  any products of the subrule must fulfill the validator function.
-  (def a (validate b validator)) says that the rule a succeeds only when b succeeds and when
-  (validator b-product) is true. The new rule's product would be b-product. If b fails or
-  (validator b-product) is false, then nil is simply returned."
-  [subrule validator]
-  (fn [tokens]
-    (let [[product remainder :as result] (subrule tokens)]
-      (if (and (not (nil? result)) (validator product))
-          result))))
+  (validate (rep* subrule) #(= (count %) factor)))
+;  (apply conc (replicate factor subrule)))
 
 (defn lit-conc-seq
   "Creates a rule function that is the concatenation of the literals of the sequence of the
