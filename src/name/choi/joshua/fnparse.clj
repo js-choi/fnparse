@@ -156,14 +156,16 @@
       (if (and (not (nil? product)) (every? #(nil? (% tokens)) subtrahends))
           product))))
 
-(defn factor
+(defn factor=
   "Creates a rule function that is the syntactic factor of the given subrule by a given
   integer--that is, it is equivalent to the subrule replicated by 1, 2, etc. times and
   then concatenated.
   (def a (factor= n b)) would be equivalent to the EBNF
     a = n * b;
   The new rule's products would be b-product. If b fails below n times, then nil is simply
-  returned."
+  returned.
+  (factor= 3 \"A\") would accept [\"A\" \"A\" \"A\" \"A\" \"B\"] and return
+  [[\"A\" \"A\" \"A\"] (\"A\" \"B\")."
   [factor subrule]
   (apply conc (replicate factor subrule)))
 
@@ -197,6 +199,20 @@
   returned."
   [limit subrule]
   (validate (rep* subrule) #(<= (count %) limit)))
+
+(defn factor<
+  "Creates a rule function that is the syntactic factor of the given subrule by less than
+  a given integer--that is, it accepts a certain number of tokens that fulfill the subrule
+  that is less than a certain factor, and leaves the rest behind."
+  [factor subrule]
+  (alt (factor= (dec factor) subrule) (rep< factor subrule)))
+
+(defn factor<=
+  "Creates a rule function that is the syntactic factor of the given subrule by a given
+  integer or less--that is, it accepts a certain number of tokens that fulfill the subrule
+  that is a certain factor or less, and leaves the rest behind."
+  [factor subrule]
+  (alt (factor= factor subrule) (rep< factor subrule)))
 
 (defn lit-conc-seq
   "Creates a rule function that is the concatenation of the literals of the sequence of the
