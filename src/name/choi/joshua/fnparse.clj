@@ -1,6 +1,6 @@
 (ns name.choi.joshua.fnparse)
 
-; A rule is a function that:
+; A rule is a delay object that contains a function that:
 ; - Takes a collection of tokens.
 ; - If the token sequence is valid, it returns a vector containing the (0) consumed symbols'
 ;   products and (1) a sequence of the remaining symbols or nil. In all documentation here,
@@ -8,8 +8,8 @@
 ; - If the given token sequence is invalid and the rule fails, it simply returns nil.
 
 (defn term
-  "Creates a rule function that is a terminal rule of the given validator--that is, it accepts
-  only tokens for whom (validator token) is true.
+  "Creates a rule that is a terminal rule of the given validator--that is, it accepts only
+  tokens for whom (validator token) is true.
   (def a (term validator)) would be equivalent to the EBNF
     a = ? (validator %) evaluates to true ?;
   The new rule's product would be the first token, if it fulfills the validator.
@@ -21,9 +21,9 @@
           [first-token (rest tokens)]))))
 
 (defn semantics
-  "Creates a rule function from attaching a semantic hook function to the given subrule--that
-  is, its products are from applying the semantic hook to the subrule's products. When the
-  subrule fails and returns nil, the new rule will return nil."
+  "Creates a rule function from attaching a semantic hook function to the given subrule--
+  that is, its products are from applying the semantic hook to the subrule's products. When
+  the subrule fails and returns nil, the new rule will return nil."
   [subrule semantic-hook]
   (fn [tokens]
       (let [subrule-result (subrule tokens)]
