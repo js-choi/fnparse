@@ -34,6 +34,18 @@
         (if (and (not (nil? result)) (validator product))
             result)))))
 
+(defn validate
+  "Creates a rule function from attaching a validator function to the given subrule--that is,
+  any products of the subrule must fulfill the validator function.
+  (def a (validate b validator)) says that the rule a succeeds only when b succeeds and when
+  (validator b-product) is true. The new rule's product would be b-product. If b fails or
+  (validator b-product) is false, then nil is simply returned."
+  [subrule validator]
+  (fn [tokens]
+    (let [[product remainder :as result] (subrule tokens)]
+      (if (and (not (nil? result)) (validator product))
+          result))))
+
 (defn semantics
   "Creates a rule delay from attaching a semantic hook function to the given subrule--that
   is, its products are from applying the semantic hook to the subrule's products. When the
@@ -108,7 +120,7 @@
   the presence of the absence of the subrule.
   (def a (opt b)) would be equivalent to the EBNF
     a = [b];
-  The new rule's product would be either a-product, if a accepts it, or else nil. Note
+  The new rule's product would be either b-product, if b accepts it, or else nil. Note
   that the latter actually means that the new rule would then return the vector
   [nil tokens]. The new rule can never simply return nil."
   [subrule]
