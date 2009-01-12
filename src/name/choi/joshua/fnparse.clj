@@ -243,6 +243,15 @@
   [tokens]
   [nil tokens])
 
+(defn followed-by
+  "Creates a rule function that figures out if the first token fulfills the subrule without
+  consuming it."
+  [subrule]
+  (fn [tokens]
+    (let [[product _ :as result] (subrule tokens)]
+      (if (not (nil? result))
+          [product tokens]))))
+
 (defn flatten
   "Takes any nested combination of sequential things (lists, vectors,
   etc.) and returns their contents as a single, flat sequence."
