@@ -15,20 +15,22 @@
   The new rule's product would be the first token, if it fulfills the validator.
   If the token does not fulfill the validator, the new rule simply returns nil."
   [validator]
-  (fn [tokens]
-    (let [first-token (first tokens)]
-      (if (validator first-token),
-          [first-token (rest tokens)]))))
+  (delay
+    (fn [tokens]
+      (let [first-token (first tokens)]
+        (if (validator first-token),
+            [first-token (rest tokens)])))))
 
 (defn semantics
   "Creates a rule function from attaching a semantic hook function to the given subrule--
   that is, its products are from applying the semantic hook to the subrule's products. When
   the subrule fails and returns nil, the new rule will return nil."
   [subrule semantic-hook]
-  (fn [tokens]
-      (let [subrule-result (subrule tokens)]
+  (delay
+    (fn [tokens]
+      (let [subrule-result ((force subrule) tokens)]
         (if (not (nil? subrule-result))
-            [(semantic-hook (subrule-result 0)) (subrule-result 1)]))))
+            [(semantic-hook (subrule-result 0)) (subrule-result 1)])))))
 
 (defn constant-semantics
   "Creates a rule function from attaching a constant semantic hook function to the given

@@ -3,33 +3,33 @@
   (:require [name.choi.joshua.fnparse :as p]))
 
 (deftest test-term
-  (is (= ((p/term #(= % "true")) ["true" "THEN"])
+  (is (= ((force (p/term #(= % "true"))) ["true" "THEN"])
          ["true" (list "THEN")])
       "created terminal rule works when first token fulfills validator")
-  (is (nil? ((p/term #(= % "true")) ["false" "THEN"]))
+  (is (nil? ((force (p/term #(= % "true"))) ["false" "THEN"]))
       "created terminal rule fails when first token fails validator"))
 
-;(deftest test-lit
-;  (is (= ((p/lit "true") ["true" "THEN"])
-;         ["true" (list "THEN")])
-;      "created literal rule works when literal token present")
-;  (is (nil? ((p/lit "true") ["false" "THEN"]))
-;      "created literal rule fails when literal token not present"))
-;
-;(deftest test-re-term
-;  (is (= ((p/re-term #"\s*true\s*") ["  true" "THEN"])
-;         ["  true" (list "THEN")])
-;      "created re-term rule works when first token matches regex")
-;  (is (nil? ((p/re-term #"\s*true\s*") ["false" "THEN"]))
-;      "created re-term rule fails when first token does not match regex"))
-;
-;(deftest test-semantics
-;  (is (= ((p/semantics (p/lit "hi") #(str % \!)) ["hi" "THEN"])
-;         ["hi!" (list "THEN")])
-;      "created rule applies semantic hook to valid result of given rule")
-;  (is (nil? ((p/semantics (p/lit "hi") #(str % \!)) "RST"))
-;      "created rule fails when given subrule fails"))
-;
+(deftest test-lit
+  (is (= ((force (p/lit "true")) ["true" "THEN"])
+         ["true" (list "THEN")])
+      "created literal rule works when literal token present")
+  (is (nil? ((force (p/lit "true")) ["false" "THEN"]))
+      "created literal rule fails when literal token not present"))
+
+(deftest test-re-term
+  (is (= ((force (p/re-term #"\s*true\s*")) ["  true" "THEN"])
+         ["  true" (list "THEN")])
+      "created re-term rule works when first token matches regex")
+  (is (nil? ((force (p/re-term #"\s*true\s*")) ["false" "THEN"]))
+      "created re-term rule fails when first token does not match regex"))
+
+(deftest test-semantics
+  (is (= ((force (p/semantics (p/lit "hi") #(str % \!))) ["hi" "THEN"])
+         ["hi!" (list "THEN")])
+      "created rule applies semantic hook to valid result of given rule")
+  (is (nil? ((force (p/semantics (p/lit "hi") #(str % \!))) "RST"))
+      "created rule fails when given subrule fails"))
+
 ;(deftest test-constant-semantics
 ;  (is (= ((p/constant-semantics (p/lit "hi") (hash-map :a 1)) ["hi" "THEN"])
 ;         [{:a 1} (list "THEN")])
