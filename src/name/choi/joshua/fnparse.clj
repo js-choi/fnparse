@@ -245,7 +245,7 @@
 
 (defn followed-by
   "Creates a rule function that figures out if the first token fulfills the subrule without
-  consuming it."
+  consuming the token."
   [subrule]
   (fn [tokens]
     (let [[product _ :as result] (subrule tokens)]
