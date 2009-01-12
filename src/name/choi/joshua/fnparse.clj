@@ -170,47 +170,47 @@
   (apply conc (replicate factor subrule)))
 
 (defn rep-predicate
-  "Creates a rule function that is the repetition of the given subrule whose valid size is
-  determined by a predicate."
+  "Creates a rule function that is the greedy repetition of the given subrule whose valid
+  size is determined by a predicate."
   [factor-predicate subrule]
   (validate (rep* subrule) (comp factor-predicate count)))
 
 (defn rep=
-  "Creates a rule function that is the repetition of the given subrule by the given positive
-  integer factor--that is, it accepts only a certain number of tokens that fulfill the
-  subrule, no more and no less."
+  "Creates a rule function that is the greedy repetition of the given subrule by the given
+  positive integer factor--that is, it accepts only a certain number of tokens that fulfill
+  the subrule, no more and no less."
   [factor subrule]
   (validate (rep* subrule) #(= (count %) factor)))
 
 (defn rep<
-  "Creates a rule function that is the repetition of the given subrule by less than the
-  given positive integer factor--that is, it accepts a certain range number of tokens that
-  fulfill the subrule, less than but not equal to the limiting factor.
+  "Creates a rule function that is the greedy repetition of the given subrule by less than
+  the given positive integer factor--that is, it accepts a certain range number of tokens
+  that fulfill the subrule, less than but not equal to the limiting factor.
   The new rule's products would be b-product. If b fails below n times, then nil is simply
   returned."
   [limit subrule]
   (validate (rep* subrule) #(< (count %) limit)))
 
 (defn rep<=
-  "Creates a rule function that is the repetition of the given subrule by the given positive
-  integer factor or less--that is, it accepts a certain range number of tokens that fulfill
-  the subrule, less than but not equal to the limiting factor.
+  "Creates a rule function that is the greedy repetition of the given subrule by the given
+  positive integer factor or less--that is, it accepts a certain range number of tokens that
+  fulfill the subrule, less than but not equal to the limiting factor.
   The new rule's products would be b-product. If b fails below n times, then nil is simply
   returned."
   [limit subrule]
   (validate (rep* subrule) #(<= (count %) limit)))
 
 (defn factor<
-  "Creates a rule function that is the syntactic factor of the given subrule by less than
-  a given integer--that is, it accepts a certain number of tokens that fulfill the subrule
-  that is less than a certain factor, and leaves the rest behind."
+  "Creates a rule function that is the syntactic factor (a nongreedy repetition) of the
+  given subrule by less than a given integer--that is, it accepts a certain number of tokens
+  that fulfill the subrule that is less than a certain factor, and leaves the rest behind."
   [factor subrule]
   (alt (factor= (dec factor) subrule) (rep< factor subrule)))
 
 (defn factor<=
-  "Creates a rule function that is the syntactic factor of the given subrule by a given
-  integer or less--that is, it accepts a certain number of tokens that fulfill the subrule
-  that is a certain factor or less, and leaves the rest behind."
+  "Creates a rule function that is the syntactic factor (a nongreedy repetition) of the
+  given subrule by a given integer or less--that is, it accepts a certain number of tokens
+  that fulfill the subrule that is a certain factor or less, and leaves the rest behind."
   [factor subrule]
   (alt (factor= factor subrule) (rep< factor subrule)))
 
