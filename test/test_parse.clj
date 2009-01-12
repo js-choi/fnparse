@@ -228,6 +228,4 @@
   (is (= ((p/followed-by (p/lit "A")) (list "B" "B")) nil)
       "created followed-by rule fails when subrule fails with first symbol"))
 
-(deftest test-recurring
-
 (run-tests)
