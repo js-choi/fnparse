@@ -42,7 +42,7 @@
   (validator b-product) is false, then nil is simply returned."
   [subrule validator]
   (fn [tokens]
-    (let [[product remainder :as result] (subrule tokens)]
+    (let [[product remainder :as result] ((force subrule) tokens)]
       (if (and (not (nil? result)) (validator product))
           result))))
 
