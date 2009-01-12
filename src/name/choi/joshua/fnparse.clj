@@ -169,7 +169,7 @@
   [factor subrule]
   (apply conc (replicate factor subrule)))
 
-(defn rep-rule
+(defn rep-predicate
   "Creates a rule function that is the repetition of the given subrule whose valid size is
   determined by a predicate."
   [factor-predicate subrule]

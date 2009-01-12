@@ -149,8 +149,8 @@
     (is (= (tested-rule (list "D" "A" "B")) [[] (list "D" "A" "B")])
         "created factor<= rule works when symbol does not fulfill subrule at all")))
 
-(deftest test-rep-rule
-  (let [tested-rule (p/rep-rule (partial > 3) (p/lit "A"))]
+(deftest test-rep-predicate
+  (let [tested-rule (p/rep-predicate (partial > 3) (p/lit "A"))]
     (is (= (tested-rule (list "A" "A" "C")) [["A" "A"] (list "C")])
         "created rep rule works when predicate returns true")
     (is (= (tested-rule (list "A" "A" "A")) nil)
@@ -227,5 +227,7 @@
       "created followed-by rule works when first symbol fulfills subrule without consuming any symbols")
   (is (= ((p/followed-by (p/lit "A")) (list "B" "B")) nil)
       "created followed-by rule fails when subrule fails with first symbol"))
+
+(deftest test-recurring
 
 (run-tests)
