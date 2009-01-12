@@ -8,8 +8,8 @@
 ; - If the given token sequence is invalid and the rule fails, it simply returns nil.
 
 (defn term
-  "Creates a rule that is a terminal rule of the given validator--that is, it accepts only
-  tokens for whom (validator token) is true.
+  "Creates a rule delay that is a terminal rule of the given validator--that is, it accepts
+  only tokens for whom (validator token) is true.
   (def a (term validator)) would be equivalent to the EBNF
     a = ? (validator %) evaluates to true ?;
   The new rule's product would be the first token, if it fulfills the validator.
@@ -21,10 +21,23 @@
         (if (validator first-token),
             [first-token (rest tokens)])))))
 
+(defn validate
+  "Creates a rule delay from attaching a validator function to the given subrule--that is,
+  any products of the subrule must fulfill the validator function.
+  (def a (validate b validator)) says that the rule a succeeds only when b succeeds and when
+  (validator b-product) is true. The new rule's product would be b-product. If b fails or
+  (validator b-product) is false, then nil is simply returned."
+  [subrule validator]
+  (delay
+    (fn [tokens]
+      (let [[product remainder :as result] ((force subrule) tokens)]
+        (if (and (not (nil? result)) (validator product))
+            result)))))
+
 (defn semantics
-  "Creates a rule function from attaching a semantic hook function to the given subrule--
-  that is, its products are from applying the semantic hook to the subrule's products. When
-  the subrule fails and returns nil, the new rule will return nil."
+  "Creates a rule delay from attaching a semantic hook function to the given subrule--that
+  is, its products are from applying the semantic hook to the subrule's products. When the
+  subrule fails and returns nil, the new rule will return nil."
   [subrule semantic-hook]
   (delay
     (fn [tokens]
@@ -33,14 +46,14 @@
             [(semantic-hook (subrule-result 0)) (subrule-result 1)])))))
 
 (defn constant-semantics
-  "Creates a rule function from attaching a constant semantic hook function to the given
+  "Creates a rule delay from attaching a constant semantic hook function to the given
   subrule--that is, its product is a constant value. When the subrule fails and returns nil,
   the new rule will return nil."
   [subrule semantic-value]
   (semantics subrule (fn [_] semantic-value)))
 
 (defn lit
-  "Creates a rule function that is the terminal rule of the given literal token--that is, it
+  "Creates a rule delay that is the terminal rule of the given literal token--that is, it
   accepts only tokens that are equal to the given literal token.
   (def a (lit \"...\")) would be equivalent to the EBNF
     a = \"...\";
@@ -50,7 +63,7 @@
   (term #(= % literal-token)))
 
 (defn re-term
-  "Creates a rule function that is the terminal rule of the given regex--that is, it accepts
+  "Creates a rule delay that is the terminal rule of the given regex--that is, it accepts
   only tokens that match the given regex.
   (def a (re-term #\"...\")) would be equivalent to the EBNF
     a = ? (re-matches #\"...\" %) evaluates to true ?;
@@ -60,7 +73,7 @@
   (term #(re-matches token-regex %)))
 
 (defn conc
-  "Creates a rule function that is the concatenation of the given subrules--that is, each
+  "Creates a rule delay that is the concatenation of the given subrules--that is, each
   subrule followed by the next.
   (def a (conc b c d)) would be equivalent to the EBNF
     a = b, c, d;
@@ -71,14 +84,14 @@
     (loop [products [], token-queue tokens, rule-queue subrules]
       (if (nil? rule-queue),
           [products token-queue],
-          (let [curr-result ((first rule-queue) token-queue)]
+          (let [curr-result ((force (first rule-queue)) token-queue)]
             (if (not (nil? curr-result))
                 (recur (conj products (curr-result 0))
                        (curr-result 1)
                        (rest rule-queue))))))))
 
 (defn alt
-  "Creates a rule function that is the alternative of the given subrules--that is, any one
+  "Creates a rule delay that is the alternative of the given subrules--that is, any one
   of the given subrules. Note that the subrules' order matters: the very first rule that
   accepts the given tokens will be selected.
   (def a (alt b c d)) would be equivalent to the EBNF
@@ -88,10 +101,10 @@
   simply returns nil."
   [& subrules]
   (fn [tokens]
-    (some #(% tokens) subrules)))
+    (some #((force %) tokens) subrules)))
 
 (defn opt
-  "Creates a rule function that is the optional form of the given subrule--that is, either
+  "Creates a rule delay that is the optional form of the given subrule--that is, either
   the presence of the absence of the subrule.
   (def a (opt b)) would be equivalent to the EBNF
     a = [b];
@@ -99,11 +112,12 @@
   that the latter actually means that the new rule would then return the vector
   [nil tokens]. The new rule can never simply return nil."
   [subrule]
-  (fn [tokens]
-    (or (subrule tokens) [nil tokens])))
+  (delay
+    (fn [tokens]
+      (or ((force subrule) tokens) [nil tokens]))))
 
 (defn rep*
-  "Creates a rule function that is the zero-or-more repetition of the given subrule--that
+  "Creates a rule delay that is the zero-or-more repetition of the given subrule--that
   is, either zero or more of the subrule.
   (def a (rep* b)) would be equivalent to the EBNF
     a = {b};
@@ -112,42 +126,140 @@
   actually means that the new rule would then return the vector [[] tokens]. The new rule
   can never simply return nil."
   [subrule]
-  (fn [tokens]
-    (loop [products [], token-queue tokens]
-      (let [cur-result (subrule token-queue)]
-        (if (or (nil? cur-result) (= cur-result [nil nil])),
-            [products token-queue],
-            (recur (conj products (cur-result 0))
-                   (cur-result 1)))))))
+  (delay
+    (fn [tokens]
+      (loop [products [], token-queue tokens]
+        (let [cur-result ((force subrule) token-queue)]
+          (if (or (nil? cur-result) (= cur-result [nil nil])),
+              [products token-queue],
+              (recur (conj products (cur-result 0))
+                     (cur-result 1))))))))
 
 (defn rep+
-  "Creates a rule function that is the one-or-more repetition of the given rule--that
+  "Creates a rule delay that is the one-or-more repetition of the given rule--that
   is, either one or more of the rule.
   (def a (rep+ b)) would be equivalent to the EBNF
     a = {b}-;
   The new rule's products would be the vector [b-product ...] for how many matches of b
   were found. If there were zero matches, then nil is simply returned."
   [subrule]
-  (fn [tokens]
-    (let [product ((rep* subrule) tokens)]
-       (if (not (empty? (product 0))), product))))
+  (delay
+    (fn [tokens]
+      (let [product ((force (rep* subrule)) tokens)]
+         (if (not (empty? (product 0))), product)))))
 
-(defn lit-seq
-  "Creates a rule function that is the concatenation of the literals of the sequence of the
+(defn except
+  "Creates a rule delay that is the exception from the first given subrules with the
+  rest of the given subrules--that is, it accepts only tokens that fulfill the first
+  subrule but fail the second subrule.
+  (def a (except b c d)) would be equivalent to the EBNF
+    a = b - c - d;
+  The new rule's products would be b-product. If b fails or either c or d succeeds, then
+  nil is simply returned."
+  [minuend & subtrahends]
+  (delay
+    (fn [tokens]
+      (let [product ((force minuend) tokens)]
+        (if (and (not (nil? product)) (every? #(nil? ((force %) tokens)) subtrahends))
+            product)))))
+
+(defn factor=
+  "Creates a rule delay that is the syntactic factor of the given subrule by a given
+  integer--that is, it is equivalent to the subrule replicated by 1, 2, etc. times and
+  then concatenated.
+  (def a (factor= n b)) would be equivalent to the EBNF
+    a = n * b;
+  The new rule's products would be b-product. If b fails below n times, then nil is simply
+  returned.
+  (factor= 3 \"A\") would accept [\"A\" \"A\" \"A\" \"A\" \"B\"] and return
+  [[\"A\" \"A\" \"A\"] (\"A\" \"B\")."
+  [factor subrule]
+  (apply conc (replicate factor subrule)))
+ 
+(defn rep-predicate
+  "Creates a rule delay that is the greedy repetition of the given subrule whose valid
+  size is determined by a predicate."
+  [factor-predicate subrule]
+  (validate (rep* subrule) (comp factor-predicate count)))
+ 
+(defn rep=
+  "Creates a rule delay that is the greedy repetition of the given subrule by the given
+  positive integer factor--that is, it accepts only a certain number of tokens that fulfill
+  the subrule, no more and no less."
+  [factor subrule]
+  (validate (rep* subrule) #(= (count %) factor)))
+ 
+(defn rep<
+  "Creates a rule delay that is the greedy repetition of the given subrule by less than
+  the given positive integer factor--that is, it accepts a certain range number of tokens
+  that fulfill the subrule, less than but not equal to the limiting factor.
+  The new rule's products would be b-product. If b fails below n times, then nil is simply
+  returned."
+  [limit subrule]
+  (validate (rep* subrule) #(< (count %) limit)))
+ 
+(defn rep<=
+  "Creates a rule delay that is the greedy repetition of the given subrule by the given
+  positive integer factor or less--that is, it accepts a certain range number of tokens that
+  fulfill the subrule, less than but not equal to the limiting factor.
+  The new rule's products would be b-product. If b fails below n times, then nil is simply
+  returned."
+  [limit subrule]
+  (validate (rep* subrule) #(<= (count %) limit)))
+ 
+(defn factor<
+  "Creates a rule delay that is the syntactic factor (a nongreedy repetition) of the
+  given subrule by less than a given integer--that is, it accepts a certain number of tokens
+  that fulfill the subrule that is less than a certain factor, and leaves the rest behind."
+  [factor subrule]
+  (alt (factor= (dec factor) subrule) (rep< factor subrule)))
+ 
+(defn factor<=
+  "Creates a rule delay that is the syntactic factor (a nongreedy repetition) of the
+  given subrule by a given integer or less--that is, it accepts a certain number of tokens
+  that fulfill the subrule that is a certain factor or less, and leaves the rest behind."
+  [factor subrule]
+  (alt (factor= factor subrule) (rep< factor subrule)))
+ 
+(defn lit-conc-seq
+  "Creates a rule delay that is the concatenation of the literals of the sequence of the
   given sequenceable object--that is, it accepts only a series of tokens that matches the
   sequence of the token sequence.
   (def a (lit-seq \"ABCD\")) would be equivalent to the EBNF
     a = \"A\", \"B\", \"C\", \"D\";
   The new rule's products would be the result of the concatenation rule."
   [token-seq]
-  (semantics (apply conc (map lit token-seq)) seq))
-
+  (apply conc (map lit token-seq)))
+ 
+(defn lit-alt-seq
+  "Creates a rule delay that is the alternative of the literals of the sequence of the
+  given sequenceable object--that is, it accepts only a series of tokens that matches any
+  of the token sequence.
+  (def a (lit-seq \"ABCD\")) would be equivalent to the EBNF
+    a = \"A\" | \"B\" | \"C\" | \"D\";
+  The new rule's products would be the result of the concatenation rule."
+  [token-seq]
+  (apply alt (map lit token-seq)))
+ 
 (defn emptiness
-  "A rule function that matches emptiness--that is, it always matches with every given token
-  sequence, and it always returns [nil tokens]."
+  "A rule delay that matches emptiness--that is, it always matches with every given token
+  sequence, and it always returns [nil tokens].
+  (def a emptiness) would be equivalent to the EBNF
+    a = ;
+  This rule's product is always nil, and it therefore always returns [nil tokens]."
   [tokens]
   [nil tokens])
-
+ 
+(defn followed-by
+  "Creates a rule delay that figures out if the first token fulfills the subrule without
+  consuming the token."
+  [subrule]
+  (delay
+    (fn [tokens]
+      (let [[product _ :as result] ((force subrule) tokens)]
+        (if (not (nil? result))
+            [product tokens])))))
+ 
 (defn flatten
   "Takes any nested combination of sequential things (lists, vectors,
   etc.) and returns their contents as a single, flat sequence."

@@ -1,14 +1,14 @@
 (ns name.choi.joshua.fnparse.json
   (:refer-clojure)
-  (:use clojure.parse))
+  (:use name.choi.joshua.fnparse))
 
 (defstruct node :kind :content)
 
 (def string-delimiter (lit \"))
 (def escape-indicator (lit \\))
-(def false-lit (constant-semantics (lit-seq "false") (struct node :scalar false)))
-(def true-lit (constant-semantics (lit-seq "true") (struct node :scalar true)))
-(def null-lit (constant-semantics (lit-seq "null") (struct node :scalar nil)))
+(def false-lit (constant-semantics (lit-conc-seq "false") (struct node :scalar false)))
+(def true-lit (constant-semantics (lit-conc-seq "true") (struct node :scalar true)))
+(def null-lit (constant-semantics (lit-conc-seq "null") (struct node :scalar nil)))
 (def keyword-lit (alt false-lit true-lit null-lit))
 
 (def ws (rep* (apply alt (map lit [\space \tab \newline \return]))))
@@ -90,7 +90,7 @@
 (declare object)
 
 (defn value [tokens]
-  (some #(% tokens) [string-lit number-lit keyword-lit array object]))
+  (some #((force %) tokens) [string-lit number-lit keyword-lit array object]))
 
 (def additional-value
   (semantics (conc value-separator value) #(% 1)))
@@ -123,7 +123,7 @@
 (def lex seq)
 
 (defn parse [tokens]
-  (let [[product remainder] (text tokens)]
+  (let [[product remainder] (force (text tokens))]
     product))
 
 (defmulti represent :kind)
