@@ -96,16 +96,16 @@
       "parsing a padded begin-array) token"))
 
 (deftest test-value
-  (is (= ((j/value) (seq "true, 5"))
+  (is (= (((j/value)) (seq "true, 5"))
          [{:kind :scalar, :content true} (seq ", 5")])
       "parsing a true literal as a value")
-  (is (= ((j/value) (seq "  [ 1, 2, 3], 5 "))
+  (is (= (((j/value)) (seq "  [ 1, 2, 3], 5 "))
          [{:kind :array, :content [{:kind :scalar, :content 1}
                                    {:kind :scalar, :content 2}
                                    {:kind :scalar, :content 3}]}
           (seq ", 5 ")])
       "parsing a flat array as a value")
-  (is (= ((j/value) (seq "  [ 1, 2, 3, [1, 2, 3]], 5 "))
+  (is (= (((j/value)) (seq "  [ 1, 2, 3, [1, 2, 3]], 5 "))
          [{:kind :array, :content [{:kind :scalar, :content 1}
                                    {:kind :scalar, :content 2}
                                    {:kind :scalar, :content 3}
@@ -114,12 +114,12 @@
                                                             {:kind :scalar, :content 3}]}]}
           (seq ", 5 ")])
       "parsing a nested array as a value")
-  (is (= ((j/value) (seq "  {\"a\": 1}, 5 "))
+  (is (= (((j/value)) (seq "  {\"a\": 1}, 5 "))
          [{:kind :object, :content {{:kind :scalar, :content "a"}
                                    {:kind :scalar, :content 1}}}
           (seq ", 5 ")])
       "parsing a flat object as a value")
-  (is (= ((j/value) (seq "  {\"a\": 1, \"b\": {\"x\": 0}}, 5 "))
+  (is (= (((j/value)) (seq "  {\"a\": 1, \"b\": {\"x\": 0}}, 5 "))
          [{:kind :object, :content {{:kind :scalar, :content "a"}
                                     {:kind :scalar, :content 1},
                                     {:kind :scalar, :content "b"}
@@ -209,4 +209,4 @@
          {"a" 1, "b\n" 2, "\u1234" 3})
       "loading a flat object containing strings and integers"))
 
-(run-tests)
+(time (run-tests))

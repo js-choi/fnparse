@@ -90,8 +90,9 @@
 (declare object)
 
 (defn value []
-  (fn [tokens]
-    (some #((force %) tokens) [string-lit number-lit keyword-lit array object])))
+  (fn []
+    (fn [tokens]
+      (some #((%) tokens) [string-lit number-lit keyword-lit array object]))))
 
 (def additional-value
   (semantics (conc value-separator (value)) #(% 1)))
@@ -124,7 +125,7 @@
 (def lex seq)
 
 (defn parse [tokens]
-  (let [[product remainder] ((text tokens))]
+  (let [[product remainder] ((text) tokens)]
     product))
 
 (defmulti represent :kind)
