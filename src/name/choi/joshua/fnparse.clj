@@ -249,8 +249,8 @@
   (def a emptiness) would be equivalent to the EBNF
     a = ;
   This rule's product is always nil, and it therefore always returns [nil tokens]."
-  [tokens]
-  (fn [] (fn [] [nil tokens])))
+  []
+  (fn [tokens] [nil tokens]))
  
 (defn followed-by
   "Creates a rule metafunction that figures out if the first token fulfills the subrule without

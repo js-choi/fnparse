@@ -217,7 +217,7 @@
  
 (deftest test-emptiness
   ; Parse the emptiness before the first symbol
-  (is (= (((p/emptiness) (list "A" "B" "C")))
+  (is (= ((p/emptiness) (list "A" "B" "C"))
          [nil (list "A" "B" "C")])
       "emptyiness rule matches emptiness"))
  
