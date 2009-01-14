@@ -89,14 +89,15 @@
 (declare array)
 (declare object)
 
-(defn value [tokens]
-  (some #((force %) tokens) [string-lit number-lit keyword-lit array object]))
+(defn value []
+  (fn [tokens]
+    (some #((force %) tokens) [string-lit number-lit keyword-lit array object])))
 
 (def additional-value
-  (semantics (conc value-separator value) #(% 1)))
+  (semantics (conc value-separator (value)) #(% 1)))
 
 (def array-contents
-  (semantics (conc value (rep* additional-value))
+  (semantics (conc (value) (rep* additional-value))
              #(into [(% 0)] (% 1))))
 
 (def array
@@ -104,7 +105,7 @@
              #(hash-map :kind :array, :content (vec (% 1)))))
 
 (def entry
-  (semantics (conc string-lit name-separator value)
+  (semantics (conc string-lit name-separator (value))
              #(vector (% 0) (% 2))))
 
 (def additional-entry
@@ -123,7 +124,7 @@
 (def lex seq)
 
 (defn parse [tokens]
-  (let [[product remainder] (force (text tokens))]
+  (let [[product remainder] ((text tokens))]
     product))
 
 (defmulti represent :kind)
