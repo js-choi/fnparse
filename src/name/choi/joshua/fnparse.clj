@@ -22,8 +22,8 @@
             [first-token (rest tokens)])))))
 
 (defn validate
-  "Creates a rule metafunction from attaching a validator function to the given subrule--that
-  is, any products of the subrule must fulfill the validator function.
+  "Creates a rule metafunction from attaching a product validator function to the given
+  subrule--that is, any products of the subrule must fulfill the validator function.
   (def a (validate b validator)) says that the rule a succeeds only when b succeeds and when
   (validator b-product) is true. The new rule's product would be b-product. If b fails or
   (validator b-product) is false, then nil is simply returned."
@@ -32,6 +32,20 @@
     (fn [tokens]
       (let [[product remainder :as result] ((subrule) tokens)]
         (if (and (not (nil? result)) (validator product))
+            result)))))
+
+(defn validate-remainder
+  "Creates a rule metafunction from attaching a remainder validator function to the given
+  subrule--that is, any tokens in the remainder of the subrule must fulfill the validator
+  function.
+  (def a (validate-product b validator)) says that the rule a succeeds only when b succeeds
+  and when (validator b-remainder) is true. The new rule's product would be b-product. If b
+  fails or (validator b-remainder) is false, then nil is simply returned."
+  [subrule validator]
+  (fn []
+    (fn [tokens]
+      (let [[product remainder :as result] ((subrule) tokens)]
+        (if (and (not (nil? result)) (validator remainder))
             result)))))
 
 (defn semantics
@@ -253,14 +267,11 @@
   (fn [tokens] [nil tokens]))
  
 (defn followed-by
-  "Creates a rule metafunction that figures out if the first token fulfills the subrule without
-  consuming the token."
-  [subrule]
-  (fn []
-    (fn [tokens]
-      (let [[product _ :as result] ((subrule) tokens)]
-        (if (not (nil? result))
-            [product tokens])))))
+  "Creates a rule metafunction that figures out if the following tokens after the base
+  subrule match the given following subrule, without consuming any of those following
+  tokens."
+  [base-subrule following-subrule]
+  (validate-remainder base-subrule (following-subrule)))
  
 (defn flatten
   "Takes any nested combination of sequential things (lists, vectors,
