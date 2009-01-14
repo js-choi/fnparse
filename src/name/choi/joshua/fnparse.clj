@@ -244,8 +244,8 @@
   (apply alt (map lit token-seq)))
  
 (defn emptiness
-  "A rule metafunction that matches emptiness--that is, it always matches with every given token
-  sequence, and it always returns [nil tokens].
+  "A rule metafunction that matches emptiness--that is, it always matches with every given
+  token sequence, and it always returns [nil tokens].
   (def a emptiness) would be equivalent to the EBNF
     a = ;
   This rule's product is always nil, and it therefore always returns [nil tokens]."
