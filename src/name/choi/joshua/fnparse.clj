@@ -7,6 +7,11 @@
 ;   "a rule's products" is the first element of a valid result from the rule.
 ; - If the given token sequence is invalid and the rule fails, it simply returns nil.
 
+(defn- identity-of-first
+  "Returns its first argument."
+  [first-arg & rest-args]
+  first-arg)
+
 (defn term
   "Creates a rule metafunction that is a terminal rule of the given validator--that is, it
   accepts only tokens for whom (validator token) is true.
@@ -14,12 +19,14 @@
     a = ? (validator %) evaluates to true ?;
   The new rule's product would be the first token, if it fulfills the validator.
   If the token does not fulfill the validator, the new rule simply returns nil."
-  [validator]
-  (fn []
-    (fn [tokens]
-      (let [first-token (first tokens)]
-        (if (validator first-token),
-            [first-token (rest tokens)])))))
+  ([validator]
+   (term validator identity-of-first))
+  ([validator process-meta]
+   (fn []
+     (fn [tokens]
+       (let [first-token (first tokens)]
+         (if (validator first-token)
+             [first-token (with-meta (rest tokens) (process-meta ^tokens first-token))]))))))
 
 (defn validate
   "Creates a rule metafunction from attaching a product validator function to the given
@@ -73,8 +80,10 @@
     a = \"...\";
   The new rule's product would be the first token, if it equals the given literal token.
   If the token does not equal the given literal token, the new rule simply returns nil."
-  [literal-token]
-  (term #(= % literal-token)))
+  ([literal-token]
+   (term #(= % literal-token)))
+  ([literal-token process-meta]
+   (term #(= % literal-token) process-meta)))
 
 (defn re-term
   "Creates a rule metafunction that is the terminal rule of the given regex--that is, it
