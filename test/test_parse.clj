@@ -6,6 +6,12 @@
   (is (= (((p/term #(= % "true"))) ["true" "THEN"])
          ["true" (list "THEN")])
       "created terminal rule works when first token fulfills validator")
+  (is (= ^(((p/term #(= % "true")
+                    (fn [metadata product]
+                      (assoc metadata :column (inc (:column metadata))))))
+                    #^{:column 13, :line 2} ["true" "THEN"])
+         {:column 14, :line 2})
+      "created terminal rule creates new metadata when valid")
   (is (nil? (((p/term #(= % "true"))) ["false" "THEN"]))
       "created terminal rule fails when first token fails validator"))
 
