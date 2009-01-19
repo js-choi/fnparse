@@ -222,11 +222,10 @@
       "emptyiness rule matches emptiness"))
  
 (deftest test-followed-by
-  ; Parse that the next symbol is "A" without consuming it
-  (is (= (((p/followed-by (p/lit "A"))) (list "A" "B" "C"))
-         ["A" (list "A" "B" "C")])
-      "created followed-by rule works when first symbol fulfills subrule without consuming any symbols")
-  (is (= (((p/followed-by (p/lit "A"))) (list "B" "B")) nil)
-      "created followed-by rule fails when subrule fails with first symbol"))
+  (is (= (((p/followed-by (p/lit "0") (p/lit "A"))) (list "0" "A" "B" "C"))
+         ["0" (list "A" "B" "C")])
+      "created followed-by rule works when base and followed-by subrules fulfilled")
+  (is (= (((p/followed-by (p/lit "0") (p/lit "A"))) (list "0" "B" "B")) nil)
+      "created followed-by rule fails when followed-by subrule fails"))
 
 (time (run-tests))
