@@ -8,13 +8,6 @@
       "created terminal rule works when first token fulfills validator")
   (is (nil? (((p/term #(= % "true"))) ["false" "THEN"]))
       "created terminal rule fails when first token fails validator")
-  (is (= ^(get (((p/term #(= % "true")
-                         (fn [metadata product]
-                           (assoc metadata :column (inc (:column metadata))))))
-                         #^{:column 13, :line 2} ["true" "THEN"])
-               1)
-         {:column 14, :line 2})
-      "created terminal rule creates new metadata on remainder when valid")
   (is (= (((p/term #(= % "true"))) ["true"])
          ["true" nil])
       "created terminal rule works when no remainder"))
@@ -23,13 +16,6 @@
   (is (= (((p/lit "true")) ["true" "THEN"])
          ["true" (list "THEN")])
       "created literal rule works when literal token present")
-  (is (= ^(get (((p/lit "true"
-                        (fn [metadata product]
-                          (assoc metadata :column (inc (:column metadata))))))
-                        #^{:column 13, :line 2} ["true" "THEN"])
-               1)
-         {:column 14, :line 2})
-      "created literal rule creates new metadata when valid")
   (is (nil? (((p/lit "true")) ["false" "THEN"]))
       "created literal rule fails when literal token not present"))
 
@@ -37,13 +23,6 @@
   (is (= (((p/re-term #"\s*true\s*")) ["  true" "THEN"])
          ["  true" (list "THEN")])
       "created re-term rule works when first token matches regex")
-  (is (= ^(get (((p/term #(= % "true")
-                         (fn [metadata product]
-                           (assoc metadata :column (+ (:column metadata) (count product))))))
-                         #^{:column 13, :line 2} ["true" "THEN"])
-               1)
-         {:column 17, :line 2})
-      "created terminal rule creates new metadata when valid")
   (is (nil? (((p/re-term #"\s*true\s*")) ["false" "THEN"]))
       "created re-term rule fails when first token does not match regex"))
 
@@ -58,6 +37,16 @@
   (is (= (((p/constant-semantics (p/lit "hi") (hash-map :a 1))) ["hi" "THEN"])
          [{:a 1} (list "THEN")])
       "created rule returns constant value when given subrule does not fail"))
+
+(deftest test-metadata
+  (is (= ^(((p/metadata (p/lit "true")
+                               (fn [metadata product]
+                                 (assoc metadata :column (inc (:column metadata))))))
+                  #^{:column 13, :line 2} ["true" "THEN"])
+         {:column 14, :line 2})
+      "created rule applies new metadata on remainder when valid")
+  (is (= (((p/metadata (p/lit "true"))) ["false"]) nil)
+      "created rule fails when subrule fails"))
 
 (deftest test-conc
   (let [identifier (p/semantics (p/term string?) symbol),
@@ -229,14 +218,7 @@
   ; Parse the first four symbols in the program "THEN"
   (is (= (((p/lit-conc-seq "THEN")) (seq "THEN print 42;"))
          [(vec "THEN") (seq " print 42;")])
-      "created literal-sequence rule is based on sequence of given token sequencible")
-  (is (= ^(get (((p/lit-conc-seq "THEN"
-                                 (fn [metadata product]
-                                   (assoc metadata :column (+ 4 (:column metadata))))))
-                                 #^{:column 13, :line 2} [(seq "THEN print 42;")])
-               1)
-        {:column 17, :line 2})
-     "created terminal rule creates new metadata when valid"))
+      "created literal-sequence rule is based on sequence of given token sequencible"))
 
 (deftest test-lit-alt-seq
   ; Parse the first four symbols in the program "B 2"
