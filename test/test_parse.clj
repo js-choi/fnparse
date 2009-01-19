@@ -30,25 +30,32 @@
   (is (nil? (((p/lit "true")) ["false" "THEN"]))
       "created literal rule fails when literal token not present"))
 
-;(deftest test-re-term
-;  (is (= (((p/re-term #"\s*true\s*")) ["  true" "THEN"])
-;         ["  true" (list "THEN")])
-;      "created re-term rule works when first token matches regex")
-;  (is (nil? (((p/re-term #"\s*true\s*")) ["false" "THEN"]))
-;      "created re-term rule fails when first token does not match regex"))
-;
-;(deftest test-semantics
-;  (is (= (((p/semantics (p/lit "hi") #(str % \!))) ["hi" "THEN"])
-;         ["hi!" (list "THEN")])
-;      "created rule applies semantic hook to valid result of given rule")
-;  (is (nil? (((p/semantics (p/lit "hi") #(str % \!))) "RST"))
-;      "created rule fails when given subrule fails"))
-;
-;(deftest test-constant-semantics
-;  (is (= (((p/constant-semantics (p/lit "hi") (hash-map :a 1))) ["hi" "THEN"])
-;         [{:a 1} (list "THEN")])
-;      "created rule returns constant value when given subrule does not fail"))
-;
+(deftest test-re-term
+  (is (= (((p/re-term #"\s*true\s*")) ["  true" "THEN"])
+         ["  true" (list "THEN")])
+      "created re-term rule works when first token matches regex")
+  (is (= ^(get (((p/term #(= % "true")
+                         (fn [metadata product]
+                           (assoc metadata :column (+ (:column metadata) (count product))))))
+                         #^{:column 13, :line 2} ["true" "THEN"])
+               1)
+         {:column 17, :line 2})
+      "created terminal rule creates new metadata when valid")
+  (is (nil? (((p/re-term #"\s*true\s*")) ["false" "THEN"]))
+      "created re-term rule fails when first token does not match regex"))
+
+(deftest test-semantics
+  (is (= (((p/semantics (p/lit "hi") #(str % \!))) ["hi" "THEN"])
+         ["hi!" (list "THEN")])
+      "created rule applies semantic hook to valid result of given rule")
+  (is (nil? (((p/semantics (p/lit "hi") #(str % \!))) "RST"))
+      "created rule fails when given subrule fails"))
+
+(deftest test-constant-semantics
+  (is (= (((p/constant-semantics (p/lit "hi") (hash-map :a 1))) ["hi" "THEN"])
+         [{:a 1} (list "THEN")])
+      "created rule returns constant value when given subrule does not fail"))
+
 ;(deftest test-conc
 ;  (let [identifier (p/semantics (p/term string?) symbol),
 ;        equals-operator (p/semantics (p/lit "=") keyword),

@@ -92,8 +92,10 @@
     a = ? (re-matches #\"...\" %) evaluates to true ?;
   The new rule's product would be the first token, if it matches the given regex.
   If the token does not match the given regex, the new rule simply returns nil."
-  [token-regex]
-  (term #(re-matches token-regex %)))
+  ([token-regex]
+   (term #(re-matches token-regex %)))
+  ([token-regex process-meta]
+   (term #(re-matches token-regex %) process-meta)))
 
 (defn conc
   "Creates a rule metafunction that is the concatenation of the given subrules--that is, each
