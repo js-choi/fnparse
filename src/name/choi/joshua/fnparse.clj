@@ -1,4 +1,5 @@
-(ns name.choi.joshua.fnparse)
+(ns name.choi.joshua.fnparse
+  (:use [clojure.contrib.except]))
 
 ; A rule is a delay object that contains a function that:
 ; - Takes a collection of tokens.
@@ -290,6 +291,20 @@
   [base-subrule following-subrule]
   (validate-remainder base-subrule (following-subrule)))
  
+(defn metadata
+  "Creates a rule metafunction that applies a processing function to a subrule's results'
+  metadata. The processing function should accept two arguments: the metadata map of the
+  subrule's results and the product of the subrule's results."
+  [subrule process-meta]
+  (fn []
+    (fn [tokens]
+      (let [subrule-result ((subrule) tokens)]
+        (if (not (nil? subrule-result))
+            (with-meta subrule-result
+                       (try (process-meta ^tokens (subrule-result 0))
+                            (catch Exception e
+                              (throw-arg "metadata process raised error: %s" e)))))))))
+
 (defn flatten
   "Takes any nested combination of sequential things (lists, vectors,
   etc.) and returns their contents as a single, flat sequence."

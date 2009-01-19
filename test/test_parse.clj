@@ -38,16 +38,6 @@
          [{:a 1} (list "THEN")])
       "created rule returns constant value when given subrule does not fail"))
 
-(deftest test-metadata
-  (is (= ^(((p/metadata (p/lit "true")
-                               (fn [metadata product]
-                                 (assoc metadata :column (inc (:column metadata))))))
-                  #^{:column 13, :line 2} ["true" "THEN"])
-         {:column 14, :line 2})
-      "created rule applies new metadata on remainder when valid")
-  (is (= (((p/metadata (p/lit "true"))) ["false"]) nil)
-      "created rule fails when subrule fails"))
-
 (deftest test-conc
   (let [identifier (p/semantics (p/term string?) symbol),
         equals-operator (p/semantics (p/lit "=") keyword),
@@ -240,5 +230,21 @@
       "created followed-by rule works when base and followed-by subrules fulfilled")
   (is (= (((p/followed-by (p/lit "0") (p/lit "A"))) (list "0" "B" "B")) nil)
       "created followed-by rule fails when followed-by subrule fails"))
+
+(deftest test-metadata
+  (is (= ^(((p/metadata (p/lit "true")
+                        (fn [metadata product]
+                          (assoc metadata :column (inc (:column metadata))))))
+                  #^{:column 13, :line 2} ["true" "THEN"])
+         {:column 14, :line 2})
+      "created rule applies new metadata on remainder when valid")
+  (is (= (((p/metadata (p/lit "true") (constantly {:a 5}))) ["false"]) nil)
+      "created rule fails when subrule fails")
+  (is (thrown? IllegalArgumentException
+        (((p/metadata (p/lit "true")
+                      (fn [metadata product]
+                        (/ 1 0))))
+         #^{:column 13, :line 2} ["true" "THEN"]))
+      "created rule throws argument exception when metadata process throws exception"))
 
 (time (run-tests))
