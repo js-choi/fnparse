@@ -24,9 +24,13 @@
   ([validator process-meta]
    (fn []
      (fn [tokens]
-       (let [first-token (first tokens)]
+       (let [first-token (first tokens)
+             remainder (rest tokens)
+             processed-meta (process-meta ^tokens first-token)]
          (if (validator first-token)
-             [first-token (with-meta (rest tokens) (process-meta ^tokens first-token))]))))))
+             (if (nil? remainder)
+                 [first-token remainder]
+                 [first-token (with-meta remainder processed-meta)])))))))
 
 (defn validate
   "Creates a rule metafunction from attaching a product validator function to the given
@@ -249,14 +253,16 @@
   (alt (factor= factor subrule) (rep< factor subrule)))
  
 (defn lit-conc-seq
-  "Creates a rule metafunction that is the concatenation of the literals of the sequence of the
-  given sequenceable object--that is, it accepts only a series of tokens that matches the
+  "Creates a rule metafunction that is the concatenation of the literals of the sequence of
+  the given sequenceable object--that is, it accepts only a series of tokens that matches the
   sequence of the token sequence.
   (def a (lit-seq \"ABCD\")) would be equivalent to the EBNF
     a = \"A\", \"B\", \"C\", \"D\";
   The new rule's products would be the result of the concatenation rule."
-  [token-seq]
-  (apply conc (map lit token-seq)))
+;  ([token-seq]
+;   (apply conc (map lit token-seq)))
+  ([token-seq]
+   (apply conc (map lit token-seq))))
  
 (defn lit-alt-seq
   "Creates a rule metafunction that is the alternative of the literals of the sequence of the
