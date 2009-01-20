@@ -84,7 +84,7 @@
         "created option rule works when symbol absent")))
 
 (deftest test-rep*
-  (let [rep*-true (p/rep* (p/semantics (p/lit "true") (fn [_] true)))]
+  (let [rep*-true (p/rep* (p/constant-semantics (p/lit "true") true))]
     ; Parse the first symbol in the program "true THEN"
     (is (= ((rep*-true) ["true" "THEN"] {})
            [[true] (list "THEN") {}])
