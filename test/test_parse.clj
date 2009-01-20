@@ -39,13 +39,13 @@
       "created rule returns constant value when given subrule does not fail"))
 
 (deftest test-conc
-  (let [identifier (p/semantics (p/term string?) symbol),
-        equals-operator (p/semantics (p/lit "=") keyword),
-        answer (p/lit "42"),
+  (let [identifier (p/metadata (p/term string?) (fn [m p] (assoc m :b 1)))
+        equals-operator (p/semantics (p/lit "=") keyword)
+        answer (p/metadata (p/lit "42") (fn [m p] (assoc m :c 3)))
         truth (p/conc identifier equals-operator answer)]
     ; Parse the first symbols in the program "answer = 42 THEN"
     (is (= ((truth) ["answer" "=" "42" "THEN"])
-           [['answer := "42"] (list "THEN")])
+           [["answer" := "42"] (list "THEN")])
         "created concatenation rule works when valid symbols are present in order")
     ; Parse the first symbols in the program "answer = 42 THEN"
     (is (= ((truth) ["answer" "42" "=" "THEN"]) nil)
