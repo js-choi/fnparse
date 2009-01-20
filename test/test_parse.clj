@@ -153,47 +153,47 @@
     (is (= ((tested-rule) (list "D" "A" "B")) [[] (list "D" "A" "B")])
         "created factor<= rule works when symbol does not fulfill subrule at all")))
 
-;(deftest test-rep-predicate
-;  (let [tested-rule-fn ((p/rep-predicate (partial > 3) (p/lit "A")))]
-;    (is (= (tested-rule-fn (list "A" "A" "C")) [["A" "A"] (list "C")])
-;        "created rep rule works when predicate returns true")
-;    (is (= (tested-rule-fn (list "A" "A" "A")) nil)
-;        "created rep rule fails when predicate returns false")
-;    (is (= (tested-rule-fn (list "D" "A" "B")) [[] (list "D" "A" "B")])
-;        "created rep rule succeeds when symbol does not fulfill subrule at all")))
-;
-;(deftest test-rep=
-;  (let [tested-rule-fn ((p/rep= 3 (p/lit "A")))]
-;    (is (= (tested-rule-fn (list "A" "A" "A" "C")) [["A" "A" "A"] (list "C")])
-;        "created rep= rule works when symbol only fulfills all subrule multiples")
-;    (is (= (tested-rule-fn (list "A" "A" "A" "A")) nil)
-;        "created rep= rule fails when symbol exceeds subrule multiples")
-;    (is (= (tested-rule-fn (list "A" "A" "C")) nil)
-;        "created rep= rule fails when symbol does not fulfill all subrule multiples")
-;    (is (= (tested-rule-fn (list "D" "A" "B")) nil)
-;        "created rep= rule fails when symbol does not fulfill subrule at all")))
-;
-;(deftest test-rep<
-;  (let [tested-rule-fn ((p/rep< 3 (p/lit "A")))]
-;    (is (= (tested-rule-fn (list "A" "A" "C")) [["A" "A"] (list "C")])
-;        "created rep< rule works when number of fulfilled rules is less than limit")
-;    (is (= (tested-rule-fn (list "A" "A" "A")) nil)
-;        "created rep< rule fails when number of fulfilled rules is equal to limit")
-;    (is (= (tested-rule-fn (list "A" "A" "A" "A" "C")) nil)
-;        "created rep< rule fails when symbol of fulfilled rules is more than limit")
-;    (is (= (tested-rule-fn (list "D" "A" "B")) [[] (list "D" "A" "B")])
-;        "created rep< rule succeeds when symbol does not fulfill subrule at all")))
-;
-;(deftest test-rep<=
-;  (let [tested-rule-fn ((p/rep<= 3 (p/lit "A")))]
-;    (is (= (tested-rule-fn (list "A" "A" "C")) [["A" "A"] (list "C")])
-;        "created rep< rule works when number of fulfilled rules is less than limit")
-;    (is (= (tested-rule-fn (list "A" "A" "A" "C")) [["A" "A" "A"] (list "C")])
-;        "created rep< rule works when number of fulfilled rules is equal to limit")
-;    (is (= (tested-rule-fn (list "A" "A" "A" "A" "C")) nil)
-;        "created rep< rule fails when symbol of fulfilled rules is more than limit")
-;    (is (= (tested-rule-fn (list "D" "A" "B")) [[] (list "D" "A" "B")])
-;        "created rep< rule succeeds when symbol does not fulfill subrule at all")))
+(deftest test-rep-predicate
+  (let [tested-rule-fn ((p/rep-predicate (partial > 3) (p/lit "A")))]
+    (is (= (tested-rule-fn (list "A" "A" "C")) [["A" "A"] (list "C")])
+        "created rep rule works when predicate returns true")
+    (is (= (tested-rule-fn (list "A" "A" "A")) nil)
+        "created rep rule fails when predicate returns false")
+    (is (= (tested-rule-fn (list "D" "A" "B")) [[] (list "D" "A" "B")])
+        "created rep rule succeeds when symbol does not fulfill subrule at all")))
+
+(deftest test-rep=
+  (let [tested-rule-fn ((p/rep= 3 (p/lit "A")))]
+    (is (= (tested-rule-fn (list "A" "A" "A" "C")) [["A" "A" "A"] (list "C")])
+        "created rep= rule works when symbol only fulfills all subrule multiples")
+    (is (= (tested-rule-fn (list "A" "A" "A" "A")) nil)
+        "created rep= rule fails when symbol exceeds subrule multiples")
+    (is (= (tested-rule-fn (list "A" "A" "C")) nil)
+        "created rep= rule fails when symbol does not fulfill all subrule multiples")
+    (is (= (tested-rule-fn (list "D" "A" "B")) nil)
+        "created rep= rule fails when symbol does not fulfill subrule at all")))
+
+(deftest test-rep<
+  (let [tested-rule-fn ((p/rep< 3 (p/lit "A")))]
+    (is (= (tested-rule-fn (list "A" "A" "C")) [["A" "A"] (list "C")])
+        "created rep< rule works when number of fulfilled rules is less than limit")
+    (is (= (tested-rule-fn (list "A" "A" "A")) nil)
+        "created rep< rule fails when number of fulfilled rules is equal to limit")
+    (is (= (tested-rule-fn (list "A" "A" "A" "A" "C")) nil)
+        "created rep< rule fails when symbol of fulfilled rules is more than limit")
+    (is (= (tested-rule-fn (list "D" "A" "B")) [[] (list "D" "A" "B")])
+        "created rep< rule succeeds when symbol does not fulfill subrule at all")))
+
+(deftest test-rep<=
+  (let [tested-rule-fn ((p/rep<= 3 (p/lit "A")))]
+    (is (= (tested-rule-fn (list "A" "A" "C")) [["A" "A"] (list "C")])
+        "created rep< rule works when number of fulfilled rules is less than limit")
+    (is (= (tested-rule-fn (list "A" "A" "A" "C")) [["A" "A" "A"] (list "C")])
+        "created rep< rule works when number of fulfilled rules is equal to limit")
+    (is (= (tested-rule-fn (list "A" "A" "A" "A" "C")) nil)
+        "created rep< rule fails when symbol of fulfilled rules is more than limit")
+    (is (= (tested-rule-fn (list "D" "A" "B")) [[] (list "D" "A" "B")])
+        "created rep< rule succeeds when symbol does not fulfill subrule at all")))
 
 (deftest test-validate
   (is (= (((p/validate (p/lit "hi") #(= "hi" %))) ["hi" "THEN"])
