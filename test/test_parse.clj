@@ -39,9 +39,9 @@
       "created rule returns constant value when given subrule does not fail"))
 
 (deftest test-conc
-  (let [identifier (p/metadata (p/term string?) (fn [m p] (assoc m :b 1)))
+  (let [identifier (p/info (p/term string?) (fn [m p] (assoc m :b 1)))
         equals-operator (p/semantics (p/lit "=") keyword)
-        answer (p/metadata (p/lit "42") (fn [m p] (assoc m :c 3)))
+        answer (p/info (p/lit "42") (fn [m p] (assoc m :c 3)))
         truth (p/conc identifier equals-operator answer)]
     ; Parse the first symbols in the program "answer = 42 THEN"
     (is (= ((truth) ["answer" "=" "42" "THEN"])
@@ -231,20 +231,17 @@
   (is (= (((p/followed-by (p/lit "0") (p/lit "A"))) (list "0" "B" "B")) nil)
       "created followed-by rule fails when followed-by subrule fails"))
 
-(deftest test-metadata
-  (is (= ^(((p/metadata (p/lit "true")
-                        (fn [metadata product]
-                          (assoc metadata :column (inc (:column metadata))))))
-                  #^{:column 13, :line 2} ["true" "THEN"])
-         {:column 14, :line 2})
-      "created rule applies new metadata on remainder when valid")
-  (is (= (((p/metadata (p/lit "true") (constantly {:a 5}))) ["false"]) nil)
-      "created rule fails when subrule fails")
+(deftest test-info
+  (is (= (((p/info (p/lit "true")
+                   (fn [i p] (assoc i :column (inc (:column i))))))
+          ["true" "THEN"] {:column 13, :line 2})
+         ["true" nil {:column 14, :line 2}])
+      "created info rule applies new info when valid")
+  (is (= (((p/info (p/lit "true") (constantly {:a 5}))) ["false"] {}) nil)
+      "created info rule fails when subrule fails")
   (is (thrown? IllegalArgumentException
-        (((p/metadata (p/lit "true")
-                      (fn [metadata product]
-                        (/ 1 0))))
-         #^{:column 13, :line 2} ["true" "THEN"]))
-      "created rule throws argument exception when metadata process throws exception"))
+        (((p/info (p/lit "true") (fn [i p] (/ 1 0))))
+         ["true" "THEN"] {}))
+      "created info rule throws argument exception when info process throws exception"))
 
 (time (run-tests))

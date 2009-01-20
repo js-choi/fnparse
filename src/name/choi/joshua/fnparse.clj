@@ -291,19 +291,19 @@
   [base-subrule following-subrule]
   (validate-remainder base-subrule (following-subrule)))
  
-(defn metadata
+(defn info
   "Creates a rule metafunction that applies a processing function to a subrule's results'
-  metadata. The processing function should accept two arguments: the metadata map of the
-  subrule's results and the product of the subrule's results."
-  [subrule process-meta]
+  info. The processing function should accept two arguments: the info of the subrule's
+  results and the product of the subrule's results."
+  [subrule process-info]
   (fn []
-    (fn [tokens]
+    (fn [tokens info]
       (let [subrule-result ((subrule) tokens)]
         (if (not (nil? subrule-result))
-            (with-meta subrule-result
-                       (try (process-meta ^tokens (subrule-result 0))
-                            (catch Exception e
-                              (throw-arg "metadata process raised error: %s" e)))))))))
+            (assoc subrule-result 2
+                   (try (process-info info (subrule-result 0))
+                        (catch Exception e
+                          (throw-arg "info process raised error: %s" e)))))))))
 
 (defn flatten
   "Takes any nested combination of sequential things (lists, vectors,
