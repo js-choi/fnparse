@@ -25,8 +25,8 @@
      (fn [tokens info]
        (let [first-token (first tokens)
              remainder (rest tokens)]
-         (if (validator first-token)
-             [first-token remainder info]))))))
+         (when (validator first-token)
+           [first-token remainder info]))))))
 
 (defn validate
   "Creates a rule metafunction from attaching a product validator function to the given
@@ -38,8 +38,8 @@
   (fn []
     (fn [tokens]
       (let [[product remainder :as result] ((subrule) tokens)]
-        (if (and (not (nil? result)) (validator product))
-            result)))))
+        (when (and (not (nil? result)) (validator product))
+          result)))))
 
 (defn validate-remainder
   "Creates a rule metafunction from attaching a remainder validator function to the given
@@ -52,8 +52,8 @@
   (fn []
     (fn [tokens]
       (let [[product remainder :as result] ((subrule) tokens)]
-        (if (and (not (nil? result)) (validator remainder))
-            result)))))
+        (when (and (not (nil? result)) (validator remainder))
+          result)))))
 
 (defn semantics
   "Creates a rule metafunction from attaching a semantic hook function to the given subrule-
@@ -63,10 +63,11 @@
   (fn []
     (fn [tokens info]
       (let [[sub-product remainder sub-info :as sub-result] ((subrule) tokens info)]
-        (if (not (nil? sub-result))
-            (let [semantic-product (try (semantic-hook sub-product)
-                                        (catch Exception e
-                                          (throw-arg "info process raised error: %s" e)))]
+        (when-not (nil? sub-result)
+          (let [semantic-product
+                (try (semantic-hook sub-product)
+                     (catch Exception e
+                       (throw-arg "info process raised error: %s" e)))]
             [semantic-product remainder sub-info]))))))
 
 (defn constant-semantics
@@ -115,9 +116,9 @@
             [products token-queue curr-info]
             (let [[sub-product sub-remainder sub-info :as sub-result]
                   (((first rule-queue)) token-queue curr-info)]
-              (if (not (nil? sub-result))
-                  (recur (conj products sub-product) sub-remainder
-                         (rest rule-queue) sub-info))))))))
+              (when-not (nil? sub-result)
+                (recur (conj products sub-product) sub-remainder
+                       (rest rule-queue) sub-info))))))))
 
 (defn alt
   "Creates a rule metafunction that is the alternative of the given subrules--that is, any
@@ -176,7 +177,8 @@
   (fn []
     (fn [tokens info]
       (let [product (((rep* subrule)) tokens info)]
-         (when (not (empty? (product 0))) product)))))
+         (when-not (empty? (product 0))
+           product)))))
 
 (defn except
   "Creates a rule metafunction that is the exception from the first given subrules with the
@@ -190,8 +192,8 @@
   (fn []
     (fn [tokens]
       (let [product ((minuend) tokens)]
-        (if (and (not (nil? product)) (every? #(nil? ((%) tokens)) subtrahends))
-            product)))))
+        (when (and (not (nil? product)) (every? #(nil? ((%) tokens)) subtrahends))
+          product)))))
 
 (defn factor=
   "Creates a rule metafunction that is the syntactic factor of the given subrule by a given
@@ -297,11 +299,11 @@
   (fn []
     (fn [tokens info]
       (let [subrule-result ((subrule) tokens info)]
-        (if (not (nil? subrule-result))
-            (assoc subrule-result 2
-                   (try (process-info info (subrule-result 0))
-                        (catch Exception e
-                          (throw-arg "info process raised error: %s" e)))))))))
+        (when-not (nil? subrule-result)
+          (assoc subrule-result 2
+                 (try (process-info info (subrule-result 0))
+                      (catch Exception e
+                        (throw-arg "info process raised error: %s" e)))))))))
 
 (defn flatten
   "Takes any nested combination of sequential things (lists, vectors,
