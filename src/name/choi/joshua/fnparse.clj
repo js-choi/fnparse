@@ -158,12 +158,11 @@
   [subrule]
   (fn []
     (fn [tokens info]
-      (loop [products [], token-queue tokens]
-        (let [cur-result ((subrule) token-queue)] ; PROBLEM HERE
-          (if (or (nil? cur-result) (= cur-result [nil nil]))
-              [products token-queue]
-              (recur (conj products (cur-result 0))
-                     (cur-result 1))))))))
+      (loop [products [], token-queue (seq tokens), cur-info info]
+        (let [[sub-product remainder sub-info :as sub-result] ((subrule) token-queue info)]
+          (if (or (nil? sub-result) (and (nil? sub-product) (nil? remainder)))
+              [products token-queue cur-info]
+              (recur (conj products sub-product) remainder sub-info)))))))
 
 (defn rep+
   "Creates a rule metafunction that is the one-or-more repetition of the given rule--that

@@ -1,6 +1,7 @@
 (ns name.choi.joshua.fnparse.test-parse
   (:use clojure.contrib.test-is)
   (:require [name.choi.joshua.fnparse :as p]))
+;(set! *warn-on-reflection* true)
 
 (deftest test-term
   (is (= (((p/term #(= % "true"))) ["true" "THEN"] {})
@@ -93,12 +94,12 @@
            [[true true true] (list "THEN") {}])
         "created zero-or-more-repetition rule works when symbol present multiply")
     ; Parse the first symbol in the program "THEN"
-    (is (= ((rep*-true) (list "THEN"))
+    (is (= ((rep*-true) ["THEN"] {})
            [[] (list "THEN") {}])
      "created zero-or-more-repetition rule works when symbol absent"))
   (let [rep*-char (p/rep* (p/term #(not= % \")))]
     ; Parse the first symbol in the program "THEN"
-    (is (= ((rep*-char) (list \a \b \c) {})
+    (is (= ((rep*-char) [\a \b \c] {})
            [[\a \b \c] nil {}])
         "created zero-or-more-repetition rule with a negative subrule works with no remainder")))
 
