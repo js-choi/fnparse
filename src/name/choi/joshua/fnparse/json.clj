@@ -1,6 +1,7 @@
 (ns name.choi.joshua.fnparse.json
   (:refer-clojure)
-  (:use name.choi.joshua.fnparse))
+  (:use [name.choi.joshua.fnparse :only [lit conc alt semantics constant-semantics]]
+        [clojure.contrib.seq-utils :only [flatten]]))
 
 (defstruct node :kind :content)
 

@@ -1,5 +1,5 @@
 (ns name.choi.joshua.fnparse
-  (:use [clojure.contrib.except]))
+  (:use [clojure.contrib.except :only [throw-arg]]))
 
 ; A rule is a delay object that contains a function that:
 ; - Takes a collection of tokens.
