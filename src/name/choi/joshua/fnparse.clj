@@ -301,13 +301,6 @@
       (let [subrule-result ((subrule) tokens info)]
         (when-not (nil? subrule-result)
           (assoc subrule-result 2
-                 (try (process-info info (subrule-result 0))
-                      (catch Exception e
-                        (throw-arg "info process raised error: %s" e)))))))))
-
-(defn flatten
-  "Takes any nested combination of sequential things (lists, vectors,
-  etc.) and returns their contents as a single, flat sequence."
-  [x]
-  (let [s? #(instance? clojure.lang.Sequential %)]
-    (filter (complement s?) (tree-seq s? seq x))))
+            (try (process-info info (subrule-result 0))
+                 (catch Exception e
+                   (throw-arg "info process raised error: %s" e)))))))))
