@@ -21,17 +21,12 @@
   The new rule's product would be the first token, if it fulfills the validator.
   If the token does not fulfill the validator, the new rule simply returns nil."
   ([validator]
-   (term validator identity-of-first))
-  ([validator process-meta]
    (fn []
-     (fn [tokens]
+     (fn [tokens info]
        (let [first-token (first tokens)
-             remainder (rest tokens)
-             processed-meta (process-meta ^tokens first-token)]
+             remainder (rest tokens)]
          (if (validator first-token)
-             (if (nil? remainder)
-                 [first-token remainder]
-                 [first-token (with-meta remainder processed-meta)])))))))
+             [first-token remainder info]))))))
 
 (defn validate
   "Creates a rule metafunction from attaching a product validator function to the given
@@ -66,17 +61,20 @@
   the subrule fails and returns nil, the new rule will return nil."
   [subrule semantic-hook]
   (fn []
-    (fn [tokens]
-      (let [subrule-result ((subrule) tokens)]
-        (if (not (nil? subrule-result))
-            [(semantic-hook (subrule-result 0)) (subrule-result 1)])))))
+    (fn [tokens info]
+      (let [[sub-product remainder sub-info :as sub-result] ((subrule) tokens info)]
+        (if (not (nil? sub-result))
+            (let [semantic-product (try (semantic-hook sub-product)
+                                        (catch Exception e
+                                          (throw-arg "info process raised error: %s" e)))]
+            [semantic-product remainder sub-info]))))))
 
 (defn constant-semantics
   "Creates a rule metafunction from attaching a constant semantic hook function to the given
   subrule--that is, its product is a constant value. When the subrule fails and returns nil,
   the new rule will return nil."
   [subrule semantic-value]
-  (semantics subrule (fn [_] semantic-value)))
+  (semantics subrule (constantly semantic-value)))
 
 (defn lit
   "Creates a rule metafunction that is the terminal rule of the given literal token--that is,
@@ -111,15 +109,15 @@
   the subrules don't match in the right place, the new rule simply returns nil."
   [& subrules]
   (fn []
-    (fn [tokens]
-      (loop [products [], token-queue tokens, rule-queue subrules]
+    (fn [tokens info]
+      (loop [products [], token-queue tokens, rule-queue subrules, curr-info info]
         (if (nil? rule-queue),
-            [products token-queue],
-            (let [curr-result (((first rule-queue)) token-queue)]
-              (if (not (nil? curr-result))
-                  (recur (conj products (curr-result 0))
-                         (curr-result 1)
-                         (rest rule-queue)))))))))
+            [products token-queue curr-info]
+            (let [[sub-product sub-remainder sub-info :as sub-result]
+                  (((first rule-queue)) token-queue curr-info)]
+              (if (not (nil? sub-result))
+                  (recur (conj products sub-product) sub-remainder
+                         (rest rule-queue) sub-info))))))))
 
 (defn alt
   "Creates a rule metafunction that is the alternative of the given subrules--that is, any
@@ -132,8 +130,8 @@
   simply returns nil."
   [& subrules]
   (fn []
-    (fn [tokens]
-      (some #((%) tokens) subrules))))
+    (fn [tokens info]
+      (some #((%) tokens info) subrules))))
 
 (defn opt
   "Creates a rule metafunction that is the optional form of the given subrule--that is,
@@ -145,8 +143,8 @@
   [nil tokens]. The new rule can never simply return nil."
   [subrule]
   (fn []
-    (fn [tokens]
-      (or ((subrule) tokens) [nil tokens]))))
+    (fn [tokens info]
+      (or ((subrule) tokens info) [nil tokens info]))))
 
 (defn rep*
   "Creates a rule metafunction that is the zero-or-more repetition of the given subrule--that
@@ -159,11 +157,11 @@
   can never simply return nil."
   [subrule]
   (fn []
-    (fn [tokens]
+    (fn [tokens info]
       (loop [products [], token-queue tokens]
-        (let [cur-result ((subrule) token-queue)]
-          (if (or (nil? cur-result) (= cur-result [nil nil])),
-              [products token-queue],
+        (let [cur-result ((subrule) token-queue)] ; PROBLEM HERE
+          (if (or (nil? cur-result) (= cur-result [nil nil]))
+              [products token-queue]
               (recur (conj products (cur-result 0))
                      (cur-result 1))))))))
 
@@ -291,14 +289,14 @@
   [base-subrule following-subrule]
   (validate-remainder base-subrule (following-subrule)))
  
-(defn info
+(defn with-info
   "Creates a rule metafunction that applies a processing function to a subrule's results'
   info. The processing function should accept two arguments: the info of the subrule's
   results and the product of the subrule's results."
   [subrule process-info]
   (fn []
     (fn [tokens info]
-      (let [subrule-result ((subrule) tokens)]
+      (let [subrule-result ((subrule) tokens info)]
         (if (not (nil? subrule-result))
             (assoc subrule-result 2
                    (try (process-info info (subrule-result 0))
