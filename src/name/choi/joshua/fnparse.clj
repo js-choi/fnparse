@@ -159,10 +159,11 @@
   (fn []
     (fn [tokens info]
       (loop [products [], token-queue (seq tokens), cur-info info]
-        (let [[sub-product remainder sub-info :as sub-result] ((subrule) token-queue info)]
-          (if (or (nil? sub-result) (and (nil? sub-product) (nil? remainder)))
+        (let [[sub-product sub-remainder sub-info :as sub-result]
+              ((subrule) token-queue cur-info)]
+          (if (or (nil? sub-result) (and (nil? sub-product) (nil? sub-remainder)))
               [products token-queue cur-info]
-              (recur (conj products sub-product) remainder sub-info)))))))
+              (recur (conj products sub-product) sub-remainder sub-info)))))))
 
 (defn rep+
   "Creates a rule metafunction that is the one-or-more repetition of the given rule--that
@@ -173,9 +174,9 @@
   were found. If there were zero matches, then nil is simply returned."
   [subrule]
   (fn []
-    (fn [tokens]
-      (let [product (((rep* subrule)) tokens)]
-         (if (not (empty? (product 0))), product)))))
+    (fn [tokens info]
+      (let [product (((rep* subrule)) tokens info)]
+         (when (not (empty? (product 0))) product)))))
 
 (defn except
   "Creates a rule metafunction that is the exception from the first given subrules with the
