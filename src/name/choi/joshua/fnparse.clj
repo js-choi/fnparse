@@ -190,9 +190,9 @@
   nil is simply returned."
   [minuend & subtrahends]
   (fn []
-    (fn [tokens]
-      (let [product ((minuend) tokens)]
-        (when (and (not (nil? product)) (every? #(nil? ((%) tokens)) subtrahends))
+    (fn [tokens info]
+      (let [product ((minuend) tokens info)]
+        (when (and (not (nil? product)) (every? #(nil? ((%) tokens info)) subtrahends))
           product)))))
 
 (defn factor=
@@ -215,9 +215,9 @@
   (validate (rep* subrule) (comp factor-predicate count)))
  
 (defn rep=
-  "Creates a rule metafunction that is the greedy repetition of the given subrule by the given
-  positive integer factor--that is, it accepts only a certain number of tokens that fulfill
-  the subrule, no more and no less."
+  "Creates a rule metafunction that is the greedy repetition of the given subrule by the
+  given positive integer factor--that is, it accepts only a certain number of tokens that
+  fulfill the subrule, no more and no less."
   [factor subrule]
   (validate (rep* subrule) #(= (count %) factor)))
  

@@ -118,17 +118,17 @@
     (is (nil? ((rep+-true) (list "THEN") {}))
         "created one-or-more-repetition rule fails when symbol absent")))
 
-;(deftest test-except
-;  ; except-rule = ("A" | "B" | "C") - "B" - "C";
-;  (let [except-rule (p/except (p/alt (p/lit "A") (p/lit "B") (p/lit "C")) (p/lit "B")
-;                                     (p/lit "C"))]
-;    (is (= ((except-rule) (list "A" "B" "C")) ["A" (list "B" "C")])
-;        "created exception rule works when symbol is not one of the syntatic exceptions")
-;    (is (= ((except-rule) (list "B" "A" "C")) nil)
-;        "created exception rule fails when symbol is one of the syntactic exceptions")
-;    (is (= ((except-rule) (list "D" "A" "B")) nil)
-;        "created exception rule fails when symbol does not fulfill subrule")))
-; 
+(deftest test-except
+  ; except-rule = ("A" | "B" | "C") - "B" - "C";
+  (let [except-rule (p/except (p/alt (p/lit "A") (p/lit "B") (p/lit "C"))
+                              (p/lit "B") (p/with-info (p/lit "C") (fn [i p] {:b "wrong"})))]
+    (is (= ((except-rule) (list "A" "B" "C") {:a 1}) ["A" (list "B" "C") {:a 1}])
+        "created exception rule works when symbol is not one of the syntatic exceptions")
+    (is (= ((except-rule) (list "B" "A" "C") {}) nil)
+        "created exception rule fails when symbol is one of the syntactic exceptions")
+    (is (= ((except-rule) (list "D" "A" "B") {}) nil)
+        "created exception rule fails when symbol does not fulfill subrule")))
+
 ;(deftest test-factor=
 ;  ; rep=-rule = 3 * "A";
 ;  (let [tested-rule (p/factor= 3 (p/lit "A"))]
