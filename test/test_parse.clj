@@ -129,18 +129,19 @@
     (is (= ((except-rule) (list "D" "A" "B") {}) nil)
         "created exception rule fails when symbol does not fulfill subrule")))
 
-;(deftest test-factor=
-;  ; rep=-rule = 3 * "A";
-;  (let [tested-rule (p/factor= 3 (p/lit "A"))]
-;    (is (= ((tested-rule) (list "A" "A" "A" "A" "C")) [["A" "A" "A"] (list "A" "C")])
-;        "created factor= rule works when symbol fulfills all subrule multiples and leaves strict remainder")
-;    (is (= ((tested-rule) (list "A" "A" "A" "C")) [["A" "A" "A"] (list "C")])
-;        "created factor= rule works when symbol fulfills all subrule multiples only")
-;    (is (= ((tested-rule) (list "A" "A" "C")) nil)
-;        "created factor= rule fails when symbol does not fulfill all subrule multiples")
-;    (is (= ((tested-rule) (list "D" "A" "B")) nil)
-;        "created factor= rule fails when symbol does not fulfill subrule at all")))
-; 
+(deftest test-factor=
+  ; rep=-rule = 3 * "A";
+  (let [tested-rule (p/factor= 3 (p/lit "A"))]
+    (is (= ((tested-rule) (list "A" "A" "A" "A" "C") {})
+           [["A" "A" "A"] (list "A" "C") {}])
+        "created factor= rule works when symbol fulfills all subrule multiples and leaves strict remainder")
+    (is (= ((tested-rule) (list "A" "A" "A" "C") {}) [["A" "A" "A"] (list "C") {}])
+        "created factor= rule works when symbol fulfills all subrule multiples only")
+    (is (= ((tested-rule) (list "A" "A" "C") {}) nil)
+        "created factor= rule fails when symbol does not fulfill all subrule multiples")
+    (is (= ((tested-rule) (list "D" "A" "B") {}) nil)
+        "created factor= rule fails when symbol does not fulfill subrule at all")))
+ 
 ;(deftest test-factor<
 ;  (let [tested-rule (p/factor< 3 (p/lit "A"))]
 ;    (is (= ((tested-rule) (list "A" "A" "A" "A" "C")) [["A" "A"] (list "A" "A" "C")])
