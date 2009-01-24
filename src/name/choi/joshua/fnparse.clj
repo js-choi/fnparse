@@ -29,7 +29,7 @@
            [first-token remainder info]))))))
 
 (defn validate
-  "Creates a rule metafunction from attaching a product validator function to the given
+  "Creates a rule metafunction from attaching a product-validating function to the given
   subrule--that is, any products of the subrule must fulfill the validator function.
   (def a (validate b validator)) says that the rule a succeeds only when b succeeds and when
   (validator b-product) is true. The new rule's product would be b-product. If b fails or
@@ -42,17 +42,31 @@
           result)))))
 
 (defn validate-remainder
-  "Creates a rule metafunction from attaching a remainder validator function to the given
+  "Creates a rule metafunction from attaching a remainder-validating function to the given
   subrule--that is, any tokens in the remainder of the subrule must fulfill the validator
   function.
-  (def a (validate-product b validator)) says that the rule a succeeds only when b succeeds
-  and when (validator b-remainder) is true. The new rule's product would be b-product. If b
-  fails or (validator b-remainder) is false, then nil is simply returned."
+  (def a (validate-remainder b validator)) says that the rule a succeeds only when b succeeds
+  and when (validator-remainder b-remainder) is true. The new rule's product would be
+  b-product. If b fails or (validator b-remainder) is false, then nil is simply returned."
   [subrule validator]
   (fn []
     (fn [tokens info]
       (let [[product remainder :as result] ((subrule) tokens info)]
         (when (and (not (nil? result)) (validator remainder))
+          result)))))
+
+(defn validate-info
+  "Creates a rule metafunction from attaching a info-validating function to the given
+  subrule--that is, any tokens in the remainder of the subrule must fulfill the validator
+  function.
+  (def a (validate-info b validator)) says that the rule a succeeds only when b succeeds and
+  when (validator b-info) is true. The new rule's product would be b-product. If b fails or
+  (validator b-info) is false, then nil is simply returned."
+  [subrule validator]
+  (fn []
+    (fn [tokens info]
+      (let [[product remainder info :as result] ((subrule) tokens info)]
+        (when (and (not (nil? result)) (validator info))
           result)))))
 
 (defn semantics
