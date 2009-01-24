@@ -36,8 +36,8 @@
   (validator b-product) is false, then nil is simply returned."
   [subrule validator]
   (fn []
-    (fn [tokens]
-      (let [[product remainder :as result] ((subrule) tokens)]
+    (fn [tokens info]
+      (let [[product remainder :as result] ((subrule) tokens info)]
         (when (and (not (nil? result)) (validator product))
           result)))))
 

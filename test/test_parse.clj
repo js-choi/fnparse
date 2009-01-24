@@ -47,6 +47,15 @@
          [{:a 1} (list "THEN") {}])
       "created constant sem rule returns constant value when given subrule does not fail"))
 
+(deftest test-validate
+  (is (= (((p/validate (p/lit "hi") #(= "hi" %))) ["hi" "THEN"] {})
+         ["hi" (list "THEN") {}])
+      "created validator rule succeeds when given subrule and validator succeed")
+  (is (= (((p/validate (p/lit "hi") #(= "RST" %))) "RST" {}) nil)
+      "created validator rule fails when given subrule fails")
+  (is (= (((p/validate (p/lit "hi") #(= "hi" %))) "hi" {}) nil)
+      "created validator rule fails when given validator fails"))
+ 
 (deftest test-conc
   (let [identifier (p/with-info (p/term string?) (fn [m p] (assoc m :b 1)))
         equals-operator (p/semantics (p/lit "=") keyword)
@@ -142,17 +151,17 @@
     (is (= ((tested-rule) (list "D" "A" "B") {}) nil)
         "created factor= rule fails when symbol does not fulfill subrule at all")))
  
-;(deftest test-factor<
-;  (let [tested-rule (p/factor< 3 (p/lit "A"))]
-;    (is (= ((tested-rule) (list "A" "A" "A" "A" "C")) [["A" "A"] (list "A" "A" "C")])
-;        "created factor< rule works when symbol fulfills all subrule multiples and leaves strict remainder")
-;    (is (= ((tested-rule) (list "A" "A" "A" "C")) [["A" "A"] (list "A" "C")])
-;        "created factor< rule works when symbol fulfills all subrule multiples only")
-;    (is (= ((tested-rule) (list "A" "A" "C")) [["A" "A"] (list "C")])
-;        "created factor< rule works when symbol does not fulfill all subrule multiples")
-;    (is (= ((tested-rule) (list "D" "A" "B")) [[] (list "D" "A" "B")])
-;        "created factor< rule works when symbol does not fulfill subrule at all")))
-; 
+(deftest test-factor<
+  (let [tested-rule (p/factor< 3 (p/lit "A"))]
+    (is (= ((tested-rule) (list "A" "A" "A" "A" "C") {}) [["A" "A"] (list "A" "A" "C") {}])
+        "created factor< rule works when symbol fulfills all subrule multiples and leaves strict remainder")
+    (is (= ((tested-rule) (list "A" "A" "A" "C") {}) [["A" "A"] (list "A" "C") {}])
+        "created factor< rule works when symbol fulfills all subrule multiples only")
+    (is (= ((tested-rule) (list "A" "A" "C") {}) [["A" "A"] (list "C") {}])
+        "created factor< rule works when symbol does not fulfill all subrule multiples")
+    (is (= ((tested-rule) (list "D" "A" "B") {}) [[] (list "D" "A" "B") {}])
+        "created factor< rule works when symbol does not fulfill subrule at all")))
+ 
 ;(deftest test-factor<=
 ;  (let [tested-rule (p/factor<= 3 (p/lit "A"))]
 ;    (is (= ((tested-rule) (list "A" "A" "A" "A" "C")) [["A" "A" "A"] (list "A" "C")])
@@ -206,15 +215,6 @@
 ;    (is (= (tested-rule-fn (list "D" "A" "B")) [[] (list "D" "A" "B")])
 ;        "created rep< rule succeeds when symbol does not fulfill subrule at all")))
 ;
-;(deftest test-validate
-;  (is (= (((p/validate (p/lit "hi") #(= "hi" %))) ["hi" "THEN"])
-;         ["hi" (list "THEN")])
-;      "created validator rule succeeds when given subrule and validator succeed")
-;  (is (= (((p/validate (p/lit "hi") #(= "RST" %))) "RST") nil)
-;      "created validator rule fails when given subrule fails")
-;  (is (= (((p/validate (p/lit "hi") #(= "hi" %))) "hi") nil)
-;      "created validator rule fails when given validator fails"))
-; 
 ;(deftest test-lit-conc-seq
 ;  ; Parse the first four symbols in the program "THEN"
 ;  (is (= (((p/lit-conc-seq "THEN")) (seq "THEN print 42;"))
