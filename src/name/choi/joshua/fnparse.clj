@@ -50,8 +50,8 @@
   fails or (validator b-remainder) is false, then nil is simply returned."
   [subrule validator]
   (fn []
-    (fn [tokens]
-      (let [[product remainder :as result] ((subrule) tokens)]
+    (fn [tokens info]
+      (let [[product remainder :as result] ((subrule) tokens info)]
         (when (and (not (nil? result)) (validator remainder))
           result)))))
 
@@ -282,14 +282,15 @@
     a = ;
   This rule's product is always nil, and it therefore always returns [nil tokens]."
   []
-  (fn [tokens] [nil tokens]))
+  (fn [tokens info] [nil tokens info]))
  
 (defn followed-by
   "Creates a rule metafunction that figures out if the following tokens after the base
   subrule match the given following subrule, without consuming any of those following
-  tokens."
+  tokens.
+  Make sure that the following subrule doesn't depend on info at all."
   [base-subrule following-subrule]
-  (validate-remainder base-subrule (following-subrule)))
+  (validate-remainder base-subrule #((following-subrule) % {})))
  
 (defn with-info
   "Creates a rule metafunction that applies a processing function to a subrule's results'

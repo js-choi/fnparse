@@ -56,6 +56,15 @@
   (is (= (((p/validate (p/lit "hi") #(= "hi" %))) "hi" {}) nil)
       "created validator rule fails when given validator fails"))
  
+(deftest test-validate-remainder
+  (is (= (((p/validate-remainder (p/lit "hi") #(= "THEN" (first %)))) ["hi" "THEN"] {})
+         ["hi" (list "THEN") {}])
+      "created remainder-validating rule succeeds when given subrule and validator succeed")
+  (is (= (((p/validate-remainder (p/lit "hi") #(= "RST" (first %)))) "RST" {}) nil)
+      "created remainder-validating rule fails when given subrule fails")
+  (is (= (((p/validate-remainder (p/lit "hi") #(= "hi" (first %)))) "hi" {}) nil)
+      "created remainder-validating rule fails when given validator fails"))
+ 
 (deftest test-conc
   (let [identifier (p/with-info (p/term string?) (fn [m p] (assoc m :b 1)))
         equals-operator (p/semantics (p/lit "=") keyword)
@@ -193,54 +202,54 @@
     (is (= (tested-rule-fn (list "D" "A" "B") {}) nil)
         "created rep= rule fails when symbol does not fulfill subrule at all")))
 
-;(deftest test-rep<
-;  (let [tested-rule-fn ((p/rep< 3 (p/lit "A")))]
-;    (is (= (tested-rule-fn (list "A" "A" "C")) [["A" "A"] (list "C")])
-;        "created rep< rule works when number of fulfilled rules is less than limit")
-;    (is (= (tested-rule-fn (list "A" "A" "A")) nil)
-;        "created rep< rule fails when number of fulfilled rules is equal to limit")
-;    (is (= (tested-rule-fn (list "A" "A" "A" "A" "C")) nil)
-;        "created rep< rule fails when symbol of fulfilled rules is more than limit")
-;    (is (= (tested-rule-fn (list "D" "A" "B")) [[] (list "D" "A" "B")])
-;        "created rep< rule succeeds when symbol does not fulfill subrule at all")))
-;
-;(deftest test-rep<=
-;  (let [tested-rule-fn ((p/rep<= 3 (p/lit "A")))]
-;    (is (= (tested-rule-fn (list "A" "A" "C")) [["A" "A"] (list "C")])
-;        "created rep< rule works when number of fulfilled rules is less than limit")
-;    (is (= (tested-rule-fn (list "A" "A" "A" "C")) [["A" "A" "A"] (list "C")])
-;        "created rep< rule works when number of fulfilled rules is equal to limit")
-;    (is (= (tested-rule-fn (list "A" "A" "A" "A" "C")) nil)
-;        "created rep< rule fails when symbol of fulfilled rules is more than limit")
-;    (is (= (tested-rule-fn (list "D" "A" "B")) [[] (list "D" "A" "B")])
-;        "created rep< rule succeeds when symbol does not fulfill subrule at all")))
-;
-;(deftest test-lit-conc-seq
-;  ; Parse the first four symbols in the program "THEN"
-;  (is (= (((p/lit-conc-seq "THEN")) (seq "THEN print 42;"))
-;         [(vec "THEN") (seq " print 42;")])
-;      "created literal-sequence rule is based on sequence of given token sequencible"))
-;
-;(deftest test-lit-alt-seq
-;  ; Parse the first four symbols in the program "B 2"
-;  (is (= (((p/lit-alt-seq "ABCD")) (seq "B 2"))
-;         [\B (seq " 2")])
-;      "created literal-alternative-sequence rule works when literal symbol present in sequence")
-;  (is (= (((p/lit-alt-seq "ABCD")) (seq "E 2")) nil)
-;      "created literal-alternative-sequence rule fails when literal symbol not present in sequence"))
-; 
-;(deftest test-emptiness
-;  ; Parse the emptiness before the first symbol
-;  (is (= ((p/emptiness) (list "A" "B" "C"))
-;         [nil (list "A" "B" "C")])
-;      "emptyiness rule matches emptiness"))
-; 
-;(deftest test-followed-by
-;  (is (= (((p/followed-by (p/lit "0") (p/lit "A"))) (list "0" "A" "B" "C"))
-;         ["0" (list "A" "B" "C")])
-;      "created followed-by rule works when base and followed-by subrules fulfilled")
-;  (is (= (((p/followed-by (p/lit "0") (p/lit "A"))) (list "0" "B" "B")) nil)
-;      "created followed-by rule fails when followed-by subrule fails"))
+(deftest test-rep<
+  (let [tested-rule-fn ((p/rep< 3 (p/lit "A")))]
+    (is (= (tested-rule-fn (list "A" "A" "C") {}) [["A" "A"] (list "C") {}])
+        "created rep< rule works when number of fulfilled rules is less than limit")
+    (is (= (tested-rule-fn (list "A" "A" "A") {}) nil)
+        "created rep< rule fails when number of fulfilled rules is equal to limit")
+    (is (= (tested-rule-fn (list "A" "A" "A" "A" "C") {}) nil)
+        "created rep< rule fails when symbol of fulfilled rules is more than limit")
+    (is (= (tested-rule-fn (list "D" "A" "B") {}) [[] (list "D" "A" "B") {}])
+        "created rep< rule succeeds when symbol does not fulfill subrule at all")))
+
+(deftest test-rep<=
+  (let [tested-rule-fn ((p/rep<= 3 (p/lit "A")))]
+    (is (= (tested-rule-fn (list "A" "A" "C") {}) [["A" "A"] (list "C") {}])
+        "created rep< rule works when number of fulfilled rules is less than limit")
+    (is (= (tested-rule-fn (list "A" "A" "A" "C") {}) [["A" "A" "A"] (list "C") {}])
+        "created rep< rule works when number of fulfilled rules is equal to limit")
+    (is (= (tested-rule-fn (list "A" "A" "A" "A" "C") {}) nil)
+        "created rep< rule fails when symbol of fulfilled rules is more than limit")
+    (is (= (tested-rule-fn (list "D" "A" "B") {}) [[] (list "D" "A" "B") {}])
+        "created rep< rule succeeds when symbol does not fulfill subrule at all")))
+
+(deftest test-lit-conc-seq
+  ; Parse the first four symbols in the program "THEN"
+  (is (= (((p/lit-conc-seq "THEN")) (seq "THEN print 42;") {})
+         [(vec "THEN") (seq " print 42;") {}])
+      "created literal-sequence rule is based on sequence of given token sequencible"))
+
+(deftest test-lit-alt-seq
+  ; Parse the first four symbols in the program "B 2"
+  (is (= (((p/lit-alt-seq "ABCD")) (seq "B 2") {})
+         [\B (seq " 2") {}])
+      "created literal-alternative-sequence rule works when literal symbol present in sequence")
+  (is (= (((p/lit-alt-seq "ABCD")) (seq "E 2") {}) nil)
+      "created literal-alternative-sequence rule fails when literal symbol not present in sequence"))
+ 
+(deftest test-emptiness
+  ; Parse the emptiness before the first symbol
+  (is (= ((p/emptiness) (list "A" "B" "C") {})
+         [nil (list "A" "B" "C") {}])
+      "emptiness rule matches emptiness"))
+ 
+(deftest test-followed-by
+  (is (= (((p/followed-by (p/lit "0") (p/lit "A"))) (list "0" "A" "B" "C") {})
+         ["0" (list "A" "B" "C") {}])
+      "created followed-by rule works when base and followed-by subrules fulfilled")
+  (is (= (((p/followed-by (p/lit "0") (p/lit "A"))) (list "0" "B" "B") {}) nil)
+      "created followed-by rule fails when followed-by subrule fails"))
 
 (deftest test-with-info
   (is (= (((p/with-info (p/lit "true")
