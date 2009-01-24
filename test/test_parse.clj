@@ -182,17 +182,17 @@
     (is (= (tested-rule-fn (list "D" "A" "B") {}) [[] (list "D" "A" "B") {}])
         "created rep rule succeeds when symbol does not fulfill subrule at all")))
 
-;(deftest test-rep=
-;  (let [tested-rule-fn ((p/rep= 3 (p/lit "A")))]
-;    (is (= (tested-rule-fn (list "A" "A" "A" "C")) [["A" "A" "A"] (list "C")])
-;        "created rep= rule works when symbol only fulfills all subrule multiples")
-;    (is (= (tested-rule-fn (list "A" "A" "A" "A")) nil)
-;        "created rep= rule fails when symbol exceeds subrule multiples")
-;    (is (= (tested-rule-fn (list "A" "A" "C")) nil)
-;        "created rep= rule fails when symbol does not fulfill all subrule multiples")
-;    (is (= (tested-rule-fn (list "D" "A" "B")) nil)
-;        "created rep= rule fails when symbol does not fulfill subrule at all")))
-;
+(deftest test-rep=
+  (let [tested-rule-fn ((p/rep= 3 (p/lit "A")))]
+    (is (= (tested-rule-fn (list "A" "A" "A" "C") {}) [["A" "A" "A"] (list "C") {}])
+        "created rep= rule works when symbol only fulfills all subrule multiples")
+    (is (= (tested-rule-fn (list "A" "A" "A" "A") {}) nil)
+        "created rep= rule fails when symbol exceeds subrule multiples")
+    (is (= (tested-rule-fn (list "A" "A" "C") {}) nil)
+        "created rep= rule fails when symbol does not fulfill all subrule multiples")
+    (is (= (tested-rule-fn (list "D" "A" "B") {}) nil)
+        "created rep= rule fails when symbol does not fulfill subrule at all")))
+
 ;(deftest test-rep<
 ;  (let [tested-rule-fn ((p/rep< 3 (p/lit "A")))]
 ;    (is (= (tested-rule-fn (list "A" "A" "C")) [["A" "A"] (list "C")])
