@@ -274,8 +274,6 @@
   (def a (lit-seq \"ABCD\")) would be equivalent to the EBNF
     a = \"A\", \"B\", \"C\", \"D\";
   The new rule's products would be the result of the concatenation rule."
-;  ([token-seq]
-;   (apply conc (map lit token-seq)))
   ([token-seq]
    (apply conc (map lit token-seq))))
  

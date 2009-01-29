@@ -126,7 +126,8 @@
 (def lex seq)
 
 (defn parse [tokens]
-  (let [[product remainder] ((text) tokens)]
+  (let [[product remainder info] ((text) tokens {})]
+    (println "FINISHED PARSING:" info)
     product))
 
 (defmulti represent :kind)
