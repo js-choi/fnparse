@@ -317,3 +317,12 @@
             (try (process-info info (subrule-result 0))
                  (catch Exception e
                    (throw-arg "info process raised error: %s" e)))))))))
+
+(defn failpoint
+  [subrule failure]
+  (fn []
+    (fn [tokens info]
+      (let [subrule-result ((subrule) tokens info)]
+        (if (nil? subrule-result)
+            (failure tokens info)
+            subrule-result)))))

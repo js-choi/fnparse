@@ -1,5 +1,5 @@
 (ns name.choi.joshua.fnparse.test-parse
-  (:use clojure.contrib.test-is)
+  (:use clojure.contrib.test-is [clojure.contrib.except :only [throw-arg]])
   (:require [name.choi.joshua.fnparse :as p]))
 ;(set! *warn-on-reflection* true)
 
@@ -272,5 +272,15 @@
         (((p/with-info (p/lit "true") (fn [i p] (/ 1 0))))
          ["true" "THEN"] {}))
       "created info rule throws argument exception when info process throws exception"))
+
+(deftest test-failpoint
+  (let [failing-rule (p/failpoint (p/lit "A")
+                                     (fn [product info]
+                                       (throw-arg "ERROR at line %s" (:line info))))]
+    (is (= ((failing-rule) ["A"] {:line 3}) ["A" nil {:line 3}])
+        "failing rules succeed when their subrules are fulfilled")
+    (is (thrown-with-msg? IllegalArgumentException #"ERROR at line 3"
+          ((failing-rule) ["B"] {:line 3})
+        "failing rules fail with given exceptions when their subrules fail"))))
 
 (time (run-tests))
