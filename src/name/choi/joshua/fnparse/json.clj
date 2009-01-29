@@ -4,6 +4,10 @@
         [clojure.contrib.seq-utils :only [flatten]]))
 
 (defstruct node :kind :content)
+(defn- info-at-next-column [info product]
+  (assoc info :column (inc (:column info))))
+(defn- info-at-next-line [info product]
+  (assoc info :line (inc (:line info)), :column 0))
 
 (def string-delimiter (lit \"))
 (def escape-indicator (lit \\))
@@ -12,7 +16,13 @@
 (def null-lit (constant-semantics (lit-conc-seq "null") (struct node :scalar nil)))
 (def keyword-lit (alt false-lit true-lit null-lit))
 
-(def ws (rep* (apply alt (map lit [\space \tab \newline \return]))))
+(def space (with-info (lit \space) info-at-next-column))
+(def tab (with-info (lit \tab) info-at-next-column))
+(def newline-lit (lit \newline))
+(def return-lit (lit \return))
+(def line-break (with-info (rep+ (alt newline-lit return-lit)) info-at-next-line))
+
+(def ws (constant-semantics (rep* (alt space tab line-break)) :ws))
 
 (def begin-array (constant-semantics (conc ws (lit \[) ws) :begin-array))
 (def end-array (constant-semantics (conc ws (lit \]) ws) :end-array))
