@@ -262,8 +262,7 @@
       "created followed-by rule fails when followed-by subrule fails"))
 
 (deftest test-with-info
-  (is (= (((p/with-info (p/lit "true")
-                   (fn [i p] (assoc i :column (inc (:column i))))))
+  (is (= (((p/with-info (p/lit "true") (fn [i p] (assoc i :column (inc (:column i))))))
           ["true" "THEN"] {:column 13, :line 2})
          ["true" (list "THEN") {:column 14, :line 2}])
       "created info rule applies new info when valid")

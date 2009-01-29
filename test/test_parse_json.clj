@@ -6,16 +6,16 @@
 ; It's a thing to do, it should be simple, but I'm too lazy to do the tedium.
 ;
 
-;(deftest test-ws
-;  (is (= ((j/ws) (seq "  , 55") {:column 55, :line 10})
-;         [[\space \space] (seq ", 55")])
-;      "parsing multiple spaces as whitespace")
-;  (is (= ((j/ws) (seq "\n\r, 55") {:column 55, :line 10})
-;         [[\newline \return] (seq ", 55")])
-;      "parsing newline and return-char as whitespace")
-;  (is (= ((j/ws) (seq ", 55") {:column 55, :line 10})
-;         [[] (seq ", 55")])
-;      "parsing emptiness as whitespace"))
+(deftest test-ws
+  (is (= ((j/ws) (seq "  , 55") {:column 2, :line 10})
+         [[\space \space] (seq ", 55") {:column 55, :line 10}])
+      "parsing multiple spaces as whitespace")
+  (is (= ((j/ws) (seq "\n\r, 55") {:column 55, :line 10})
+         [[\newline \return] (seq ", 55") {:column 0, :line 11}])
+      "parsing newline and return-char as whitespace")
+  (is (= ((j/ws) (seq ", 55") {:column 55, :line 10})
+         [[] (seq ", 55") {:column 55, :line 10}])
+      "parsing emptiness as whitespace"))
 
 ;(deftest test-false-lit
 ;  (is (= ((j/false-lit) (seq "false, 55"))
