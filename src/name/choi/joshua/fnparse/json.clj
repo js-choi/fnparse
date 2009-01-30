@@ -4,10 +4,6 @@
         [clojure.contrib.seq-utils :only [flatten]]))
 
 (defstruct node :kind :content)
-(defn- info-at-next-column [info product]
-  (assoc info :column (inc (:column info))))
-(defn- info-at-next-line [info product]
-  (assoc info :line (inc (:line info)), :column 0))
 
 (def string-delimiter (lit \"))
 (def escape-indicator (lit \\))
@@ -16,11 +12,11 @@
 (def null-lit (constant-semantics (lit-conc-seq "null") (struct node :scalar nil)))
 (def keyword-lit (alt false-lit true-lit null-lit))
 
-(def space (with-info (lit \space) info-at-next-column))
-(def tab (with-info (lit \tab) info-at-next-column))
+(def space (lit \space))
+(def tab (lit \tab))
 (def newline-lit (lit \newline))
 (def return-lit (lit \return))
-(def line-break (with-info (rep+ (alt newline-lit return-lit)) info-at-next-line))
+(def line-break (rep+ (alt newline-lit return-lit)))
 
 (def ws (constant-semantics (rep* (alt space tab line-break)) :ws))
 
@@ -100,13 +96,19 @@
 (declare array)
 (declare object)
 
-(def value (alt string-lit number-lit keyword-lit 'array 'object))
+(defn value []
+  ; value is uniquely defined as infinitely recursive among array-contents and entry. I
+  ; get unbound-var errors if I try using alt.
+  ; I have no idea how to fix this other than having to manually define it within a function.
+  (fn []
+    (fn [tokens info]
+      (some #((%) tokens info) [string-lit number-lit keyword-lit array object]))))
 
 (def additional-value
   (semantics (conc value-separator (value)) #(% 1)))
 
 (def array-contents
-  (semantics (conc value (rep* additional-value))
+  (semantics (conc (value) (rep* additional-value))
              #(into [(% 0)] (% 1))))
 
 (def array
@@ -114,7 +116,7 @@
              #(hash-map :kind :array, :content (vec (% 1)))))
 
 (def entry
-  (semantics (conc string-lit name-separator value)
+  (semantics (conc string-lit name-separator (value))
              #(vector (% 0) (% 2))))
 
 (def additional-entry
