@@ -46,13 +46,14 @@
   subrule--that is, any tokens in the remainder of the subrule must fulfill the validator
   function.
   (def a (validate-remainder b validator)) says that the rule a succeeds only when b succeeds
-  and when (validator-remainder b-remainder) is true. The new rule's product would be
-  b-product. If b fails or (validator b-remainder) is false, then nil is simply returned."
+  and when (validator-remainder b-remainder b-info) is true. The new rule's product would be
+  b-product. If b fails or (validator b-remainder b-info) is false, then nil is simply
+  returned."
   [subrule validator]
   (fn []
     (fn [tokens info]
       (let [[product remainder :as result] ((subrule) tokens info)]
-        (when (and (not (nil? result)) (validator remainder))
+        (when (and (not (nil? result)) (validator remainder info))
           result)))))
 
 (defn validate-info
@@ -78,10 +79,7 @@
     (fn [tokens info]
       (let [[sub-product remainder sub-info :as sub-result] ((subrule) tokens info)]
         (when-not (nil? sub-result)
-          (let [semantic-product
-                (try (semantic-hook sub-product)
-                     (catch Exception e
-                       (throw-arg "info process raised error: %s" e)))]
+          (let [semantic-product (semantic-hook sub-product)]
             [semantic-product remainder sub-info]))))))
 
 (defn constant-semantics
@@ -286,7 +284,7 @@
   The new rule's products would be the result of the concatenation rule."
   [token-seq]
   (apply alt (map lit token-seq)))
- 
+
 (defn emptiness
   "A rule metafunction that matches emptiness--that is, it always matches with every given
   token sequence, and it always returns [nil tokens].
@@ -295,15 +293,16 @@
   This rule's product is always nil, and it therefore always returns [nil tokens]."
   []
   (fn [tokens info] [nil tokens info]))
- 
+
 (defn followed-by
   "Creates a rule metafunction that figures out if the following tokens after the base
   subrule match the given following subrule, without consuming any of those following
   tokens.
   Make sure that the following subrule doesn't depend on info at all."
   [base-subrule following-subrule]
-  (validate-remainder base-subrule #((following-subrule) % {})))
- 
+  (validate-remainder base-subrule
+    (fn [remainder info] ((following-subrule) remainder info))))
+
 (defn with-info
   "Creates a rule metafunction that applies a processing function to a subrule's results'
   info. The processing function should accept two arguments: the info of the subrule's
@@ -313,10 +312,7 @@
     (fn [tokens info]
       (let [subrule-result ((subrule) tokens info)]
         (when-not (nil? subrule-result)
-          (assoc subrule-result 2
-            (try (process-info info (subrule-result 0))
-                 (catch Exception e
-                   (throw-arg "info process raised error: %s" e)))))))))
+          (assoc subrule-result 2 (process-info info (subrule-result 0))))))))
 
 (defn failpoint
   [subrule failure]

@@ -36,11 +36,7 @@
   (is (= (((p/semantics (p/with-info (p/lit "hi") #(assoc %1 :a %2)) #(str % \!)))
           ["hi" "THEN"] {})
          ["hi!" (list "THEN") {:a "hi"}])
-      "created semantics rule passes info to subrule")
-  (is (thrown? IllegalArgumentException
-        (((p/semantics (p/lit "hi") (fn [p] (/ 1 0))))
-         ["hi" "THEN"] {}))
-      "created semantics rule throws argument exception when info process throws exception"))
+      "created semantics rule passes info to subrule"))
 
 (deftest test-constant-semantics
   (is (= (((p/constant-semantics (p/lit "hi") (hash-map :a 1))) ["hi" "THEN"] {})
@@ -57,16 +53,21 @@
       "created validator rule fails when given validator fails"))
  
 (deftest test-validate-remainder
-  (is (= (((p/validate-remainder (p/lit "hi") #(= "THEN" (first %)))) ["hi" "THEN"] {})
+  (is (= (((p/validate-remainder (p/lit "hi") (fn [r i] (= "THEN" (first r)))))
+          ["hi" "THEN"] {})
          ["hi" (list "THEN") {}])
       "created remainder-validating rule succeeds when given subrule and validator succeed")
-  (is (= (((p/validate-remainder (p/lit "hi") #(= "RST" (first %)))) "RST" {}) nil)
+  (is (= (((p/validate-remainder (p/lit "hi") (fn [r i] (= "THEN" (first r)))))
+          ["bye" "THEN"] {})
+         nil)
       "created remainder-validating rule fails when given subrule fails")
-  (is (= (((p/validate-remainder (p/lit "hi") #(= "hi" (first %)))) "hi" {}) nil)
+  (is (= (((p/validate-remainder (p/lit "hi") (fn [r i] (= "THEN" (first r)))))
+          ["hi" "WELL"] {})
+         nil)
       "created remainder-validating rule fails when given validator fails"))
  
 (deftest test-validate-info
-  (let [subrule (p/with-info (p/lit "hi") (fn [m p] (assoc m :b 1)))]
+  (let [subrule (p/with-info (p/lit "hi") (fn [i p] (assoc i :b 1)))]
     (is (= (((p/validate-info subrule #(contains? % :b))) ["hi" "THEN"] {})
            ["hi" (list "THEN") {:b 1}])
         "created info-validating rule succeeds when given subrule and validator succeed")
@@ -258,6 +259,11 @@
   (is (= (((p/followed-by (p/lit "0") (p/lit "A"))) (list "0" "A" "B" "C") {})
          ["0" (list "A" "B" "C") {}])
       "created followed-by rule works when base and followed-by subrules fulfilled")
+  (is (= (((p/followed-by (p/lit "0")
+                          (p/validate-info (p/lit "A") #(contains? % :a))))
+          (list "0" "A" "B" "C") {:a 5})
+         ["0" (list "A" "B" "C") {:a 5}])
+      "created followed-by rule passes info to followed-by subrule")
   (is (= (((p/followed-by (p/lit "0") (p/lit "A"))) (list "0" "B" "B") {}) nil)
       "created followed-by rule fails when followed-by subrule fails"))
 
@@ -267,15 +273,11 @@
          ["true" (list "THEN") {:column 14, :line 2}])
       "created info rule applies new info when valid")
   (is (= (((p/with-info (p/lit "true") (constantly {:a 5}))) ["false"] {}) nil)
-      "created info rule fails when subrule fails")
-  (is (thrown? IllegalArgumentException
-        (((p/with-info (p/lit "true") (fn [i p] (/ 1 0))))
-         ["true" "THEN"] {}))
-      "created info rule throws argument exception when info process throws exception"))
+      "created info rule fails when subrule fails"))
 
 (deftest test-failpoint
   (let [failing-rule (p/failpoint (p/lit "A")
-                                     (fn [product info]
+                                     (fn [tokens info]
                                        (throw-arg "ERROR at line %s" (:line info))))]
     (is (= ((failing-rule) ["A"] {:line 3}) ["A" nil {:line 3}])
         "failing rules succeed when their subrules are fulfilled")
