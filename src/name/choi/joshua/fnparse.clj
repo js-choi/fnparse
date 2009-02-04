@@ -336,3 +336,10 @@
     (fn [tokens info]
       (effects tokens info)
       ((subrule) tokens info))))
+
+(defn anything
+  "A rule metafunction that matches anything--that is, it matches the first token of the
+  tokens it is given.
+  This rule's product is the first token it receives."
+  []
+  (fn [tokens info] [(first tokens) (rest tokens) info]))

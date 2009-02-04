@@ -293,4 +293,10 @@
     ; SHOULD PRINT "YES [A] {:line 3}"
         "pre-effect rules succeed when their subrules are fulfilled")))
  
+(deftest test-anything
+  ; Parse the first symbol
+  (is (= ((p/anything) (list "A" "B" "C") {})
+         ["A" (list "B" "C") {}])
+      "anything rule matches first token"))
+ 
 (time (run-tests))
