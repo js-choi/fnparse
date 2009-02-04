@@ -315,6 +315,9 @@
           (assoc subrule-result 2 (process-info info (subrule-result 0))))))))
 
 (defn failpoint
+  "Creates a rule metafunction that applies a failpoint to a subrule. When the subrule
+  fails—i.e., it returns nil—then the failure function is called. Its two arguments are the
+  tokens and info that caused it to fail."
   [subrule failure]
   (fn []
     (fn [tokens info]
