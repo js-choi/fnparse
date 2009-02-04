@@ -325,3 +325,14 @@
         (if (nil? subrule-result)
             (failure tokens info)
             subrule-result)))))
+
+(defn do-effects-before
+  "Creates a rule metafunction that applies a side-effect function to a subrule before its
+  subrule tests its tokens.
+  This is useful for temporarily making a rule print a message whenever it's called. The
+  effects function is passed the tokens and info given to this rule."
+  [subrule effects]
+  (fn []
+    (fn [tokens info]
+      (effects tokens info)
+      ((subrule) tokens info))))

@@ -277,12 +277,20 @@
 
 (deftest test-failpoint
   (let [failing-rule (p/failpoint (p/lit "A")
-                                     (fn [tokens info]
-                                       (throw-arg "ERROR at line %s" (:line info))))]
+                                  (fn [tokens info]
+                                    (throw-arg "ERROR at line %s" (:line info))))]
     (is (= ((failing-rule) ["A"] {:line 3}) ["A" nil {:line 3}])
         "failing rules succeed when their subrules are fulfilled")
     (is (thrown-with-msg? IllegalArgumentException #"ERROR at line 3"
           ((failing-rule) ["B"] {:line 3})
         "failing rules fail with given exceptions when their subrules fail"))))
 
+(deftest test-do-effects-before
+  (let [effect-rule (p/do-effects-before (p/lit "A")
+                                         (fn [tokens info]
+                                           (println "YES" tokens info)))]
+    (is (= ((effect-rule) ["A"] {:line 3}) ["A" nil {:line 3}])
+    ; SHOULD PRINT "YES [A] {:line 3}"
+        "pre-effect rules succeed when their subrules are fulfilled")))
+ 
 (time (run-tests))
