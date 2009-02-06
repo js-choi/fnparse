@@ -160,16 +160,18 @@
 
 (deftest test-factor=
   ; rep=-rule = 3 * "A";
-  (let [tested-rule (p/factor= 3 (p/lit "A"))]
-    (is (= ((tested-rule) (list "A" "A" "A" "A" "C") {})
+  (let [tested-rule-3 (p/factor= 3 (p/lit "A")), tested-rule-0 (p/factor= 0 (p/lit "A"))]
+    (is (= ((tested-rule-3) (list "A" "A" "A" "A" "C") {})
            [["A" "A" "A"] (list "A" "C") {}])
         "created factor= rule works when symbol fulfills all subrule multiples and leaves strict remainder")
-    (is (= ((tested-rule) (list "A" "A" "A" "C") {}) [["A" "A" "A"] (list "C") {}])
+    (is (= ((tested-rule-3) (list "A" "A" "A" "C") {}) [["A" "A" "A"] (list "C") {}])
         "created factor= rule works when symbol fulfills all subrule multiples only")
-    (is (= ((tested-rule) (list "A" "A" "C") {}) nil)
+    (is (= ((tested-rule-3) (list "A" "A" "C") {}) nil)
         "created factor= rule fails when symbol does not fulfill all subrule multiples")
-    (is (= ((tested-rule) (list "D" "A" "B") {}) nil)
-        "created factor= rule fails when symbol does not fulfill subrule at all")))
+    (is (= ((tested-rule-3) (list "D" "A" "B") {}) nil)
+        "created factor= rule fails when symbol does not fulfill subrule at all")
+    (is (= ((tested-rule-0) (list "D" "A" "B") {}) [[] (list "D" "A" "B") {}])
+        "created factor= rule works when symbol fulfils zero multiples and factor is zero")))
  
 (deftest test-factor<
   (let [tested-rule (p/factor< 3 (p/lit "A"))]
