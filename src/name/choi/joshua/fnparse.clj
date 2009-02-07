@@ -129,7 +129,10 @@
   `(fn [tokens# info#]
      (conc-fn tokens# info# ~@subrules)))
 
-(defn alt
+(defn alt-fn [tokens info & subrules]
+  (some #(% tokens info) subrules))
+
+(defmacro alt
   "Creates a rule metafunction that is the alternative of the given subrules--that is, any
   one of the given subrules. Note that the subrules' order matters: the very first rule that
   accepts the given tokens will be selected.
@@ -139,9 +142,8 @@
   of the rules first accepts the given tokens. If none of the subrules matches, the new rule
   simply returns nil."
   [& subrules]
-  (fn []
-    (fn [tokens info]
-      (some #((%) tokens info) subrules))))
+  `(fn [tokens# info#]
+     (alt-fn tokens# info# ~@subrules)))
 
 (defn opt
   "Creates a rule metafunction that is the optional form of the given subrule--that is,
@@ -152,9 +154,8 @@
   that the latter actually means that the new rule would then return the vector
   [nil tokens]. The new rule can never simply return nil."
   [subrule]
-  (fn []
-    (fn [tokens info]
-      (or ((subrule) tokens info) [nil tokens info]))))
+  (fn [tokens info]
+    (or (subrule tokens info) [nil tokens info])))
 
 (defn rep*
   "Creates a rule metafunction that is the zero-or-more repetition of the given subrule--that

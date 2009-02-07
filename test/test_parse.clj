@@ -89,29 +89,29 @@
     (is (= (truth ["answer" "42" "=" "THEN"] {}) nil)
         "created concatenation rule fails when invalid symbols present")))
 
-;(deftest test-alt
-;  (let [literal-true (p/semantics (p/lit "true") (fn [_] true)),
-;        literal-false (p/semantics (p/lit "false") (fn [_] false)),
-;        literal-boolean (p/alt literal-true literal-false)]
-;    ; Parse the first symbol in the program "false THEN"
-;    (is (= ((literal-boolean) ["false" "THEN"] {})
-;           [false (list "THEN") {}])
-;        "created alternatives rule works with first valid rule product")
-;    ; Parse the first symbol in the program "aRSTIR"
-;    (is (nil? ((literal-boolean) ["aRSTIR"] {}))
-;        "created alternatives rule fails when no valid rule product present")))
-;
-;(deftest test-opt
-;  (let [opt-true (p/opt (p/semantics (p/lit "true") (fn [_] true)))]
-;    ; Parse the first symbol in the program "true THEN"
-;    (is (= ((opt-true) ["true" "THEN"] {})
-;           [true (list "THEN") {}])
-;        "created option rule works when symbol present")
-;    ; Parse the first symbol in the program "THEN"
-;    (is (= ((opt-true) (list "THEN") {})
-;           [nil (list "THEN") {}])
-;        "created option rule works when symbol absent")))
-;
+(deftest test-alt
+  (let [literal-true (p/constant-semantics (p/lit "true") true)
+        literal-false (p/constant-semantics (p/lit "false") false)
+        literal-boolean (p/alt literal-true literal-false)]
+    ; Parse the first symbol in the program "false THEN"
+    (is (= (literal-boolean ["false" "THEN"] {})
+           [false (list "THEN") {}])
+        "created alternatives rule works with first valid rule product")
+    ; Parse the first symbol in the program "aRSTIR"
+    (is (nil? (literal-boolean ["aRSTIR"] {}))
+        "created alternatives rule fails when no valid rule product present")))
+
+(deftest test-opt
+  (let [opt-true (p/opt (p/semantics (p/lit "true") (fn [_] true)))]
+    ; Parse the first symbol in the program "true THEN"
+    (is (= (opt-true ["true" "THEN"] {})
+           [true (list "THEN") {}])
+        "created option rule works when symbol present")
+    ; Parse the first symbol in the program "THEN"
+    (is (= (opt-true (list "THEN") {})
+           [nil (list "THEN") {}])
+        "created option rule works when symbol absent")))
+
 ;(deftest test-rep*
 ;  (let [rep*-true (p/rep* (p/with-info (p/constant-semantics (p/lit "true") true)
 ;                                       (fn [i p] (assoc i :a (inc (i :a))))))]
