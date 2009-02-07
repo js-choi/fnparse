@@ -43,52 +43,52 @@
          [{:a 1} (list "THEN") {}])
       "created constant sem rule returns constant value when given subrule does not fail"))
 
-;(deftest test-validate
-;  (is (= (((p/validate (p/lit "hi") #(= "hi" %))) ["hi" "THEN"] {})
-;         ["hi" (list "THEN") {}])
-;      "created validator rule succeeds when given subrule and validator succeed")
-;  (is (= (((p/validate (p/lit "hi") #(= "RST" %))) "RST" {}) nil)
-;      "created validator rule fails when given subrule fails")
-;  (is (= (((p/validate (p/lit "hi") #(= "hi" %))) "hi" {}) nil)
-;      "created validator rule fails when given validator fails"))
-; 
-;(deftest test-validate-remainder
-;  (is (= (((p/validate-remainder (p/lit "hi") (fn [r i] (= "THEN" (first r)))))
-;          ["hi" "THEN"] {})
-;         ["hi" (list "THEN") {}])
-;      "created remainder-validating rule succeeds when given subrule and validator succeed")
-;  (is (= (((p/validate-remainder (p/lit "hi") (fn [r i] (= "THEN" (first r)))))
-;          ["bye" "THEN"] {})
-;         nil)
-;      "created remainder-validating rule fails when given subrule fails")
-;  (is (= (((p/validate-remainder (p/lit "hi") (fn [r i] (= "THEN" (first r)))))
-;          ["hi" "WELL"] {})
-;         nil)
-;      "created remainder-validating rule fails when given validator fails"))
-; 
-;(deftest test-validate-info
-;  (let [subrule (p/with-info (p/lit "hi") (fn [i p] (assoc i :b 1)))]
-;    (is (= (((p/validate-info subrule #(contains? % :b))) ["hi" "THEN"] {})
-;           ["hi" (list "THEN") {:b 1}])
-;        "created info-validating rule succeeds when given subrule and validator succeed")
-;    (is (= (((p/validate-info subrule #(contains? % :b))) ["bye" "THEN"] {}) nil)
-;        "created info-validating rule fails when given subrule fails")
-;    (is (= (((p/validate-info subrule #(= 2 (count %)))) ["hi" "THEN"] {}) nil)
-;        "created info-validating rule fails when given validator fails")))
-; 
-;(deftest test-conc
-;  (let [identifier (p/with-info (p/term string?) (fn [m p] (assoc m :b 1)))
-;        equals-operator (p/semantics (p/lit "=") keyword)
-;        answer (p/with-info (p/lit "42") (fn [m p] (assoc m :c 3)))
-;        truth (p/conc identifier equals-operator answer)]
-;    ; Parse the first symbols in the program "answer = 42 THEN"
-;    (is (= ((truth) ["answer" "=" "42" "THEN"] {:a 50})
-;           [["answer" := "42"] (list "THEN") {:a 50, :b 1, :c 3}])
-;        "created concatenation rule works when valid symbols are present in order")
-;    ; Parse the first symbols in the program "answer = 42 THEN"
-;    (is (= ((truth) ["answer" "42" "=" "THEN"] {}) nil)
-;        "created concatenation rule fails when invalid symbols present")))
-;
+(deftest test-validate
+  (is (= ((p/validate (p/lit "hi") #(= "hi" %)) ["hi" "THEN"] {})
+         ["hi" (list "THEN") {}])
+      "created validator rule succeeds when given subrule and validator succeed")
+  (is (= ((p/validate (p/lit "hi") #(= "RST" %)) "RST" {}) nil)
+      "created validator rule fails when given subrule fails")
+  (is (= ((p/validate (p/lit "hi") #(= "hi" %)) "hi" {}) nil)
+      "created validator rule fails when given validator fails"))
+ 
+(deftest test-validate-remainder
+  (is (= ((p/validate-remainder (p/lit "hi") (fn [r i] (= "THEN" (first r))))
+          ["hi" "THEN"] {})
+         ["hi" (list "THEN") {}])
+      "created remainder-validating rule succeeds when given subrule and validator succeed")
+  (is (= ((p/validate-remainder (p/lit "hi") (fn [r i] (= "THEN" (first r))))
+          ["bye" "THEN"] {})
+         nil)
+      "created remainder-validating rule fails when given subrule fails")
+  (is (= ((p/validate-remainder (p/lit "hi") (fn [r i] (= "THEN" (first r))))
+          ["hi" "WELL"] {})
+         nil)
+      "created remainder-validating rule fails when given validator fails"))
+ 
+(deftest test-validate-info
+  (let [subrule (p/with-info (p/lit "hi") (fn [i p] (assoc i :b 1)))]
+    (is (= ((p/validate-info subrule #(contains? % :b)) ["hi" "THEN"] {})
+           ["hi" (list "THEN") {:b 1}])
+        "created info-validating rule succeeds when given subrule and validator succeed")
+    (is (= ((p/validate-info subrule #(contains? % :b)) ["bye" "THEN"] {}) nil)
+        "created info-validating rule fails when given subrule fails")
+    (is (= ((p/validate-info subrule #(= 2 (count %))) ["hi" "THEN"] {}) nil)
+        "created info-validating rule fails when given validator fails")))
+ 
+(deftest test-conc
+  (let [identifier (p/with-info (p/term string?) (fn [m p] (assoc m :b 1)))
+        equals-operator (p/semantics (p/lit "=") keyword)
+        answer (p/with-info (p/lit "42") (fn [m p] (assoc m :c 3)))
+        truth (p/conc identifier equals-operator answer)]
+    ; Parse the first symbols in the program "answer = 42 THEN"
+    (is (= (truth ["answer" "=" "42" "THEN"] {:a 50})
+           [["answer" := "42"] (list "THEN") {:a 50, :b 1, :c 3}])
+        "created concatenation rule works when valid symbols are present in order")
+    ; Parse the first symbols in the program "answer = 42 THEN"
+    (is (= (truth ["answer" "42" "=" "THEN"] {}) nil)
+        "created concatenation rule fails when invalid symbols present")))
+
 ;(deftest test-alt
 ;  (let [literal-true (p/semantics (p/lit "true") (fn [_] true)),
 ;        literal-false (p/semantics (p/lit "false") (fn [_] false)),

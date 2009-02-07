@@ -35,7 +35,7 @@
   (validator b-product) is false, then nil is simply returned."
   [subrule validator]
   (fn [tokens info]
-    (let [[product remainder :as result] ((subrule) tokens info)]
+    (let [[product remainder :as result] (subrule tokens info)]
       (when (and (not (nil? result)) (validator product))
         result))))
 
@@ -49,7 +49,7 @@
   returned."
   [subrule validator]
   (fn [tokens info]
-    (let [[product remainder :as result] ((subrule) tokens info)]
+    (let [[product remainder :as result] (subrule tokens info)]
       (when (and (not (nil? result)) (validator remainder info))
         result))))
 
@@ -62,7 +62,7 @@
   (validator b-info) is false, then nil is simply returned."
   [subrule validator]
   (fn [tokens info]
-    (let [[product remainder info :as result] ((subrule) tokens info)]
+    (let [[product remainder info :as result] (subrule tokens info)]
       (when (and (not (nil? result)) (validator info))
         result))))
 
@@ -108,7 +108,17 @@
   ([token-regex process-meta]
    (term #(re-matches token-regex %) process-meta)))
 
-(defn conc
+(defn conc-fn [tokens info & subrules]
+  (loop [products [], token-queue tokens, rule-queue subrules, curr-info info]
+    (if (nil? rule-queue),
+        [products token-queue curr-info]
+        (let [[sub-product sub-remainder sub-info :as sub-result]
+              ((first rule-queue) token-queue curr-info)]
+          (when-not (nil? sub-result)
+            (recur (conj products sub-product) sub-remainder
+                   (rest rule-queue) sub-info))))))
+
+(defmacro conc
   "Creates a rule metafunction that is the concatenation of the given subrules--that is, each
   subrule followed by the next.
   (def a (conc b c d)) would be equivalent to the EBNF
@@ -116,15 +126,8 @@
   The new rule's products would be the vector [b-product c-product d-product]. If any of
   the subrules don't match in the right place, the new rule simply returns nil."
   [& subrules]
-  (fn [tokens info]
-    (loop [products [], token-queue tokens, rule-queue subrules, curr-info info]
-      (if (nil? rule-queue),
-          [products token-queue curr-info]
-          (let [[sub-product sub-remainder sub-info :as sub-result]
-                (((first rule-queue)) token-queue curr-info)]
-            (when-not (nil? sub-result)
-              (recur (conj products sub-product) sub-remainder
-                     (rest rule-queue) sub-info)))))))
+  `(fn [tokens# info#]
+     (conc-fn tokens# info# ~@subrules)))
 
 (defn alt
   "Creates a rule metafunction that is the alternative of the given subrules--that is, any
@@ -201,7 +204,7 @@
         (when (and (not (nil? product)) (every? #(nil? ((%) tokens info)) subtrahends))
           product)))))
 
-(defn factor=
+(defmacro factor=
   "Creates a rule metafunction that is the syntactic factor of the given subrule by a given
   integer--that is, it is equivalent to the subrule replicated by 1, 2, etc. times and
   then concatenated.
@@ -212,7 +215,7 @@
   (factor= 3 \"A\") would accept [\"A\" \"A\" \"A\" \"A\" \"B\"] and return
   [[\"A\" \"A\" \"A\"] (\"A\" \"B\")."
   [factor subrule]
-  (apply conc (replicate factor subrule)))
+  `(conc ~@(replicate factor subrule)))
  
 (defn rep-predicate
   "Creates a rule metafunction that is the greedy repetition of the given subrule whose valid
@@ -245,39 +248,39 @@
   [limit subrule]
   (validate (rep* subrule) #(<= (count %) limit)))
  
-(defn factor<
-  "Creates a rule metafunction that is the syntactic factor (a nongreedy repetition) of the
-  given subrule by less than a given integer--that is, it accepts a certain number of tokens
-  that fulfill the subrule that is less than a certain factor, and leaves the rest behind."
-  [factor subrule]
-  (alt (factor= (dec factor) subrule) (rep< factor subrule)))
- 
-(defn factor<=
-  "Creates a rule metafunction that is the syntactic factor (a nongreedy repetition) of the
-  given subrule by a given integer or less--that is, it accepts a certain number of tokens
-  that fulfill the subrule that is a certain factor or less, and leaves the rest behind."
-  [factor subrule]
-  (alt (factor= factor subrule) (rep< factor subrule)))
- 
-(defn lit-conc-seq
-  "Creates a rule metafunction that is the concatenation of the literals of the sequence of
-  the given sequenceable object--that is, it accepts only a series of tokens that matches the
-  sequence of the token sequence.
-  (def a (lit-seq \"ABCD\")) would be equivalent to the EBNF
-    a = \"A\", \"B\", \"C\", \"D\";
-  The new rule's products would be the result of the concatenation rule."
-  ([token-seq]
-   (apply conc (map lit token-seq))))
- 
-(defn lit-alt-seq
-  "Creates a rule metafunction that is the alternative of the literals of the sequence of the
-  given sequenceable object--that is, it accepts only a series of tokens that matches any
-  of the token sequence.
-  (def a (lit-seq \"ABCD\")) would be equivalent to the EBNF
-    a = \"A\" | \"B\" | \"C\" | \"D\";
-  The new rule's products would be the result of the concatenation rule."
-  [token-seq]
-  (apply alt (map lit token-seq)))
+;(defn factor<
+;  "Creates a rule metafunction that is the syntactic factor (a nongreedy repetition) of the
+;  given subrule by less than a given integer--that is, it accepts a certain number of tokens
+;  that fulfill the subrule that is less than a certain factor, and leaves the rest behind."
+;  [factor subrule]
+;  (alt (factor= (dec factor) subrule) (rep< factor subrule)))
+; 
+;(defn factor<=
+;  "Creates a rule metafunction that is the syntactic factor (a nongreedy repetition) of the
+;  given subrule by a given integer or less--that is, it accepts a certain number of tokens
+;  that fulfill the subrule that is a certain factor or less, and leaves the rest behind."
+;  [factor subrule]
+;  (alt (factor= factor subrule) (rep< factor subrule)))
+; 
+;(defn lit-conc-seq
+;  "Creates a rule metafunction that is the concatenation of the literals of the sequence of
+;  the given sequenceable object--that is, it accepts only a series of tokens that matches the
+;  sequence of the token sequence.
+;  (def a (lit-seq \"ABCD\")) would be equivalent to the EBNF
+;    a = \"A\", \"B\", \"C\", \"D\";
+;  The new rule's products would be the result of the concatenation rule."
+;  ([token-seq]
+;   (apply conc (map lit token-seq))))
+; 
+;(defn lit-alt-seq
+;  "Creates a rule metafunction that is the alternative of the literals of the sequence of the
+;  given sequenceable object--that is, it accepts only a series of tokens that matches any
+;  of the token sequence.
+;  (def a (lit-seq \"ABCD\")) would be equivalent to the EBNF
+;    a = \"A\" | \"B\" | \"C\" | \"D\";
+;  The new rule's products would be the result of the concatenation rule."
+;  [token-seq]
+;  (apply alt (map lit token-seq)))
 
 (defn emptiness
   "A rule metafunction that matches emptiness--that is, it always matches with every given
