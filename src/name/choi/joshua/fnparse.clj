@@ -167,14 +167,13 @@
   actually means that the new rule would then return the vector [[] tokens]. The new rule
   can never simply return nil."
   [subrule]
-  (fn []
-    (fn [tokens info]
-      (loop [products [], token-queue (seq tokens), cur-info info]
-        (let [[sub-product sub-remainder sub-info :as sub-result]
-              ((subrule) token-queue cur-info)]
-          (if (or (nil? sub-result) (and (nil? sub-product) (nil? sub-remainder)))
-              [products token-queue cur-info]
-              (recur (conj products sub-product) sub-remainder sub-info)))))))
+  (fn [tokens info]
+    (loop [products [], token-queue (seq tokens), cur-info info]
+      (let [[sub-product sub-remainder sub-info :as sub-result]
+            (subrule token-queue cur-info)]
+        (if (or (nil? sub-result) (and (nil? sub-product) (nil? sub-remainder)))
+            [products token-queue cur-info]
+            (recur (conj products sub-product) sub-remainder sub-info))))))
 
 (defn rep+
   "Creates a rule metafunction that is the one-or-more repetition of the given rule--that

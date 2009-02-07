@@ -112,27 +112,27 @@
            [nil (list "THEN") {}])
         "created option rule works when symbol absent")))
 
-;(deftest test-rep*
-;  (let [rep*-true (p/rep* (p/with-info (p/constant-semantics (p/lit "true") true)
-;                                       (fn [i p] (assoc i :a (inc (i :a))))))]
-;    ; Parse the first symbol in the program "true THEN"
-;    (is (= ((rep*-true) ["true" "THEN"] {:a 3})
-;           [[true] (list "THEN") {:a 4}])
-;        "created zero-or-more-repetition rule works when symbol present singularly")
-;    ; Parse the first symbol in the program "true true true THEN"
-;    (is (= ((rep*-true) ["true" "true" "true" "THEN"] {:a 3})
-;           [[true true true] (list "THEN") {:a 6}])
-;        "created zero-or-more-repetition rule works when symbol present multiply")
-;    ; Parse the first symbol in the program "THEN"
-;    (is (= ((rep*-true) ["THEN"] {})
-;           [[] (list "THEN") {}])
-;     "created zero-or-more-repetition rule works when symbol absent"))
-;  (let [rep*-char (p/rep* (p/term #(not= % \")))]
-;    ; Parse the first symbol in the program "THEN"
-;    (is (= ((rep*-char) [\a \b \c] {})
-;           [[\a \b \c] nil {}])
-;        "created zero-or-more-repetition rule with a negative subrule works with no remainder")))
-;
+(deftest test-rep*
+  (let [rep*-true (p/rep* (p/with-info (p/constant-semantics (p/lit "true") true)
+                                       (fn [i p] (assoc i :a (inc (i :a))))))]
+    ; Parse the first symbol in the program "true THEN"
+    (is (= (rep*-true ["true" "THEN"] {:a 3})
+           [[true] (list "THEN") {:a 4}])
+        "created zero-or-more-repetition rule works when symbol present singularly")
+    ; Parse the first symbol in the program "true true true THEN"
+    (is (= (rep*-true ["true" "true" "true" "THEN"] {:a 3})
+           [[true true true] (list "THEN") {:a 6}])
+        "created zero-or-more-repetition rule works when symbol present multiply")
+    ; Parse the first symbol in the program "THEN"
+    (is (= (rep*-true ["THEN"] {})
+           [[] (list "THEN") {}])
+     "created zero-or-more-repetition rule works when symbol absent"))
+  (let [rep*-char (p/rep* (p/term #(not= % \")))]
+    ; Parse the first symbol in the program "THEN"
+    (is (= (rep*-char [\a \b \c] {})
+           [[\a \b \c] nil {}])
+        "created zero-or-more-repetition rule with a negative subrule works with no remainder")))
+
 ;(deftest test-rep+
 ;  (let [rep+-true (p/rep+ (p/constant-semantics (p/lit "true") true))]
 ;    ; Parse the first symbol in the program "true THEN"
