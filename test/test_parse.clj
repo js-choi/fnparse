@@ -4,45 +4,45 @@
 ;(set! *warn-on-reflection* true)
 
 (deftest test-term
-  (is (= (((p/term #(= % "true"))) ["true" "THEN"] {})
+  (is (= ((p/term #(= % "true")) ["true" "THEN"] {})
          ["true" (list "THEN") {}])
       "created terminal rule works when first token fulfills validator")
-  (is (nil? (((p/term #(= % "true"))) ["false" "THEN"] {}))
+  (is (nil? ((p/term #(= % "true")) ["false" "THEN"] {}))
       "created terminal rule fails when first token fails validator")
-  (is (= (((p/term #(= % "true"))) ["true"] {})
+  (is (= ((p/term #(= % "true")) ["true"] {})
          ["true" nil {}])
       "created terminal rule works when no remainder"))
 
-;(deftest test-lit
-;  (is (= (((p/lit "true")) ["true" "THEN"] {})
-;         ["true" (list "THEN") {}])
-;      "created literal rule works when literal token present")
-;  (is (nil? (((p/lit "true")) ["false" "THEN"] {}))
-;      "created literal rule fails when literal token not present"))
-;
-;(deftest test-re-term
-;  (is (= (((p/re-term #"\s*true\s*")) ["  true" "THEN"] {})
-;         ["  true" (list "THEN") {}])
-;      "created re-term rule works when first token matches regex")
-;  (is (nil? (((p/re-term #"\s*true\s*")) ["false" "THEN"] {}))
-;      "created re-term rule fails when first token does not match regex"))
-;
-;(deftest test-semantics
-;  (is (= (((p/semantics (p/lit "hi") #(str % \!))) ["hi" "THEN"] {})
-;         ["hi!" (list "THEN") {}])
-;      "created semantics rule applies semantic hook to valid result of given rule")
-;  (is (nil? (((p/semantics (p/lit "hi") #(str % \!))) ["RST"] {}))
-;      "created semantics rule fails when given subrule fails")
-;  (is (= (((p/semantics (p/with-info (p/lit "hi") #(assoc %1 :a %2)) #(str % \!)))
-;          ["hi" "THEN"] {})
-;         ["hi!" (list "THEN") {:a "hi"}])
-;      "created semantics rule passes info to subrule"))
-;
-;(deftest test-constant-semantics
-;  (is (= (((p/constant-semantics (p/lit "hi") (hash-map :a 1))) ["hi" "THEN"] {})
-;         [{:a 1} (list "THEN") {}])
-;      "created constant sem rule returns constant value when given subrule does not fail"))
-;
+(deftest test-lit
+  (is (= ((p/lit "true") ["true" "THEN"] {})
+         ["true" (list "THEN") {}])
+      "created literal rule works when literal token present")
+  (is (nil? ((p/lit "true") ["false" "THEN"] {}))
+      "created literal rule fails when literal token not present"))
+
+(deftest test-re-term
+  (is (= ((p/re-term #"\s*true\s*") ["  true" "THEN"] {})
+         ["  true" (list "THEN") {}])
+      "created re-term rule works when first token matches regex")
+  (is (nil? ((p/re-term #"\s*true\s*") ["false" "THEN"] {}))
+      "created re-term rule fails when first token does not match regex"))
+
+(deftest test-semantics
+  (is (= ((p/semantics (p/lit "hi") #(str % \!)) ["hi" "THEN"] {})
+         ["hi!" (list "THEN") {}])
+      "created semantics rule applies semantic hook to valid result of given rule")
+  (is (nil? ((p/semantics (p/lit "hi") #(str % \!)) ["RST"] {}))
+      "created semantics rule fails when given subrule fails")
+  (is (= ((p/semantics (p/with-info (p/lit "hi") #(assoc %1 :a %2)) #(str % \!))
+          ["hi" "THEN"] {})
+         ["hi!" (list "THEN") {:a "hi"}])
+      "created semantics rule passes info to subrule"))
+
+(deftest test-constant-semantics
+  (is (= ((p/constant-semantics (p/lit "hi") (hash-map :a 1)) ["hi" "THEN"] {})
+         [{:a 1} (list "THEN") {}])
+      "created constant sem rule returns constant value when given subrule does not fail"))
+
 ;(deftest test-validate
 ;  (is (= (((p/validate (p/lit "hi") #(= "hi" %))) ["hi" "THEN"] {})
 ;         ["hi" (list "THEN") {}])

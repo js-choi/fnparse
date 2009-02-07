@@ -20,13 +20,12 @@
     a = ? (validator %) evaluates to true ?;
   The new rule's product would be the first token, if it fulfills the validator.
   If the token does not fulfill the validator, the new rule simply returns nil."
-  ([validator]
-   (fn []
-     (fn [tokens info]
-       (let [first-token (first tokens)
-             remainder (rest tokens)]
-         (when (validator first-token)
-           [first-token remainder info]))))))
+  [validator]
+    (fn [tokens info]
+      (let [first-token (first tokens)
+            remainder (rest tokens)]
+        (when (validator first-token)
+          [first-token remainder info]))))
 
 (defn validate
   "Creates a rule metafunction from attaching a product-validating function to the given
@@ -35,11 +34,10 @@
   (validator b-product) is true. The new rule's product would be b-product. If b fails or
   (validator b-product) is false, then nil is simply returned."
   [subrule validator]
-  (fn []
-    (fn [tokens info]
-      (let [[product remainder :as result] ((subrule) tokens info)]
-        (when (and (not (nil? result)) (validator product))
-          result)))))
+  (fn [tokens info]
+    (let [[product remainder :as result] ((subrule) tokens info)]
+      (when (and (not (nil? result)) (validator product))
+        result))))
 
 (defn validate-remainder
   "Creates a rule metafunction from attaching a remainder-validating function to the given
@@ -50,11 +48,10 @@
   b-product. If b fails or (validator b-remainder b-info) is false, then nil is simply
   returned."
   [subrule validator]
-  (fn []
-    (fn [tokens info]
-      (let [[product remainder :as result] ((subrule) tokens info)]
-        (when (and (not (nil? result)) (validator remainder info))
-          result)))))
+  (fn [tokens info]
+    (let [[product remainder :as result] ((subrule) tokens info)]
+      (when (and (not (nil? result)) (validator remainder info))
+        result))))
 
 (defn validate-info
   "Creates a rule metafunction from attaching a info-validating function to the given
@@ -64,23 +61,21 @@
   when (validator b-info) is true. The new rule's product would be b-product. If b fails or
   (validator b-info) is false, then nil is simply returned."
   [subrule validator]
-  (fn []
-    (fn [tokens info]
-      (let [[product remainder info :as result] ((subrule) tokens info)]
-        (when (and (not (nil? result)) (validator info))
-          result)))))
+  (fn [tokens info]
+    (let [[product remainder info :as result] ((subrule) tokens info)]
+      (when (and (not (nil? result)) (validator info))
+        result))))
 
 (defn semantics
   "Creates a rule metafunction from attaching a semantic hook function to the given subrule-
   that is, its products are from applying the semantic hook to the subrule's products. When
   the subrule fails and returns nil, the new rule will return nil."
   [subrule semantic-hook]
-  (fn []
-    (fn [tokens info]
-      (let [[sub-product remainder sub-info :as sub-result] ((subrule) tokens info)]
-        (when-not (nil? sub-result)
-          (let [semantic-product (semantic-hook sub-product)]
-            [semantic-product remainder sub-info]))))))
+  (fn [tokens info]
+    (let [[sub-product remainder sub-info :as sub-result] (subrule tokens info)]
+      (when-not (nil? sub-result)
+        (let [semantic-product (semantic-hook sub-product)]
+          [semantic-product remainder sub-info])))))
 
 (defn constant-semantics
   "Creates a rule metafunction from attaching a constant semantic hook function to the given
@@ -121,16 +116,15 @@
   The new rule's products would be the vector [b-product c-product d-product]. If any of
   the subrules don't match in the right place, the new rule simply returns nil."
   [& subrules]
-  (fn []
-    (fn [tokens info]
-      (loop [products [], token-queue tokens, rule-queue subrules, curr-info info]
-        (if (nil? rule-queue),
-            [products token-queue curr-info]
-            (let [[sub-product sub-remainder sub-info :as sub-result]
-                  (((first rule-queue)) token-queue curr-info)]
-              (when-not (nil? sub-result)
-                (recur (conj products sub-product) sub-remainder
-                       (rest rule-queue) sub-info))))))))
+  (fn [tokens info]
+    (loop [products [], token-queue tokens, rule-queue subrules, curr-info info]
+      (if (nil? rule-queue),
+          [products token-queue curr-info]
+          (let [[sub-product sub-remainder sub-info :as sub-result]
+                (((first rule-queue)) token-queue curr-info)]
+            (when-not (nil? sub-result)
+              (recur (conj products sub-product) sub-remainder
+                     (rest rule-queue) sub-info)))))))
 
 (defn alt
   "Creates a rule metafunction that is the alternative of the given subrules--that is, any
@@ -308,11 +302,10 @@
   info. The processing function should accept two arguments: the info of the subrule's
   results and the product of the subrule's results."
   [subrule process-info]
-  (fn []
-    (fn [tokens info]
-      (let [subrule-result ((subrule) tokens info)]
-        (when-not (nil? subrule-result)
-          (assoc subrule-result 2 (process-info info (subrule-result 0))))))))
+  (fn [tokens info]
+    (let [subrule-result (subrule tokens info)]
+      (when-not (nil? subrule-result)
+        (assoc subrule-result 2 (process-info info (subrule-result 0)))))))
 
 (defn failpoint
   "Creates a rule metafunction that applies a failpoint to a subrule. When the subrule
