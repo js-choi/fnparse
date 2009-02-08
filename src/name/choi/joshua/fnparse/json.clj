@@ -129,7 +129,7 @@
 (def lex seq)
 
 (defn parse [tokens]
-  (let [[product remainder info] ((text) tokens {:column 0, :line 0})]
+  (let [[product remainder info] (text tokens {:column 0, :line 0})]
     (println "FINISHED PARSING:" info)
     product))
 
