@@ -261,25 +261,27 @@
   [factor subrule]
   (alt (factor= factor subrule) (rep< factor subrule)))
 
-;(defn lit-conc-seq
-;  "Creates a rule metafunction that is the concatenation of the literals of the sequence of
-;  the given sequenceable object--that is, it accepts only a series of tokens that matches the
-;  sequence of the token sequence.
-;  (def a (lit-seq \"ABCD\")) would be equivalent to the EBNF
-;    a = \"A\", \"B\", \"C\", \"D\";
-;  The new rule's products would be the result of the concatenation rule."
-;  ([token-seq]
-;   (apply conc (map lit token-seq))))
-; 
-;(defn lit-alt-seq
-;  "Creates a rule metafunction that is the alternative of the literals of the sequence of the
-;  given sequenceable object--that is, it accepts only a series of tokens that matches any
-;  of the token sequence.
-;  (def a (lit-seq \"ABCD\")) would be equivalent to the EBNF
-;    a = \"A\" | \"B\" | \"C\" | \"D\";
-;  The new rule's products would be the result of the concatenation rule."
-;  [token-seq]
-;  (apply alt (map lit token-seq)))
+(defn lit-conc-seq
+  "Creates a rule metafunction that is the concatenation of the literals of the sequence of
+  the given sequenceable object--that is, it accepts only a series of tokens that matches the
+  sequence of the token sequence.
+  (def a (lit-seq \"ABCD\")) would be equivalent to the EBNF
+    a = \"A\", \"B\", \"C\", \"D\";
+  The new rule's products would be the result of the concatenation rule."
+  [token-seq]
+  (fn [tokens info]
+    (apply conc-fn tokens info (map lit token-seq))))
+
+(defn lit-alt-seq
+  "Creates a rule metafunction that is the alternative of the literals of the sequence of the
+  given sequenceable object--that is, it accepts only a series of tokens that matches any
+  of the token sequence.
+  (def a (lit-seq \"ABCD\")) would be equivalent to the EBNF
+    a = \"A\" | \"B\" | \"C\" | \"D\";
+  The new rule's products would be the result of the concatenation rule."
+  [token-seq]
+  (fn [tokens info]
+    (apply alt-fn tokens info (map lit token-seq))))
 
 (defn emptiness
   "A rule metafunction that matches emptiness--that is, it always matches with every given
@@ -287,8 +289,8 @@
   (def a emptiness) would be equivalent to the EBNF
     a = ;
   This rule's product is always nil, and it therefore always returns [nil tokens]."
-  []
-  (fn [tokens info] [nil tokens info]))
+  [tokens info]
+  [nil tokens info])
 
 (defn followed-by
   "Creates a rule metafunction that figures out if the following tokens after the base
@@ -297,7 +299,7 @@
   Make sure that the following subrule doesn't depend on info at all."
   [base-subrule following-subrule]
   (validate-remainder base-subrule
-    (fn [remainder info] ((following-subrule) remainder info))))
+    (fn [remainder info] (following-subrule remainder info))))
 
 (defn with-info
   "Creates a rule metafunction that applies a processing function to a subrule's results'
@@ -314,12 +316,11 @@
   fails—i.e., it returns nil—then the failure function is called. Its two arguments are the
   tokens and info that caused it to fail."
   [subrule failure]
-  (fn []
-    (fn [tokens info]
-      (let [subrule-result ((subrule) tokens info)]
-        (if (nil? subrule-result)
-            (failure tokens info)
-            subrule-result)))))
+  (fn [tokens info]
+    (let [subrule-result (subrule tokens info)]
+      (if (nil? subrule-result)
+          (failure tokens info)
+          subrule-result))))
 
 (defn do-effects-before
   "Creates a rule metafunction that applies a side-effect function to a subrule before its
@@ -327,14 +328,13 @@
   This is useful for temporarily making a rule print a message whenever it's called. The
   effects function is passed the tokens and info given to this rule."
   [subrule effects]
-  (fn []
-    (fn [tokens info]
-      (effects tokens info)
-      ((subrule) tokens info))))
+  (fn [tokens info]
+    (effects tokens info)
+    (subrule tokens info)))
 
 (defn anything
   "A rule metafunction that matches anything--that is, it matches the first token of the
   tokens it is given.
   This rule's product is the first token it receives."
-  []
-  (fn [tokens info] [(first tokens) (rest tokens) info]))
+  [tokens info]
+  [(first tokens) (rest tokens) info])
