@@ -183,11 +183,10 @@
   The new rule's products would be the vector [b-product ...] for how many matches of b
   were found. If there were zero matches, then nil is simply returned."
   [subrule]
-  (fn []
-    (fn [tokens info]
-      (let [product (((rep* subrule)) tokens info)]
-         (when-not (empty? (product 0))
-           product)))))
+  (fn [tokens info]
+    (let [product ((rep* subrule) tokens info)]
+       (when-not (empty? (product 0))
+         product))))
 
 (defn except
   "Creates a rule metafunction that is the exception from the first given subrules with the
@@ -198,13 +197,12 @@
   The new rule's products would be b-product. If b fails or either c or d succeeds, then
   nil is simply returned."
   [minuend & subtrahends]
-  (fn []
-    (fn [tokens info]
-      (let [product ((minuend) tokens info)]
-        (when (and (not (nil? product)) (every? #(nil? ((%) tokens info)) subtrahends))
-          product)))))
+  (fn [tokens info]
+    (let [product (minuend tokens info)]
+      (when (and (not (nil? product)) (every? #(nil? (% tokens info)) subtrahends))
+        product))))
 
-(defmacro factor=
+(defn factor=
   "Creates a rule metafunction that is the syntactic factor of the given subrule by a given
   integer--that is, it is equivalent to the subrule replicated by 1, 2, etc. times and
   then concatenated.
@@ -215,7 +213,8 @@
   (factor= 3 \"A\") would accept [\"A\" \"A\" \"A\" \"A\" \"B\"] and return
   [[\"A\" \"A\" \"A\"] (\"A\" \"B\")."
   [factor subrule]
-  `(conc ~@(replicate factor subrule)))
+  (fn [tokens info]
+    (apply conc-fn tokens info (replicate factor subrule))))
  
 (defn rep-predicate
   "Creates a rule metafunction that is the greedy repetition of the given subrule whose valid
@@ -229,39 +228,39 @@
   fulfill the subrule, no more and no less."
   [factor subrule]
   (validate (rep* subrule) #(= (count %) factor)))
- 
+
 (defn rep<
-  "Creates a rule metafunction that is the greedy repetition of the given subrule by less than
-  the given positive integer factor--that is, it accepts a certain range number of tokens
-  that fulfill the subrule, less than but not equal to the limiting factor.
+  "Creates a rule metafunction that is the greedy repetition of the given subrule by less
+  than the given positive integer factor--that is, it accepts a certain range number of
+  tokens that fulfill the subrule, less than but not equal to the limiting factor.
   The new rule's products would be b-product. If b fails below n times, then nil is simply
   returned."
   [limit subrule]
   (validate (rep* subrule) #(< (count %) limit)))
- 
+
 (defn rep<=
-  "Creates a rule metafunction that is the greedy repetition of the given subrule by the given
-  positive integer factor or less--that is, it accepts a certain range number of tokens that
-  fulfill the subrule, less than but not equal to the limiting factor.
+  "Creates a rule metafunction that is the greedy repetition of the given subrule by the
+  given positive integer factor or less--that is, it accepts a certain range number of tokens
+  that fulfill the subrule, less than but not equal to the limiting factor.
   The new rule's products would be b-product. If b fails below n times, then nil is simply
   returned."
   [limit subrule]
   (validate (rep* subrule) #(<= (count %) limit)))
- 
-;(defn factor<
-;  "Creates a rule metafunction that is the syntactic factor (a nongreedy repetition) of the
-;  given subrule by less than a given integer--that is, it accepts a certain number of tokens
-;  that fulfill the subrule that is less than a certain factor, and leaves the rest behind."
-;  [factor subrule]
-;  (alt (factor= (dec factor) subrule) (rep< factor subrule)))
-; 
-;(defn factor<=
-;  "Creates a rule metafunction that is the syntactic factor (a nongreedy repetition) of the
-;  given subrule by a given integer or less--that is, it accepts a certain number of tokens
-;  that fulfill the subrule that is a certain factor or less, and leaves the rest behind."
-;  [factor subrule]
-;  (alt (factor= factor subrule) (rep< factor subrule)))
-; 
+
+(defn factor<
+  "Creates a rule metafunction that is the syntactic factor (a nongreedy repetition) of the
+  given subrule by less than a given integer--that is, it accepts a certain number of tokens
+  that fulfill the subrule that is less than a certain factor, and leaves the rest behind."
+  [factor subrule]
+  (alt (factor= (dec factor) subrule) (rep< factor subrule)))
+
+(defn factor<=
+  "Creates a rule metafunction that is the syntactic factor (a nongreedy repetition) of the
+  given subrule by a given integer or less--that is, it accepts a certain number of tokens
+  that fulfill the subrule that is a certain factor or less, and leaves the rest behind."
+  [factor subrule]
+  (alt (factor= factor subrule) (rep< factor subrule)))
+
 ;(defn lit-conc-seq
 ;  "Creates a rule metafunction that is the concatenation of the literals of the sequence of
 ;  the given sequenceable object--that is, it accepts only a series of tokens that matches the

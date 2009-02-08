@@ -133,57 +133,57 @@
            [[\a \b \c] nil {}])
         "created zero-or-more-repetition rule with a negative subrule works with no remainder")))
 
-;(deftest test-rep+
-;  (let [rep+-true (p/rep+ (p/constant-semantics (p/lit "true") true))]
-;    ; Parse the first symbol in the program "true THEN"
-;    (is (= ((rep+-true) ["true" "THEN"] {})
-;           [[true] (list "THEN") {}])
-;        "created one-or-more-repetition rule works when symbol present singularly")
-;    ; Parse the first symbol in the program "true true true THEN"
-;    (is (= ((rep+-true) ["true" "true" "true" "THEN"] {})
-;           [[true true true] (list "THEN") {}])
-;        "created one-or-more-repetition rule works when symbol present multiply")
-;    ; Parse the first symbol in the program "THEN"
-;    (is (nil? ((rep+-true) (list "THEN") {}))
-;        "created one-or-more-repetition rule fails when symbol absent")))
-;
-;(deftest test-except
-;  ; except-rule = ("A" | "B" | "C") - "B" - "C";
-;  (let [except-rule (p/except (p/alt (p/lit "A") (p/lit "B") (p/lit "C"))
-;                              (p/lit "B") (p/with-info (p/lit "C") (fn [i p] {:b "wrong"})))]
-;    (is (= ((except-rule) (list "A" "B" "C") {:a 1}) ["A" (list "B" "C") {:a 1}])
-;        "created exception rule works when symbol is not one of the syntatic exceptions")
-;    (is (= ((except-rule) (list "B" "A" "C") {}) nil)
-;        "created exception rule fails when symbol is one of the syntactic exceptions")
-;    (is (= ((except-rule) (list "D" "A" "B") {}) nil)
-;        "created exception rule fails when symbol does not fulfill subrule")))
-;
-;(deftest test-factor=
-;  ; rep=-rule = 3 * "A";
-;  (let [tested-rule-3 (p/factor= 3 (p/lit "A")), tested-rule-0 (p/factor= 0 (p/lit "A"))]
-;    (is (= ((tested-rule-3) (list "A" "A" "A" "A" "C") {})
-;           [["A" "A" "A"] (list "A" "C") {}])
-;        "created factor= rule works when symbol fulfills all subrule multiples and leaves strict remainder")
-;    (is (= ((tested-rule-3) (list "A" "A" "A" "C") {}) [["A" "A" "A"] (list "C") {}])
-;        "created factor= rule works when symbol fulfills all subrule multiples only")
-;    (is (= ((tested-rule-3) (list "A" "A" "C") {}) nil)
-;        "created factor= rule fails when symbol does not fulfill all subrule multiples")
-;    (is (= ((tested-rule-3) (list "D" "A" "B") {}) nil)
-;        "created factor= rule fails when symbol does not fulfill subrule at all")
-;    (is (= ((tested-rule-0) (list "D" "A" "B") {}) [[] (list "D" "A" "B") {}])
-;        "created factor= rule works when symbol fulfils zero multiples and factor is zero")))
-; 
-;(deftest test-factor<
-;  (let [tested-rule (p/factor< 3 (p/lit "A"))]
-;    (is (= ((tested-rule) (list "A" "A" "A" "A" "C") {}) [["A" "A"] (list "A" "A" "C") {}])
-;        "created factor< rule works when symbol fulfills all subrule multiples and leaves strict remainder")
-;    (is (= ((tested-rule) (list "A" "A" "A" "C") {}) [["A" "A"] (list "A" "C") {}])
-;        "created factor< rule works when symbol fulfills all subrule multiples only")
-;    (is (= ((tested-rule) (list "A" "A" "C") {}) [["A" "A"] (list "C") {}])
-;        "created factor< rule works when symbol does not fulfill all subrule multiples")
-;    (is (= ((tested-rule) (list "D" "A" "B") {}) [[] (list "D" "A" "B") {}])
-;        "created factor< rule works when symbol does not fulfill subrule at all")))
-; 
+(deftest test-rep+
+  (let [rep+-true (p/rep+ (p/constant-semantics (p/lit "true") true))]
+    ; Parse the first symbol in the program "true THEN"
+    (is (= (rep+-true ["true" "THEN"] {})
+           [[true] (list "THEN") {}])
+        "created one-or-more-repetition rule works when symbol present singularly")
+    ; Parse the first symbol in the program "true true true THEN"
+    (is (= (rep+-true ["true" "true" "true" "THEN"] {})
+           [[true true true] (list "THEN") {}])
+        "created one-or-more-repetition rule works when symbol present multiply")
+    ; Parse the first symbol in the program "THEN"
+    (is (nil? (rep+-true (list "THEN") {}))
+        "created one-or-more-repetition rule fails when symbol absent")))
+
+(deftest test-except
+  ; except-rule = ("A" | "B" | "C") - "B" - "C";
+  (let [except-rule (p/except (p/alt (p/lit "A") (p/lit "B") (p/lit "C"))
+                              (p/lit "B") (p/with-info (p/lit "C") (fn [i p] {:b "wrong"})))]
+    (is (= (except-rule (list "A" "B" "C") {:a 1}) ["A" (list "B" "C") {:a 1}])
+        "created exception rule works when symbol is not one of the syntatic exceptions")
+    (is (= (except-rule (list "B" "A" "C") {}) nil)
+        "created exception rule fails when symbol is one of the syntactic exceptions")
+    (is (= (except-rule (list "D" "A" "B") {}) nil)
+        "created exception rule fails when symbol does not fulfill subrule")))
+
+(deftest test-factor=
+  ; rep=-rule = 3 * "A";
+  (let [tested-rule-3 (p/factor= 3 (p/lit "A")), tested-rule-0 (p/factor= 0 (p/lit "A"))]
+    (is (= (tested-rule-3 (list "A" "A" "A" "A" "C") {})
+           [["A" "A" "A"] (list "A" "C") {}])
+        "created factor= rule works when symbol fulfills all subrule multiples and leaves strict remainder")
+    (is (= (tested-rule-3 (list "A" "A" "A" "C") {}) [["A" "A" "A"] (list "C") {}])
+        "created factor= rule works when symbol fulfills all subrule multiples only")
+    (is (= (tested-rule-3 (list "A" "A" "C") {}) nil)
+        "created factor= rule fails when symbol does not fulfill all subrule multiples")
+    (is (= (tested-rule-3 (list "D" "A" "B") {}) nil)
+        "created factor= rule fails when symbol does not fulfill subrule at all")
+    (is (= (tested-rule-0 (list "D" "A" "B") {}) [[] (list "D" "A" "B") {}])
+        "created factor= rule works when symbol fulfils zero multiples and factor is zero")))
+
+(deftest test-factor<
+  (let [tested-rule (p/factor< 3 (p/lit "A"))]
+    (is (= (tested-rule (list "A" "A" "A" "A" "C") {}) [["A" "A"] (list "A" "A" "C") {}])
+        "created factor< rule works when symbol fulfills all subrule multiples and leaves strict remainder")
+    (is (= (tested-rule (list "A" "A" "A" "C") {}) [["A" "A"] (list "A" "C") {}])
+        "created factor< rule works when symbol fulfills all subrule multiples only")
+    (is (= (tested-rule (list "A" "A" "C") {}) [["A" "A"] (list "C") {}])
+        "created factor< rule works when symbol does not fulfill all subrule multiples")
+    (is (= (tested-rule (list "D" "A" "B") {}) [[] (list "D" "A" "B") {}])
+        "created factor< rule works when symbol does not fulfill subrule at all")))
+
 ;(deftest test-factor<=
 ;  (let [tested-rule (p/factor<= 3 (p/lit "A"))]
 ;    (is (= ((tested-rule) (list "A" "A" "A" "A" "C") {}) [["A" "A" "A"] (list "A" "C") {}])
