@@ -296,11 +296,21 @@
                  "pre-effect rules succeed when their subrules are fulfilled"))
            "YES [A B] {:line 3}\n")
         "pre-effect rules should call their effect with tokens and info before processing")))
- 
+
 (deftest test-anything
   ; Parse the first symbol
   (is (= (p/anything (list "A" "B" "C") {})
          ["A" (list "B" "C") {}])
       "anything rule matches first token"))
- 
+
+(deftest test-product-context
+  (let [receiving-rule-maker (fn rule-maker [n]
+                               (p/factor= (Integer/parseInt (str n)) (p/lit \a)))
+        digit (p/semantics p/anything #(Integer/parseInt (str %)))
+        rule (p/product-context [n digit, m digit]
+               (receiving-rule-maker (+ n m)))]
+    (is (= (rule (seq "31aaaa23aa") {})
+           [[3 1 [\a \a \a \a]] (seq "23aa") {}]))
+    (is (= (rule (seq "31aaa23aa") {}) nil))))
+
 (time (run-tests))

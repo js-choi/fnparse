@@ -72,10 +72,10 @@
   the subrule fails and returns nil, the new rule will return nil."
   [subrule semantic-hook]
   (fn [tokens info]
-    (let [[sub-product remainder sub-info :as sub-result] (subrule tokens info)]
-      (when-not (nil? sub-result)
-        (let [semantic-product (semantic-hook sub-product)]
-          [semantic-product remainder sub-info])))))
+    (let [[subproduct remainder subinfo :as subresult] (subrule tokens info)]
+      (when-not (nil? subresult)
+        (let [semantic-product (semantic-hook subproduct)]
+          [semantic-product remainder subinfo])))))
 
 (defn constant-semantics
   "Creates a rule metafunction from attaching a constant semantic hook function to the given
@@ -112,11 +112,11 @@
   (loop [products [], token-queue tokens, rule-queue subrules, curr-info info]
     (if (nil? rule-queue),
         [products token-queue curr-info]
-        (let [[sub-product sub-remainder sub-info :as sub-result]
+        (let [[subproduct subremainder subinfo :as subresult]
               ((first rule-queue) token-queue curr-info)]
-          (when-not (nil? sub-result)
-            (recur (conj products sub-product) sub-remainder
-                   (rest rule-queue) sub-info))))))
+          (when-not (nil? subresult)
+            (recur (conj products subproduct) subremainder
+                   (rest rule-queue) subinfo))))))
 
 (defmacro conc
   "Creates a rule metafunction that is the concatenation of the given subrules--that is, each
@@ -169,11 +169,11 @@
   [subrule]
   (fn [tokens info]
     (loop [products [], token-queue (seq tokens), cur-info info]
-      (let [[sub-product sub-remainder sub-info :as sub-result]
+      (let [[subproduct subremainder subinfo :as subresult]
             (subrule token-queue cur-info)]
-        (if (or (nil? sub-result) (and (nil? sub-product) (nil? sub-remainder)))
+        (if (or (nil? subresult) (and (nil? subproduct) (nil? subremainder)))
             [products token-queue cur-info]
-            (recur (conj products sub-product) sub-remainder sub-info))))))
+            (recur (conj products subproduct) subremainder subinfo))))))
 
 (defn rep+
   "Creates a rule metafunction that is the one-or-more repetition of the given rule--that
@@ -338,3 +338,18 @@
   This rule's product is the first token it receives."
   [tokens info]
   [(first tokens) (rest tokens) info])
+
+(defmacro product-context
+  "Creates a concatenation rule metafunction with bindings. First, the tokens are fed into a
+  series of binding subrules in a vector head: each of those rule's products is bound to a
+  lexical variable(s). Then, each of the subrules in the body is evaluated with those
+  variables available. In other words, it's like the let macro, except that all arguments are
+  rules concatenated together."
+  [bindvec & other-subrules]
+  (if (odd? (count bindvec))
+    (throw-arg "Odd number of elements in product-context bindings")
+    `(fn [tokens# info#]
+       (when-let [[[~@(take-nth 2 bindvec) :as subproducts#] subremainder# subinfo#]
+                  (conc-fn tokens# info# ~@(take-nth 2 (rest bindvec)))]
+         (when-let [second-result# (conc-fn subremainder# subinfo# ~@other-subrules)]
+           (assoc second-result# 0 (into subproducts# (second-result# 0))))))))
