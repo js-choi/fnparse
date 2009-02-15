@@ -67,13 +67,13 @@
       "created remainder-validating rule fails when given validator fails"))
  
 (deftest test-validate-info
-  (let [subrule (p/with-info (p/lit "hi") (fn [i p] (assoc i :b 1)))]
-    (is (= ((p/validate-info subrule #(contains? % :b)) ["hi" "THEN"] {})
+  (let [subrule (p/lit "hi")]
+    (is (= ((p/validate-info subrule #(contains? % :b)) ["hi" "THEN"] {:b 1})
            ["hi" (list "THEN") {:b 1}])
         "created info-validating rule succeeds when given subrule and validator succeed")
-    (is (= ((p/validate-info subrule #(contains? % :b)) ["bye" "THEN"] {}) nil)
+    (is (= ((p/validate-info subrule #(contains? % :b)) ["bye" "THEN"] {:b 1}) nil)
         "created info-validating rule fails when given subrule fails")
-    (is (= ((p/validate-info subrule #(= 2 (count %))) ["hi" "THEN"] {}) nil)
+    (is (= ((p/validate-info subrule #(contains? % :b)) ["hi" "THEN"] {}) nil)
         "created info-validating rule fails when given validator fails")))
  
 (deftest test-conc
