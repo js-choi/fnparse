@@ -311,6 +311,15 @@
                (receiving-rule-maker (+ n m)))]
     (is (= (rule (seq "31aaaa23aa") {})
            [[3 1 [\a \a \a \a]] (seq "23aa") {}]))
-    (is (= (rule (seq "31aaa23aa") {}) nil))))
+    (is (= (rule (seq "31aaa23aa") {}) nil)))
+  (let [receiving-rule-maker (fn rule-maker [x]
+                               (p/rep+ (p/lit x)))
+        header (p/semantics (p/conc p/anything p/anything)
+                            #(hash-map :token (% 0), :type (% 1)))
+        rule (p/product-context [{token :token} header]
+               (receiving-rule-maker token))]
+    (is (= (rule (seq "a+aasdf") {})
+           [[{:type \+, :token \a} [\a \a]] (seq "sdf") {}]))
+    (is (= (rule (seq "+asdf") {}) nil))))
 
 (time (run-tests))
