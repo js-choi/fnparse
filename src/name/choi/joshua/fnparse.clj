@@ -353,3 +353,14 @@
                   (conc-fn tokens# info# ~@(take-nth 2 (rest bindvec)))]
          (when-let [second-result# (conc-fn subremainder# subinfo# ~@other-subrules)]
            (assoc second-result# 0 (into subproducts# (second-result# 0))))))))
+
+(defn match-remainder
+  "Creates a rule made of two subrules. The first matches the first of its tokens as usual.
+  The second matches the remainder, but does not actually consume the remainder. The product
+  of (match-remainder a b) is [a b], and the remainder is a-remainder and the info is a-info.
+  If either subrule fails, the whole rule fails."
+  [first-subrule remainder-subrule]
+  (fn [tokens info]
+    (when-let [[first-product first-remainder first-info] (first-subrule tokens info)]
+      (when-let [[remainder-product] (remainder-subrule first-remainder first-info)]
+        [[first-product remainder-product] first-remainder first-info]))))

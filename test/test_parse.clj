@@ -322,4 +322,15 @@
            [[{:type \+, :token \a} [\a \a]] (seq "sdf") {}]))
     (is (= (rule (seq "+asdf") {}) nil))))
 
+(deftest test-match-remainder
+  (is (= ((p/match-remainder (p/lit "hi") (p/lit "THEN")) ["hi" "THEN"] {})
+         [["hi" "THEN"] (list "THEN") {}])
+      "created remainder-matching rule succeeds when given subrule and matching succeed")
+  (is (= ((p/match-remainder (p/lit "hi") (p/lit "THEN")) ["bye" "THEN"] {})
+         nil)
+      "created remainder-matching rule fails when given subrule fails")
+  (is (= ((p/match-remainder (p/lit "hi") (p/lit "THEN")) ["hi" "WELL"] {})
+         nil)
+      "created remainder-matching rule fails when given matching fails"))
+ 
 (time (run-tests))
