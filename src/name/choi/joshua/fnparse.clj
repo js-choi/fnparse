@@ -23,7 +23,7 @@
   [validator]
     (fn [tokens info]
       (let [first-token (first tokens)
-            remainder (rest tokens)]
+            remainder (next tokens)]
         (when (validator first-token)
           [first-token remainder info]))))
 
@@ -116,7 +116,7 @@
               ((first rule-queue) token-queue curr-info)]
           (when-not (nil? subresult)
             (recur (conj products subproduct) subremainder
-                   (rest rule-queue) subinfo))))))
+                   (next rule-queue) subinfo))))))
 
 (defmacro conc
   "Creates a rule metafunction that is the concatenation of the given subrules--that is, each
@@ -337,7 +337,7 @@
   tokens it is given.
   This rule's product is the first token it receives."
   [tokens info]
-  [(first tokens) (rest tokens) info])
+  [(first tokens) (next tokens) info])
 
 (defmacro product-context
   "Creates a concatenation rule metafunction with bindings. First, the tokens are fed into a
@@ -350,7 +350,7 @@
     (throw-arg "Odd number of elements in product-context bindings")
     `(fn [tokens# info#]
        (when-let [[[~@(take-nth 2 bindvec) :as subproducts#] subremainder# subinfo#]
-                  (conc-fn tokens# info# ~@(take-nth 2 (rest bindvec)))]
+                  (conc-fn tokens# info# ~@(take-nth 2 (next bindvec)))]
          (when-let [second-result# (conc-fn subremainder# subinfo# ~@other-subrules)]
            (assoc second-result# 0 (into subproducts# (second-result# 0))))))))
 
