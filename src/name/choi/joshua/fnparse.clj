@@ -129,7 +129,7 @@
   `(fn [tokens# info#]
      (conc-fn (lazy-seq [~@subrules]) tokens# info#)))
 
-(defn alt-fn [tokens info & subrules]
+(defn alt-fn [subrules tokens info]
   (some #(% tokens info) subrules))
 
 (defmacro alt
@@ -143,7 +143,7 @@
   simply returns nil."
   [& subrules]
   `(fn [tokens# info#]
-     (alt-fn tokens# info# ~@subrules)))
+     (alt-fn (lazy-seq [~@subrules]) tokens# info#)))
 
 (defn opt
   "Creates a rule metafunction that is the optional form of the given subrule--that is,
@@ -281,7 +281,7 @@
   The new rule's products would be the result of the concatenation rule."
   [token-seq]
   (fn [tokens info]
-    (apply alt-fn tokens info (map lit token-seq))))
+    (alt-fn (map lit token-seq) tokens info)))
 
 (defn emptiness
   "A rule metafunction that matches emptiness--that is, it always matches with every given
@@ -350,8 +350,9 @@
     (throw-arg "Odd number of elements in product-context bindings")
     `(fn [tokens# info#]
        (when-let [[[~@(take-nth 2 bindvec) :as subproducts#] subremainder# subinfo#]
-                  (conc-fn ~(take-nth 2 (next bindvec)) tokens# info#)]
-         (when-let [second-result# (conc-fn ~other-subrules subremainder# subinfo#)]
+                  (conc-fn (lazy-seq [~@(take-nth 2 (next bindvec))]) tokens# info#)]
+         (when-let [second-result#
+                    (conc-fn (lazy-seq [~@other-subrules]) subremainder# subinfo#)]
            (assoc second-result# 0 (into subproducts# (second-result# 0))))))))
 
 (defn match-remainder
