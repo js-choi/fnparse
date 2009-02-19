@@ -108,8 +108,8 @@
   ([token-regex process-meta]
    (term #(re-matches token-regex %) process-meta)))
 
-(defn conc-fn [tokens info & subrules]
-  (loop [products [], token-queue tokens, rule-queue subrules, curr-info info]
+(defn conc-fn [subrules tokens info]
+  (loop [products [], token-queue tokens, rule-queue (seq subrules), curr-info info]
     (if (nil? rule-queue),
         [products token-queue curr-info]
         (let [[subproduct subremainder subinfo :as subresult]
@@ -127,7 +127,7 @@
   the subrules don't match in the right place, the new rule simply returns nil."
   [& subrules]
   `(fn [tokens# info#]
-     (conc-fn tokens# info# ~@subrules)))
+     (conc-fn (lazy-seq [~@subrules]) tokens# info#)))
 
 (defn alt-fn [tokens info & subrules]
   (some #(% tokens info) subrules))
@@ -214,7 +214,7 @@
   [[\"A\" \"A\" \"A\"] (\"A\" \"B\")."
   [factor subrule]
   (fn [tokens info]
-    (apply conc-fn tokens info (replicate factor subrule))))
+    (conc-fn (replicate factor subrule) tokens info)))
  
 (defn rep-predicate
   "Creates a rule metafunction that is the greedy repetition of the given subrule whose valid
@@ -270,7 +270,7 @@
   The new rule's products would be the result of the concatenation rule."
   [token-seq]
   (fn [tokens info]
-    (apply conc-fn tokens info (map lit token-seq))))
+    (conc-fn (map lit token-seq) tokens info)))
 
 (defn lit-alt-seq
   "Creates a rule metafunction that is the alternative of the literals of the sequence of the
@@ -350,8 +350,8 @@
     (throw-arg "Odd number of elements in product-context bindings")
     `(fn [tokens# info#]
        (when-let [[[~@(take-nth 2 bindvec) :as subproducts#] subremainder# subinfo#]
-                  (conc-fn tokens# info# ~@(take-nth 2 (next bindvec)))]
-         (when-let [second-result# (conc-fn subremainder# subinfo# ~@other-subrules)]
+                  (conc-fn ~(take-nth 2 (next bindvec)) tokens# info#)]
+         (when-let [second-result# (conc-fn ~other-subrules subremainder# subinfo#)]
            (assoc second-result# 0 (into subproducts# (second-result# 0))))))))
 
 (defn match-remainder
