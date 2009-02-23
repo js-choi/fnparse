@@ -84,6 +84,16 @@
   [subrule semantic-value]
   (semantics subrule (constantly semantic-value)))
 
+(defn semantics-with-info
+  "Exactly like the semantics function, only both the product and info are passed to the
+  semantics hook."
+  [subrule semantic-hook]
+  (fn [tokens info]
+    (let [[subproduct remainder subinfo :as subresult] (subrule tokens info)]
+      (when-not (nil? subresult)
+        (let [semantic-product (semantic-hook subproduct info)]
+          [semantic-product remainder subinfo])))))
+
 (defn lit
   "Creates a rule metafunction that is the terminal rule of the given literal token--that is,
   it accepts only tokens that are equal to the given literal token.
@@ -171,9 +181,11 @@
     (loop [products [], token-queue (seq tokens), cur-info info]
       (let [[subproduct subremainder subinfo :as subresult]
             (subrule token-queue cur-info)]
-        (if (or (nil? subresult) (and (nil? subproduct) (nil? subremainder)))
-            [products token-queue cur-info]
-            (recur (conj products subproduct) subremainder subinfo))))))
+        (if (nil? subresult)
+          [products token-queue cur-info]
+          (if (nil? subremainder)
+             [(conj products subproduct) subremainder subinfo]
+            (recur (conj products subproduct) subremainder subinfo)))))))
 
 (defn rep+
   "Creates a rule metafunction that is the one-or-more repetition of the given rule--that

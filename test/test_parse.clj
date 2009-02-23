@@ -131,7 +131,11 @@
     ; Parse the first symbol in the program "THEN"
     (is (= (rep*-char [\a \b \c] {})
            [[\a \b \c] nil {}])
-        "created zero-or-more-repetition rule with a negative subrule works with no remainder")))
+        "created zero-or-more-repetition rule with a negative subrule works with no remainder"))
+  (let [letter (p/term int)]
+    (is (= ((p/rep* letter) [\a \a \a] {})
+           [[\a \a \a] nil {}])
+        "created zero-or-more-repetition rule works with a subrule that cannot accept nil and no remainder")))
 
 (deftest test-rep+
   (let [rep+-true (p/rep+ (p/constant-semantics (p/lit "true") true))]
