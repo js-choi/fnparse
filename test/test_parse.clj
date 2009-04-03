@@ -326,6 +326,15 @@
            [[{:type \+, :token \a} [\a \a]] (seq "sdf") {}]))
     (is (= (rule (seq "+asdf") {}) nil))))
 
+(deftest test-product-invisible-context
+  (let [digit (p/semantics p/anything #(Integer/parseInt (str %)))
+        receiving-rule-maker (fn rule-maker [n]
+                               (p/factor= (Integer/parseInt (str n)) p/anything))
+        rule (p/product-invisible-context [n digit, m digit]
+               (receiving-rule-maker (+ n m)))]
+    (is (= (rule (seq "31aaaa") {})
+           [[3 1 [\3 \1 \a \a]] (seq "aa") {}]))))
+
 (deftest test-match-remainder
   (is (= ((p/match-remainder (p/lit "hi") (p/lit "THEN")) ["hi" "THEN"] {})
          [["hi" "THEN"] (list "THEN") {}])

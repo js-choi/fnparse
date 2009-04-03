@@ -355,8 +355,8 @@
   "Creates a concatenation rule metafunction with bindings. First, the tokens are fed into a
   series of binding subrules in a vector head: each of those rule's products is bound to a
   lexical variable(s). Then, each of the subrules in the body is evaluated with those
-  variables available. In other words, it's like the let macro, except that all arguments are
-  rules concatenated together."
+  variables available. In other words, it's like the let macro, except that all arguments
+  are rules concatenated together."
   [bindvec & other-subrules]
   (if (odd? (count bindvec))
     (throw-arg "Odd number of elements in product-context bindings")
@@ -367,10 +367,23 @@
                     (conc-fn (lazy-seq [~@other-subrules]) subremainder# subinfo#)]
            (assoc second-result# 0 (into subproducts# (second-result# 0))))))))
 
+(defmacro product-invisible-context
+  "Like product-context, only the bindings don't consume any tokens."
+  [bindvec & other-subrules]
+  (if (odd? (count bindvec))
+    (throw-arg "Odd number of elements in product-context bindings")
+    `(fn [tokens# info#]
+       (when-let [[[~@(take-nth 2 bindvec) :as subproducts#] subremainder# subinfo#]
+                  (conc-fn (lazy-seq [~@(take-nth 2 (next bindvec))]) tokens# info#)]
+         (when-let [second-result#
+                    (conc-fn (lazy-seq [~@other-subrules]) tokens# info#)]
+           (assoc second-result# 0 (into subproducts# (second-result# 0))))))))
+
 (defn match-remainder
   "Creates a rule made of two subrules. The first matches the first of its tokens as usual.
   The second matches the remainder, but does not actually consume the remainder. The product
-  of (match-remainder a b) is [a b], and the remainder is a-remainder and the info is a-info.
+  of (match-remainder a b) is [a b], and the remainder is a-remainder and the info is
+  a-info.
   If either subrule fails, the whole rule fails."
   [first-subrule remainder-subrule]
   (fn [tokens info]
