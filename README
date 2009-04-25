@@ -5,14 +5,14 @@ Maintenance (http://citeseer.ist.psu.edu/148293.html).
 
 FnParse's distribution has src and test folders. To use FnParse, download this
 distribution and include its src folder in your program's classpath—for instance,
-  java -cp $CLOJURE_PATH:path-to-FnParse/FnParse/src/ ...
+  java -cp $CLOJURE_PATH:path-to-FnParse-folder/src/ ...
 
-FnParse's namespace is name.choi.joshua.FnParse. 
+FnParse's namespace is name.choi.joshua.fnparse.
 
-FnParse's unit tests are stored in the tests folder and require the test-is library
+FnParse's unit tests are stored in the tests folder and use the test-is library
 from clojure-contrib, the Clojure standard library.
 
-For documentation, go to: http://github.com/joshua-choi/FnParse/wikis
+For documentation, go to: http://github.com/joshua-choi/fnparse/wikis
 
  *   FnParse
  *   Copyright (c) 2009 Joshua Choi. All rights reserved.
