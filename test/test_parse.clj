@@ -53,15 +53,15 @@
       "created validator rule fails when given validator fails"))
  
 (deftest test-validate-remainder
-  (is (= ((p/validate-remainder (p/lit "hi") (fn [r i] (= "THEN" (first r))))
+  (is (= ((p/validate-remainder (p/lit "hi") (fn [r] (= "THEN" (first r))))
           ["hi" "THEN"] {})
          ["hi" (list "THEN") {}])
       "created remainder-validating rule succeeds when given subrule and validator succeed")
-  (is (= ((p/validate-remainder (p/lit "hi") (fn [r i] (= "THEN" (first r))))
+  (is (= ((p/validate-remainder (p/lit "hi") (fn [r] (= "THEN" (first r))))
           ["bye" "THEN"] {})
          nil)
       "created remainder-validating rule fails when given subrule fails")
-  (is (= ((p/validate-remainder (p/lit "hi") (fn [r i] (= "THEN" (first r))))
+  (is (= ((p/validate-remainder (p/lit "hi") (fn [r] (= "THEN" (first r))))
           ["hi" "WELL"] {})
          nil)
       "created remainder-validating rule fails when given validator fails"))
@@ -348,9 +348,4 @@
          nil)
       "created remainder-matching rule fails when given matching fails"))
 
-(deftest test-check-product
-  (is (= ((p/check-product (p/lit "hi") #(= % "hi")) ["hi" "THEN"] {})
-         [["hi"] (list "THEN") {}]))
-  (is (nil? ((p/check-product (p/lit "hi") #(not= % "hi")) ["hi" "THEN"] {}))))
- 
 (time (run-tests))

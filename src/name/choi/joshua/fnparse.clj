@@ -35,7 +35,7 @@
   (validator b-product) is false, then nil is simply returned."
   [subrule validator]
   (fn [tokens info]
-    (let [[product remainder :as result] (subrule tokens info)]
+    (let [[product :as result] (subrule tokens info)]
       (when (and (not (nil? result)) (validator product))
         result))))
 
@@ -43,14 +43,14 @@
   "Creates a rule metafunction from attaching a remainder-validating function to the given
   subrule--that is, any tokens in the remainder of the subrule must fulfill the validator
   function.
-  (def a (validate-remainder b validator)) says that the rule a succeeds only when b succeeds
-  and when (validator-remainder b-remainder b-info) is true. The new rule's product would be
-  b-product. If b fails or (validator b-remainder b-info) is false, then nil is simply
+  (def a (validate-remainder b validator)) says that the rule a succeeds only when b
+  succeeds and when (validator-remainder b-remainder) is true. The new rule's product would
+  be b-product. If b fails or (validator b-remainder b-info) is false, then nil is simply
   returned."
   [subrule validator]
   (fn [tokens info]
-    (let [[product remainder :as result] (subrule tokens info)]
-      (when (and (not (nil? result)) (validator remainder info))
+    (let [[_ remainder :as result] (subrule tokens info)]
+      (when (and (not (nil? result)) (validator remainder))
         result))))
 
 (defn validate-info
@@ -62,8 +62,22 @@
   (validator b-info) is false, then nil is simply returned."
   [subrule validator]
   (fn [tokens info]
-    (let [[product remainder info :as result] (subrule tokens info)]
+    (let [[_ _ info :as result] (subrule tokens info)]
       (when (and (not (nil? result)) (validator info))
+        result))))
+
+(defn validate-all
+  "Creates a rule metafunction from attaching a product/remainder/info-validating function
+  to the given subrule--that is, any tokens in the remainder of the subrule must fulfill the
+  validator function.
+  (def a (validate-remainder b validator)) says that the rule a succeeds only when b
+  succeeds and when (validator-remainder b-product b-remainder b-info) is true. The new
+  rule's product would be b-product. If b fails or (validator b-remainder b-info) is false,
+  then nil is simply returned."
+  [subrule validator]
+  (fn [tokens info]
+    (let [[product remainder info :as result] (subrule tokens info)]
+      (when (and (not (nil? result)) (validator product remainder info))
         result))))
 
 (defn semantics
@@ -95,8 +109,8 @@
           [semantic-product remainder subinfo])))))
 
 (defn lit
-  "Creates a rule metafunction that is the terminal rule of the given literal token--that is,
-  it accepts only tokens that are equal to the given literal token.
+  "Creates a rule metafunction that is the terminal rule of the given literal token--that
+  is, it accepts only tokens that are equal to the given literal token.
   (def a (lit \"...\")) would be equivalent to the EBNF
     a = \"...\";
   The new rule's product would be the first token, if it equals the given literal token.
@@ -129,8 +143,8 @@
                    (next rule-queue) subinfo))))))
 
 (defmacro conc
-  "Creates a rule metafunction that is the concatenation of the given subrules--that is, each
-  subrule followed by the next.
+  "Creates a rule metafunction that is the concatenation of the given subrules--that is,
+  each subrule followed by the next.
   (def a (conc b c d)) would be equivalent to the EBNF
     a = b, c, d;
   The new rule's products would be the vector [b-product c-product d-product]. If any of
@@ -168,8 +182,8 @@
     (or (subrule tokens info) [nil tokens info])))
 
 (defn rep*
-  "Creates a rule metafunction that is the zero-or-more repetition of the given subrule--that
-  is, either zero or more of the subrule.
+  "Creates a rule metafunction that is the zero-or-more repetition of the given subrule-
+  that is, either zero or more of the subrule.
   (def a (rep* b)) would be equivalent to the EBNF
     a = {b};
   The new rule's products would be either the vector [b-product ...] for how many matches
@@ -252,8 +266,8 @@
 
 (defn rep<=
   "Creates a rule metafunction that is the greedy repetition of the given subrule by the
-  given positive integer factor or less--that is, it accepts a certain range number of tokens
-  that fulfill the subrule, less than but not equal to the limiting factor.
+  given positive integer factor or less--that is, it accepts a certain range number of
+  tokens that fulfill the subrule, less than but not equal to the limiting factor.
   The new rule's products would be b-product. If b fails below n times, then nil is simply
   returned."
   [limit subrule]
@@ -275,8 +289,8 @@
 
 (defn lit-conc-seq
   "Creates a rule metafunction that is the concatenation of the literals of the sequence of
-  the given sequenceable object--that is, it accepts only a series of tokens that matches the
-  sequence of the token sequence.
+  the given sequenceable object--that is, it accepts only a series of tokens that matches
+  the sequence of the token sequence.
   (def a (lit-seq \"ABCD\")) would be equivalent to the EBNF
     a = \"A\", \"B\", \"C\", \"D\";
   The new rule's products would be the result of the concatenation rule."
@@ -285,9 +299,9 @@
     (conc-fn (map lit token-seq) tokens info)))
 
 (defn lit-alt-seq
-  "Creates a rule metafunction that is the alternative of the literals of the sequence of the
-  given sequenceable object--that is, it accepts only a series of tokens that matches any
-  of the token sequence.
+  "Creates a rule metafunction that is the alternative of the literals of the sequence of
+  the given sequenceable object--that is, it accepts only a series of tokens that matches
+  any of the token sequence.
   (def a (lit-seq \"ABCD\")) would be equivalent to the EBNF
     a = \"A\" | \"B\" | \"C\" | \"D\";
   The new rule's products would be the result of the concatenation rule."
@@ -310,8 +324,8 @@
   tokens.
   Make sure that the following subrule doesn't depend on info at all."
   [base-subrule following-subrule]
-  (validate-remainder base-subrule
-    (fn [remainder info] (following-subrule remainder info))))
+  (validate-all base-subrule
+    (fn [_ remainder info] (following-subrule remainder info))))
 
 (defn with-info
   "Creates a rule metafunction that applies a processing function to a subrule's results'
