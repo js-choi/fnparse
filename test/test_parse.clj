@@ -333,7 +333,9 @@
         rule (p/product-invisible-context [n digit, m digit]
                (receiving-rule-maker (+ n m)))]
     (is (= (rule (seq "31aaaa") {})
-           [[3 1 [\3 \1 \a \a]] (seq "aa") {}]))))
+           [[3 1 [\3 \1 \a \a]] (seq "aa") {}]))
+    (is (= ((p/conc digit rule) (seq "531aaaa") {})
+           [[5 [3 1 [\3 \1 \a \a]]] (seq "aa") {}]))))
 
 (deftest test-match-remainder
   (is (= ((p/match-remainder (p/lit "hi") (p/lit "THEN")) ["hi" "THEN"] {})
@@ -345,5 +347,10 @@
   (is (= ((p/match-remainder (p/lit "hi") (p/lit "THEN")) ["hi" "WELL"] {})
          nil)
       "created remainder-matching rule fails when given matching fails"))
+
+(deftest test-check-product
+  (is (= ((p/check-product (p/lit "hi") #(= % "hi")) ["hi" "THEN"] {})
+         [["hi"] (list "THEN") {}]))
+  (is (nil? ((p/check-product (p/lit "hi") #(not= % "hi")) ["hi" "THEN"] {}))))
  
 (time (run-tests))
