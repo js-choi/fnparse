@@ -93,11 +93,11 @@
 
   (def failure (m-result nil))
 
+  (defn opt
+    [subrule]
+    (m-plus subrule failure))
+  
 )
-
-(defn opt
-  [subrule]
-  (alt 
 
 ;(defn validate-state
 ;  [subrule validator]

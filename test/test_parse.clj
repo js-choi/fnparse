@@ -117,7 +117,7 @@
   (let [opt-true (p/opt (p/lit "true"))]
     ; Parse the first symbol in the program "true THEN"
     (is (= (opt-true {:remainder ["true" "THEN"]})
-           [true {:remainder (list "THEN")}])
+           ["true" {:remainder (list "THEN")}])
         "created option rule works when symbol present")
     ; Parse the first symbol in the program "THEN"
     (is (= (opt-true {:remainder (list "THEN")})
