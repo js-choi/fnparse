@@ -72,6 +72,12 @@
     (domonad parser-m [subproduct subrule]
       (semantic-hook subproduct)))
 
+  (defn constant-semantics
+    [subrule semantic-value]
+;    (complex [subproduct subrule]
+    (domonad parser-m [subproduct subrule]
+      semantic-value))
+
 )
 
 ;(defn- identity-of-first

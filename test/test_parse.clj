@@ -54,11 +54,11 @@
          ["hi!" {:remainder (list "THEN")}])
       "created simple semantic rule applies semantic hook to valid result of given rule"))
 
-;(deftest test-constant-semantics
-;  (is (= ((p/constant-semantics (p/lit "hi") (hash-map :a 1)) ["hi" "THEN"] {})
-;         [{:a 1} (list "THEN") {}])
-;      "created constant sem rule returns constant value when given subrule does not fail"))
-;
+(deftest test-constant-semantics
+  (is (= ((p/constant-semantics (p/lit "hi") {:a 1}) {:remainder ["hi" "THEN"]})
+         [{:a 1} {:remainder (list "THEN")}])
+      "created constant sem rule returns constant value when given subrule does not fail"))
+
 ;(deftest test-validate
 ;  (is (= ((p/validate (p/lit "hi") #(= "hi" %)) ["hi" "THEN"] {})
 ;         ["hi" (list "THEN") {}])
