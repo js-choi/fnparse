@@ -79,11 +79,11 @@
       semantic-value))
 
   (defn validate
-  "Creates a rule from attaching a product-validating function to the given subrule--that is,
-  any products of the subrule must fulfill the validator function.
-  (def a (validate b validator)) says that the rule a succeeds only when b succeeds and when
-  (validator b-product) is true. The new rule's product would be b-product. If b fails or
-  (validator b-product) is false, then nil is simply returned."
+    "Creates a rule from attaching a product-validating function to the given subrule--that
+    is, any products of the subrule must fulfill the validator function.
+    (def a (validate b validator)) says that the rule a succeeds only when b succeeds and
+    when (validator b-product) is true. The new rule's product would be b-product. If b fails
+    or (validator b-product) is false, then nil is simply returned."
     [subrule validator]
     (domonad [subproduct subrule, :when (validator subproduct)]
       subproduct))
