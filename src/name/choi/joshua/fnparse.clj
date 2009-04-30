@@ -69,18 +69,18 @@
   (defn semantics
     [subrule semantic-hook]
 ;    (complex [subproduct subrule]
-    (domonad parser-m [subproduct subrule]
+    (domonad [subproduct subrule]
       (semantic-hook subproduct)))
 
   (defn constant-semantics
     [subrule semantic-value]
 ;    (complex [subproduct subrule]
-    (domonad parser-m [subproduct subrule]
+    (domonad [subproduct subrule]
       semantic-value))
 
   (defn validate
     [subrule validator]
-    (domonad parser-m [subproduct subrule, :when (validator subproduct)]
+    (domonad [subproduct subrule, :when (validator subproduct)]
       subproduct))
 
 )
