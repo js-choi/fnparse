@@ -25,13 +25,13 @@
   (is (nil? ((p/lit "true") ["false" "THEN"] {}))
       "created literal rule fails when literal token not present"))
 
-;(deftest test-re-term
-;  (is (= ((p/re-term #"\s*true\s*") ["  true" "THEN"] {})
-;         ["  true" (list "THEN") {}])
-;      "created re-term rule works when first token matches regex")
-;  (is (nil? ((p/re-term #"\s*true\s*") ["false" "THEN"] {}))
-;      "created re-term rule fails when first token does not match regex"))
-;
+(deftest test-re-term
+  (is (= ((p/re-term #"\s*true\s*") ["  true" "THEN"] {})
+         ["  true" (list "THEN") {}])
+      "created re-term rule works when first token matches regex")
+  (is (nil? ((p/re-term #"\s*true\s*") ["false" "THEN"] {}))
+      "created re-term rule fails when first token does not match regex"))
+
 ;(deftest test-semantics
 ;  (is (= ((p/semantics (p/lit "hi") #(str % \!)) ["hi" "THEN"] {})
 ;         ["hi!" (list "THEN") {}])

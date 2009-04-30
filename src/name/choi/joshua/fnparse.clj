@@ -36,6 +36,10 @@
     [literal-token]
     (term (partial = literal-token)))
 
+  (defn re-term
+    [token-re]
+    (term (partial re-matches token-re)))
+
 )
 
 ;(defn- identity-of-first
