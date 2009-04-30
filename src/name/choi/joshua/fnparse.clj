@@ -91,7 +91,13 @@
     [& subrules]
     (apply m-plus subrules))
 
+  (def failure (m-result nil))
+
 )
+
+(defn opt
+  [subrule]
+  (alt 
 
 ;(defn validate-state
 ;  [subrule validator]
