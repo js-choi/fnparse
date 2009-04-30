@@ -25,12 +25,12 @@
   (is (nil? ((p/lit "true") {:remainder ["false" "THEN"]}))
       "created literal rule fails when literal token not present"))
 
-;(deftest test-re-term
-;  (is (= ((p/re-term #"\s*true\s*") ["  true" "THEN"] {})
-;         ["  true" (list "THEN") {}])
-;      "created re-term rule works when first token matches regex")
-;  (is (nil? ((p/re-term #"\s*true\s*") ["false" "THEN"] {}))
-;      "created re-term rule fails when first token does not match regex"))
+(deftest test-re-term
+  (is (= ((p/re-term #"\s*true\s*") {:remainder ["  true" "THEN"]})
+         ["  true" {:remainder (list "THEN")}])
+      "created re-term rule works when first token matches regex")
+  (is (nil? ((p/re-term #"\s*true\s*") {:remainder ["false" "THEN"]}))
+      "created re-term rule fails when first token does not match regex"))
 
 (println ">>" (macroexpand-1 (p/complex [ftoken (p/lit "hi")] (str ftoken \!))))
 
