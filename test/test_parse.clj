@@ -38,7 +38,7 @@
       "created complex rule applies semantic hook to valid result of given rule")
   (is (nil? ((p/complex [a (p/lit "hi")] (str a \!)) {:remainder ["RST"]}))
       "created complex rule fails when a given subrule fails")
-  (is (= ((p/complex [a (p/lit "hi")] (str a \!)) {:remainder ["hi" "THEN"]})
+  (is (= ((p/complex [a (p/lit "hi")] (str a \!)) {:remainder ["hi" "THEN"], :a "hi"})
          ["hi!" {:remainder (list "THEN"), :a "hi"}])
       "created complex rule passes rest of state to subrule"))
 
