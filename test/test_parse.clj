@@ -61,7 +61,7 @@
 
 (deftest test-validate
   (is (= ((p/validate (p/lit "hi") (partial = "hi")) {:remainder ["hi" "THEN"]})
-         ["hi" (list "THEN") {}])
+         ["hi" {:remainder (list "THEN")}])
       "created validator rule succeeds when given subrule and validator succeed")
   (is (nil? ((p/validate (p/lit "hi") (partial = "RST")) {:remainder ["RST"]}))
       "created validator rule fails when given subrule fails")

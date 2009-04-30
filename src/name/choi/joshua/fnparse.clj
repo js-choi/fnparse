@@ -78,6 +78,11 @@
     (domonad parser-m [subproduct subrule]
       semantic-value))
 
+  (defn validate
+    [subrule validator]
+    (domonad parser-m [subproduct subrule, :when (validator subproduct)]
+      subproduct))
+
 )
 
 ;(defn- identity-of-first
