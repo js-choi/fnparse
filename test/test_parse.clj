@@ -18,13 +18,13 @@
          ["true" {:remainder nil}])
       "created terminal rule works when no remainder"))
 
-;(deftest test-lit
-;  (is (= ((p/lit "true") ["true" "THEN"] {})
-;         ["true" (list "THEN") {}])
-;      "created literal rule works when literal token present")
-;  (is (nil? ((p/lit "true") ["false" "THEN"] {}))
-;      "created literal rule fails when literal token not present"))
-;
+(deftest test-lit
+  (is (= ((p/lit "true") {:remainder ["true" "THEN"]})
+         ["true" {:remainder (list "THEN")}])
+      "created literal rule works when literal token present")
+  (is (nil? ((p/lit "true") {:remainder ["false" "THEN"]}))
+      "created literal rule fails when literal token not present"))
+
 ;(deftest test-re-term
 ;  (is (= ((p/re-term #"\s*true\s*") ["  true" "THEN"] {})
 ;         ["  true" (list "THEN") {}])
