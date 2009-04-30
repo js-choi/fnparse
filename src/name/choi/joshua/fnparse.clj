@@ -32,6 +32,10 @@
     (domonad [first-token anything, :when (validator first-token)]
       first-token))
 
+  (defn lit
+    [literal-token]
+    (term (partial = literal-token)))
+
 )
 
 ;(defn- identity-of-first
