@@ -39,6 +39,12 @@
       first-token))
 
   (defn lit
+    "Creates a rule metafunction that is the terminal rule of the given literal token--that
+    is, it accepts only tokens that are equal to the given literal token.
+    (def a (lit \"...\")) would be equivalent to the EBNF
+      a = \"...\";
+    The new rule's product would be the first token, if it equals the given literal token.
+    If the token does not equal the given literal token, the new rule simply returns nil."
     [literal-token]
     (term (partial = literal-token)))
 
