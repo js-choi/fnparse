@@ -99,6 +99,17 @@
   
 )
 
+(declare rep+)
+
+(defn rep*
+  [subrule]
+  (opt (rep+ subrule)))
+
+(defn rep+
+  [subrule]
+  (complex [first-subproduct subrule, rest-subproducts (rep* subrule)]
+    (cons first-subproduct rest-subproducts)))
+
 ;(defn validate-state
 ;  [subrule validator]
 ;  (complex [subproduct subrule, substate get-state, :when (validator state)] subproduct))
