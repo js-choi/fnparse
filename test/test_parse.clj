@@ -59,15 +59,15 @@
          [{:a 1} {:remainder (list "THEN")}])
       "created constant sem rule returns constant value when given subrule does not fail"))
 
-;(deftest test-validate
-;  (is (= ((p/validate (p/lit "hi") #(= "hi" %)) ["hi" "THEN"] {})
-;         ["hi" (list "THEN") {}])
-;      "created validator rule succeeds when given subrule and validator succeed")
-;  (is (= ((p/validate (p/lit "hi") #(= "RST" %)) "RST" {}) nil)
-;      "created validator rule fails when given subrule fails")
-;  (is (= ((p/validate (p/lit "hi") #(= "hi" %)) "hi" {}) nil)
-;      "created validator rule fails when given validator fails"))
-; 
+(deftest test-validate
+  (is (= ((p/validate (p/lit "hi") (partial = "hi")) {:remainder ["hi" "THEN"]})
+         ["hi" (list "THEN") {}])
+      "created validator rule succeeds when given subrule and validator succeed")
+  (is (nil? ((p/validate (p/lit "hi") (partial = "RST")) {:remainder ["RST"]}))
+      "created validator rule fails when given subrule fails")
+  (is (nil? ((p/validate (p/lit "hi") (partial = "hi")) {:remainder "hi"}))
+      "created validator rule fails when given validator fails"))
+ 
 ;(deftest test-validate-remainder
 ;  (is (= ((p/validate-remainder (p/lit "hi") (fn [r] (= "THEN" (first r))))
 ;          ["hi" "THEN"] {})
