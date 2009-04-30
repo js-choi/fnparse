@@ -23,7 +23,7 @@
                   ((deepener product) state)))))
    m-zero (constantly nil)
    m-plus (fn [& parsers]
-            (fn [state] (some #(% state) parsers)))])
+            (fn [state] (first (drop-while nil? (map #(% state) parsers)))))])
 
 (defmacro complex
   [steps & product-expr]
@@ -82,8 +82,7 @@
   (complex [subproduct subrule]
     semantic-value))
 
-(def get-state (fetch-state))
-(def get-remainder (fetch-val :remainder))
+(def fetch-remainder (fetch-val :remainder))
 
 (with-monad parser-m
 
@@ -107,7 +106,10 @@
 
 (defn rep+
   [subrule]
-  (complex [first-subproduct subrule, rest-subproducts (rep* subrule)]
+  (complex [first-subproduct subrule
+            first-subremainder (fetch-remainder)
+            :when (empty? first-subremainder)
+            rest-subproducts (rep* subrule)]
     (cons first-subproduct rest-subproducts)))
 
 ;(defn validate-state

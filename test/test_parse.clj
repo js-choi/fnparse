@@ -136,18 +136,23 @@
         "created zero-or-more-repetition rule works when symbol present multiply")
     ; Parse the first symbol in the program "THEN"
     (is (= (rep*-true {:remainder ["THEN"], :a 3})
-           [[] {:remainder (list "THEN"), :a 3}])
+           [nil {:remainder (list "THEN"), :a 3}])
      "created zero-or-more-repetition rule works when symbol absent"))
   (let [rep*-char (p/rep* (p/term (partial not= \")))]
     ; Parse the first symbol in the program "THEN"
-    (is (= (rep*-char [\a \b \c] {})
-           [[\a \b \c] nil {}])
-        (str "created zero-or-more-repetition rule with a negative subrule works with no"
+    (is (= (rep*-char {:remainder [\a \b \c \"]})
+           [[\a \b \c] {:remainder (seq "\"")}])
+        (str "created zero-or-more-repetition rule with a negative subrule works with a "
+             "remainder"))
+    ; Parse the first symbol in the program "THEN"
+    (is (= (rep*-char {:remainder [\a \b \c]})
+           [[\a \b \c] {:remainder nil}])
+        (str "created zero-or-more-repetition rule with a negative subrule works with no "
              "remainder")))
   (let [letter (p/term int)]
-    (is (= ((p/rep* letter) [\a \a \a] {})
-           [[\a \a \a] nil {}])
-        (str "created zero-or-more-repetition rule works with a subrule that cannot accept"
+    (is (= ((p/rep* letter) {:remainder [\a \a \a]})
+           [[\a \a \a] {:remainder nil}])
+        (str "created zero-or-more-repetition rule works with a subrule that cannot accept "
              "nil and no remainder"))))
 
 ;(deftest test-rep+
