@@ -8,16 +8,16 @@
          [\A {:remainder (seq "BC")}])
       "anything rule matches first token"))
 
-;(deftest test-term
-;  (is (= ((p/term (partial = "true")) ["true" "THEN"] {})
-;         ["true" (list "THEN") {}])
-;      "created terminal rule works when first token fulfills validator")
-;  (is (nil? ((p/term (partial = "true")) ["false" "THEN"] {}))
-;      "created terminal rule fails when first token fails validator")
-;  (is (= ((p/term (partial = "true")) ["true"] {})
-;         ["true" nil {}])
-;      "created terminal rule works when no remainder"))
-;
+(deftest test-term
+  (is (= ((p/term (partial = "true")) {:remainder ["true" "THEN"]})
+         ["true" {:remainder (list "THEN")}])
+      "created terminal rule works when first token fulfills validator")
+  (is (nil? ((p/term (partial = "true")) {:remainder ["false" "THEN"]}))
+      "created terminal rule fails when first token fails validator")
+  (is (= ((p/term (partial = "true")) {:remainder ["true"]})
+         ["true" {:remainder nil}])
+      "created terminal rule works when no remainder"))
+
 ;(deftest test-lit
 ;  (is (= ((p/lit "true") ["true" "THEN"] {})
 ;         ["true" (list "THEN") {}])

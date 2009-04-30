@@ -16,8 +16,8 @@
 
 (with-monad parser-m
 
-  (defn anything [tokens info]
-    [(first tokens) (next tokens) info])
+  (defn anything [{tokens :remainder, :as state}]
+    [(first tokens) (assoc state :remainder (next tokens))])
   
   (defn term
     "Creates a rule metafunction that is a terminal rule of the given validator--that is, it
