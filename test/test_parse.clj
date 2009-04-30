@@ -32,17 +32,22 @@
   (is (nil? ((p/re-term #"\s*true\s*") {:remainder ["false" "THEN"]}))
       "created re-term rule fails when first token does not match regex"))
 
-(println (macroexpand-1 (p/complex [a (p/lit "A")] a)))
-
-;(deftest test-complex
-;  (is (= ((p/complex [a (p/lit "hi")] (str a "!")) {:remainder ["hi" "THEN"]})
-;         ["hi!" {:remainder (list "THEN")}])
-;      "created complex rule applies semantic hook to valid result of given rule")
-;  (is (nil? ((p/complex [a (p/lit "hi")] (str a \!)) {:remainder ["RST"]}))
-;      "created complex rule fails when a given subrule fails")
-;  (is (= ((p/complex [a (p/lit "hi")] (str a \!)) {:remainder ["hi" "THEN"], :a "hi"})
-;         ["hi!" {:remainder (list "THEN"), :a "hi"}])
-;      "created complex rule passes rest of state to subrule"))
+(deftest test-complex
+  (is (= ((p/complex [a (p/lit "hi")] (str a "!")) {:remainder ["hi" "THEN"]})
+         ["hi!" {:remainder (list "THEN")}])
+      "created complex rule applies semantic hook to valid result of given rule")
+  (is (nil? ((p/complex [a (p/lit "hi")] (str a \!)) {:remainder ["RST"]}))
+      "created complex rule fails when a given subrule fails")
+  (is (= ((p/complex [a (p/lit "hi")] (str a \!)) {:remainder ["hi" "THEN"], :a "hi"})
+         ["hi!" {:remainder (list "THEN"), :a "hi"}])
+      "created complex rule passes rest of state to subrule")
+  (is (= ((p/complex [a (p/lit "hi") b (p/lit "THEN")] [(str a "!") b])
+          {:remainder ["hi" "THEN" "bye"]})
+         [["hi!" "THEN"] {:remainder (list "bye")}])
+      "created complex rule succeeds when all subrules fulfilled in order")
+  (is (nil? ((p/complex [a (p/lit "hi") b (p/lit "THEN")] [(str a "!") b])
+          {:remainder ["hi" "bye" "boom"]}))
+      "created complex rule fails when one subrule fails"))
 
 ;(deftest test-constant-semantics
 ;  (is (= ((p/constant-semantics (p/lit "hi") (hash-map :a 1)) ["hi" "THEN"] {})
