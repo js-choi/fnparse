@@ -24,7 +24,7 @@
    m-zero (constantly nil)
    m-plus (fn [& parsers]
             (fn [state]
-              (some (partial not= nil) (map #(% state) parsers))))])
+              (some (complement nil?) (map #(% state) parsers))))])
 
 (with-monad parser-m
 
