@@ -28,6 +28,12 @@
     [(first tokens) (next tokens) info])
   
   (defn term
+    "Creates a rule metafunction that is a terminal rule of the given validator--that is, it
+    accepts only tokens for whom (validator token) is true.
+    (def a (term validator)) would be equivalent to the EBNF
+      a = ? (validator %) evaluates to true ?;
+    The new rule's product would be the first token, if it fulfills the validator.
+    If the token does not fulfill the validator, the new rule simply returns nil."
     [validator]
     (domonad [first-token anything, :when (validator first-token)]
       first-token))
