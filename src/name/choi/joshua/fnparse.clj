@@ -26,68 +26,64 @@
             (fn [state]
               (some (complement nil?) (map #(% state) parsers))))])
 
-(with-monad parser-m
+(defmacro complex
+  [steps & product-expr]
+  `(domonad parser-m ~steps ~@product-expr))
 
-  (defn anything [{tokens :remainder, :as state}]
-    [(first tokens) (assoc state :remainder (next tokens))])
-  
-  (defn validate
-    "Creates a rule from attaching a product-validating function to the given subrule--that
-    is, any products of the subrule must fulfill the validator function.
-    (def a (validate b validator)) says that the rule a succeeds only when b succeeds and
-    when (validator b-product) is true. The new rule's product would be b-product. If b fails
-    or (validator b-product) is false, then nil is simply returned."
-    [subrule validator]
-    (domonad [subproduct subrule, :when (validator subproduct)]
-      subproduct))
+(defn anything [{tokens :remainder, :as state}]
+  [(first tokens) (assoc state :remainder (next tokens))])
 
-  (defn term
-    "Creates a rule metafunction that is a terminal rule of the given validator--that is, it
-    accepts only tokens for whom (validator token) is true.
-    (def a (term validator)) would be equivalent to the EBNF
-      a = ? (validator %) evaluates to true ?;
-    The new rule's product would be the first token, if it fulfills the validator.
-    If the token does not fulfill the validator, the new rule simply returns nil."
-    [validator]
-    (validate anything validator))
+(defn validate
+  "Creates a rule from attaching a product-validating function to the given subrule--that
+  is, any products of the subrule must fulfill the validator function.
+  (def a (validate b validator)) says that the rule a succeeds only when b succeeds and
+  when (validator b-product) is true. The new rule's product would be b-product. If b fails
+  or (validator b-product) is false, then nil is simply returned."
+  [subrule validator]
+  (complex [subproduct subrule, :when (validator subproduct)]
+    subproduct))
 
-  (defn lit
-    "Creates a rule metafunction that is the terminal rule of the given literal token--that
-    is, it accepts only tokens that are equal to the given literal token.
-    (def a (lit \"...\")) would be equivalent to the EBNF
-      a = \"...\";
-    The new rule's product would be the first token, if it equals the given literal token.
-    If the token does not equal the given literal token, the new rule simply returns nil."
-    [literal-token]
-    (term (partial = literal-token)))
+(defn term
+  "Creates a rule metafunction that is a terminal rule of the given validator--that is, it
+  accepts only tokens for whom (validator token) is true.
+  (def a (term validator)) would be equivalent to the EBNF
+    a = ? (validator %) evaluates to true ?;
+  The new rule's product would be the first token, if it fulfills the validator.
+  If the token does not fulfill the validator, the new rule simply returns nil."
+  [validator]
+  (validate anything validator))
 
-  (defn re-term
-    "Creates a rule metafunction that is the terminal rule of the given regex--that is, it
-    accepts only tokens that match the given regex.
-    (def a (re-term #\"...\")) would be equivalent to the EBNF
-      a = ? (re-matches #\"...\" %) evaluates to true ?;
-    The new rule's product would be the first token, if it matches the given regex.
-    If the token does not match the given regex, the new rule simply returns nil."
-    [token-re]
-    (term (partial re-matches token-re)))
+(defn lit
+  "Creates a rule metafunction that is the terminal rule of the given literal token--that
+  is, it accepts only tokens that are equal to the given literal token.
+  (def a (lit \"...\")) would be equivalent to the EBNF
+    a = \"...\";
+  The new rule's product would be the first token, if it equals the given literal token.
+  If the token does not equal the given literal token, the new rule simply returns nil."
+  [literal-token]
+  (term (partial = literal-token)))
 
-  (defmacro complex
-    [steps & product-expr]
-    `(domonad parser-m ~steps ~@product-expr))
+(defn re-term
+  "Creates a rule metafunction that is the terminal rule of the given regex--that is, it
+  accepts only tokens that match the given regex.
+  (def a (re-term #\"...\")) would be equivalent to the EBNF
+    a = ? (re-matches #\"...\" %) evaluates to true ?;
+  The new rule's product would be the first token, if it matches the given regex.
+  If the token does not match the given regex, the new rule simply returns nil."
+  [token-re]
+  (term (partial re-matches token-re)))
 
-  (defn semantics
-    [subrule semantic-hook]
-;    (complex [subproduct subrule]
-    (domonad [subproduct subrule]
-      (semantic-hook subproduct)))
+(defn semantics
+  [subrule semantic-hook]
+  (complex [subproduct subrule]
+    (semantic-hook subproduct)))
 
-  (defn constant-semantics
-    [subrule semantic-value]
-;    (complex [subproduct subrule]
-    (domonad [subproduct subrule]
-      semantic-value))
+(defn constant-semantics
+  [subrule semantic-value]
+  (complex [subproduct subrule]
+    semantic-value))
 
-)
+
 
 ;(defn- identity-of-first
 ;  "Returns its first argument."
