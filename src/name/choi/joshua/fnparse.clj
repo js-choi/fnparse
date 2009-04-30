@@ -83,7 +83,8 @@
   (complex [subproduct subrule]
     semantic-value))
 
-
+(defn validate-state
+  [subrule vl
 
 ;(defn- identity-of-first
 ;  "Returns its first argument."

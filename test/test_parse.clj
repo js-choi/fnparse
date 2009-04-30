@@ -68,20 +68,18 @@
   (is (nil? ((p/validate (p/lit "hi") (partial = "hi")) {:remainder "hi"}))
       "created validator rule fails when given validator fails"))
  
-;(deftest test-validate-remainder
-;  (is (= ((p/validate-remainder (p/lit "hi") (fn [r] (= "THEN" (first r))))
-;          ["hi" "THEN"] {})
-;         ["hi" (list "THEN") {}])
-;      "created remainder-validating rule succeeds when given subrule and validator succeed")
-;  (is (= ((p/validate-remainder (p/lit "hi") (fn [r] (= "THEN" (first r))))
-;          ["bye" "THEN"] {})
-;         nil)
-;      "created remainder-validating rule fails when given subrule fails")
-;  (is (= ((p/validate-remainder (p/lit "hi") (fn [r] (= "THEN" (first r))))
-;          ["hi" "WELL"] {})
-;         nil)
-;      "created remainder-validating rule fails when given validator fails"))
-; 
+(deftest test-validate-remainder
+  (is (= ((p/validate-remainder (p/lit "hi") (fn [r] (= "THEN" (first r))))
+          {:remainder ["hi" "THEN"]})
+         ["hi" (list "THEN") {}])
+      "created remainder-validating rule succeeds when given subrule and validator succeed")
+  (is (nil? ((p/validate-remainder (p/lit "hi") (fn [r] (= "THEN" (first r))))
+          {:remainder ["bye" "THEN"]}))
+      "created remainder-validating rule fails when given subrule fails")
+  (is (= ((p/validate-remainder (p/lit "hi") (fn [r] (= "THEN" (first r))))
+          {:remainder ["hi" "WELL"]}))
+      "created remainder-validating rule fails when given validator fails"))
+ 
 ;(deftest test-validate-info
 ;  (let [subrule (p/lit "hi")]
 ;    (is (= ((p/validate-info subrule #(contains? % :b)) ["hi" "THEN"] {:b 1})
