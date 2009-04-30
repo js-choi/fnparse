@@ -14,9 +14,9 @@
 
 (defmonad parser-m
   [m-result (fn [product] (fn [tokens info] [product tokens info]))
-   m-bind (fn [parser deepener]
+   m-bind (fn [rule deepener]
             (fn [tokens info]
-              (let [[product remainder info :as result] (parser tokens info)]
+              (let [[product remainder info :as result] (rule tokens info)]
                 (when-not (nil? result)
                   ((deepener product) remainder info)))))
    m-zero (constantly nil)])
@@ -57,6 +57,10 @@
     If the token does not match the given regex, the new rule simply returns nil."
     [token-re]
     (term (partial re-matches token-re)))
+
+  (defmacro complex
+    [steps & product-expr]
+    `(domonad parser-m ~steps ~product-expr))
 
 )
 

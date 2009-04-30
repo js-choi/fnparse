@@ -1,5 +1,5 @@
 (ns name.choi.joshua.fnparse.test-parse
-  (:use clojure.contrib.test-is [clojure.contrib.except :only [throw-arg]])
+  (:use clojure.contrib.test-is clojure.contrib.monads [clojure.contrib.except :only [throw-arg]])
   (:require [name.choi.joshua.fnparse :as p]))
 ;(set! *warn-on-reflection* true)
 
@@ -32,16 +32,19 @@
   (is (nil? ((p/re-term #"\s*true\s*") ["false" "THEN"] {}))
       "created re-term rule fails when first token does not match regex"))
 
-(deftest test-semantics
-  (is (= ((p/semantics (p/lit "hi") #(str % \!)) ["hi" "THEN"] {})
-         ["hi!" (list "THEN") {}])
-      "created semantics rule applies semantic hook to valid result of given rule")
-  (is (nil? ((p/semantics (p/lit "hi") #(str % \!)) ["RST"] {}))
-      "created semantics rule fails when given subrule fails")
-  (is (= ((p/semantics (p/with-info (p/lit "hi") #(assoc %1 :a %2)) #(str % \!))
-          ["hi" "THEN"] {})
-         ["hi!" (list "THEN") {:a "hi"}])
-      "created semantics rule passes info to subrule"))
+(println ">>" (macroexpand-1 (p/complex [ftoken (p/lit "hi")] (str ftoken \!))))
+
+;(deftest test-complex
+;  (is (= ((p/complex [ftoken (p/lit "hi")] (str ftoken "!")) ["hi" "THEN"] {})
+;         ["hi!" (list "THEN") {}])
+;      "created semantics rule applies semantic hook to valid result of given rule")
+;  (is (nil? ((p/semantics (p/lit "hi") #(str % \!)) ["RST"] {}))
+;      "created semantics rule fails when given subrule fails")
+;  (is (= ((p/semantics (p/with-info (p/lit "hi") #(assoc %1 :a %2)) #(str % \!))
+;          ["hi" "THEN"] {})
+;         ["hi!" (list "THEN") {:a "hi"}])
+;      "created semantics rule passes info to subrule"))
+;)
 
 ;(deftest test-constant-semantics
 ;  (is (= ((p/constant-semantics (p/lit "hi") (hash-map :a 1)) ["hi" "THEN"] {})
