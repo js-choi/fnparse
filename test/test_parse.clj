@@ -113,17 +113,17 @@
     (is (nil? (literal-boolean {:remainder ["aRSTIR"]}))
         "created alternatives rule fails when no valid rule product present")))
 
-;(deftest test-opt
-;  (let [opt-true (p/opt (p/semantics (p/lit "true") (fn [_] true)))]
-;    ; Parse the first symbol in the program "true THEN"
-;    (is (= (opt-true ["true" "THEN"] {})
-;           [true (list "THEN") {}])
-;        "created option rule works when symbol present")
-;    ; Parse the first symbol in the program "THEN"
-;    (is (= (opt-true (list "THEN") {})
-;           [nil (list "THEN") {}])
-;        "created option rule works when symbol absent")))
-;
+(deftest test-opt
+  (let [opt-true (p/opt (p/lit "true"))]
+    ; Parse the first symbol in the program "true THEN"
+    (is (= (opt-true {:remainder ["true" "THEN"]})
+           [true {:remainder (list "THEN")}])
+        "created option rule works when symbol present")
+    ; Parse the first symbol in the program "THEN"
+    (is (= (opt-true {:remainder (list "THEN")})
+           [nil {:remainder (list "THEN")}])
+        "created option rule works when symbol absent")))
+
 ;(deftest test-rep*
 ;  (let [rep*-true (p/rep* (p/with-info (p/constant-semantics (p/lit "true") true)
 ;                                       (fn [i p] (assoc i :a (inc (i :a))))))]
