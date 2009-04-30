@@ -129,7 +129,7 @@
 (def lex seq)
 
 (defn parse [tokens]
-  (let [[product remainder info] (text tokens {:column 0, :line 0})]
+  (let [[product remainder info] (text {:remainder tokens, :column 0, :line 0})]
     (println "FINISHED PARSING:" info)
     product))
 
@@ -144,4 +144,4 @@
 (defmethod represent :scalar [node]
   (:content node))
 
-(def load-stream (comp represent parse lex))
+(def load-stream (comp represent parse))
