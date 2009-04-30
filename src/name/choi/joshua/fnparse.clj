@@ -18,9 +18,9 @@
                 [product state]))
    m-bind (fn [parser deepener]
             (fn [tokens]
-              (let [[product remainder :as result] (parser tokens)]
+              (let [[product state :as result] (parser tokens)]
                 (when-not (nil? result)
-                  ((deepener product) remainder)))))
+                  ((deepener product) state)))))
    m-zero (constantly nil)
    m-plus (fn [& parsers]
             (fn [state]
