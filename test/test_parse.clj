@@ -104,11 +104,11 @@
 ;        "created concatenation rule fails when invalid symbols present")))
 ;
 (deftest test-alt
-  (let [literal-true (p/constant-semantics (p/lit "true") true)
-        literal-false (p/constant-semantics (p/lit "false") false)
+  (let [literal-true (p/lit "true")
+        literal-false (p/lit "false")
         literal-boolean (p/alt literal-true literal-false)]
     (is (= (literal-boolean {:remainder ["false" "THEN"]})
-           [false {:remainder (list "THEN")}])
+           ["false" {:remainder (list "THEN")}])
         "created alternatives rule works with first valid rule product")
     (is (nil? (literal-boolean {:remainder ["aRSTIR"]}))
         "created alternatives rule fails when no valid rule product present")))
