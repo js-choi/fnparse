@@ -49,6 +49,12 @@
     (term (partial = literal-token)))
 
   (defn re-term
+    "Creates a rule metafunction that is the terminal rule of the given regex--that is, it
+    accepts only tokens that match the given regex.
+    (def a (re-term #\"...\")) would be equivalent to the EBNF
+      a = ? (re-matches #\"...\" %) evaluates to true ?;
+    The new rule's product would be the first token, if it matches the given regex.
+    If the token does not match the given regex, the new rule simply returns nil."
     [token-re]
     (term (partial re-matches token-re)))
 
