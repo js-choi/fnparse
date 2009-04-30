@@ -85,10 +85,13 @@
 (def get-state (fetch-state))
 (def get-remainder (fetch-val :remainder))
 
-(defn alt
-  [& subrules]
-  (with-monad parser-m
-    (apply m-plus subrules)))
+(with-monad parser-m
+
+  (defn alt
+    [& subrules]
+    (apply m-plus subrules))
+
+)
 
 ;(defn validate-state
 ;  [subrule validator]
