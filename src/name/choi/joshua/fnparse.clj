@@ -17,14 +17,13 @@
               (fn [state]
                 [product state]))
    m-bind (fn [parser deepener]
-            (fn [tokens]
-              (let [[product state :as result] (parser tokens)]
+            (fn [state]
+              (let [[product state :as result] (parser state)]
                 (when-not (nil? result)
                   ((deepener product) state)))))
    m-zero (constantly nil)
    m-plus (fn [& parsers]
-            (fn [state]
-              (some (complement nil?) (map #(% state) parsers))))])
+            (fn [state] (some #(% state) parsers)))])
 
 (defmacro complex
   [steps & product-expr]
@@ -85,6 +84,11 @@
 
 (def get-state (fetch-state))
 (def get-remainder (fetch-val :remainder))
+
+(defn alt
+  [& subrules]
+  (with-monad parser-m
+    (apply m-plus subrules)))
 
 ;(defn validate-state
 ;  [subrule validator]

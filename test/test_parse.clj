@@ -103,18 +103,16 @@
 ;    (is (= (truth ["answer" "42" "=" "THEN"] {}) nil)
 ;        "created concatenation rule fails when invalid symbols present")))
 ;
-;(deftest test-alt
-;  (let [literal-true (p/constant-semantics (p/lit "true") true)
-;        literal-false (p/constant-semantics (p/lit "false") false)
-;        literal-boolean (p/alt literal-true literal-false)]
-;    ; Parse the first symbol in the program "false THEN"
-;    (is (= (literal-boolean ["false" "THEN"] {})
-;           [false (list "THEN") {}])
-;        "created alternatives rule works with first valid rule product")
-;    ; Parse the first symbol in the program "aRSTIR"
-;    (is (nil? (literal-boolean ["aRSTIR"] {}))
-;        "created alternatives rule fails when no valid rule product present")))
-;
+(deftest test-alt
+  (let [literal-true (p/constant-semantics (p/lit "true") true)
+        literal-false (p/constant-semantics (p/lit "false") false)
+        literal-boolean (p/alt literal-true literal-false)]
+    (is (= (literal-boolean {:remainder ["false" "THEN"]})
+           [false {:remainder (list "THEN")}])
+        "created alternatives rule works with first valid rule product")
+    (is (nil? (literal-boolean {:remainder ["aRSTIR"]}))
+        "created alternatives rule fails when no valid rule product present")))
+
 ;(deftest test-opt
 ;  (let [opt-true (p/opt (p/semantics (p/lit "true") (fn [_] true)))]
 ;    ; Parse the first symbol in the program "true THEN"
