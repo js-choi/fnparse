@@ -49,6 +49,11 @@
           {:remainder ["hi" "bye" "boom"]}))
       "created complex rule fails when one subrule fails"))
 
+(deftest test-semantics
+  (is (= ((p/semantics (p/lit "hi") #(str % "!")) {:remainder ["hi" "THEN"]})
+         ["hi!" {:remainder (list "THEN")}])
+      "created simple semantic rule applies semantic hook to valid result of given rule"))
+
 ;(deftest test-constant-semantics
 ;  (is (= ((p/constant-semantics (p/lit "hi") (hash-map :a 1)) ["hi" "THEN"] {})
 ;         [{:a 1} (list "THEN") {}])

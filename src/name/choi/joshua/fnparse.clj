@@ -66,6 +66,12 @@
     [steps & product-expr]
     `(domonad parser-m ~steps ~@product-expr))
 
+  (defn semantics
+    [subrule semantic-hook]
+;    (complex [subproduct subrule]
+    (domonad parser-m [subproduct subrule]
+      (semantic-hook subproduct)))
+
 )
 
 ;(defn- identity-of-first
