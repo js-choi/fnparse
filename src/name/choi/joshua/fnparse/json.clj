@@ -3,7 +3,7 @@
   (:use name.choi.joshua.fnparse
         [clojure.contrib.seq-utils :only [flatten]]))
 
-(defstruct node :kind :content)
+(defstruct node-s :kind :content)
 
 (def string-delimiter (lit \"))
 (def escape-indicator (lit \\))
@@ -41,15 +41,23 @@
   (conc exponential-sign (opt (alt plus-sign minus-sign)) (rep+ decimal-digit)))
 
 (def number-lit
-  (semantics
-    (conc (opt minus-sign) (alt zero-digit (rep+ nonzero-decimal-digit))
-          (opt fractional-part) (opt exponential-part))
-    (fn [product]
-        (if (or (product 2) (product 3))
-            (hash-map :kind :scalar, :content (Double/parseDouble
-                                      (apply str (flatten product))))
-            (hash-map :kind :scalar, :content (Integer/parseInt
-                                        (apply str (flatten product))))))))
+  (complex [minus (opt minus-sign)
+            above-one (alt zero-digit (rep+ nonzero-decimal-digit))
+            below-one (opt fractional part)
+            power (opt exponential-part)]
+    (->
+      (Double/parseDouble (apply str (flatten [minus above-one below-one power]))
+      (if below-one identity int)
+      #(struct node-s :scalar %)))))
+;  (semantics
+;    (conc (opt minus-sign) (alt zero-digit (rep+ nonzero-decimal-digit))
+;          (opt fractional-part) (opt exponential-part))
+;    (fn [product]
+;        (if (or (product 2) (product 3))
+;            (hash-map :kind :scalar, :content (Double/parseDouble
+;                                      (apply str (flatten product))))
+;            (hash-map :kind :scalar, :content (Integer/parseInt
+;                                        (apply str (flatten product))))))))
 
 (def hexadecimal-digit
   (alt decimal-digit (lit \A) (lit \B) (lit \C) (lit \D) (lit \E) (lit \F)))

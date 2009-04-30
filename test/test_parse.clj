@@ -1,14 +1,15 @@
-(ns name.choi.joshua.fnparse.test-parse
-  (:use clojure.contrib.test-is clojure.contrib.monads [clojure.contrib.except :only [throw-arg]])
+(ns name.choi.joshua.fnparse.parse
+  (:use clojure.contrib.test-is clojure.contrib.monads
+        [clojure.contrib.except :only [throw-arg]])
   (:require [name.choi.joshua.fnparse :as p]))
 ;(set! *warn-on-reflection* true)
 
-(deftest test-anything
+(deftest anything
   (is (= (p/anything {:remainder "ABC"})
          [\A {:remainder (seq "BC")}])
       "anything rule matches first token"))
 
-(deftest test-term
+(deftest term
   (is (= ((p/term (partial = "true")) {:remainder ["true" "THEN"]})
          ["true" {:remainder (list "THEN")}])
       "created terminal rule works when first token fulfills validator")
@@ -18,21 +19,21 @@
          ["true" {:remainder nil}])
       "created terminal rule works when no remainder"))
 
-(deftest test-lit
+(deftest lit
   (is (= ((p/lit "true") {:remainder ["true" "THEN"]})
          ["true" {:remainder (list "THEN")}])
       "created literal rule works when literal token present")
   (is (nil? ((p/lit "true") {:remainder ["false" "THEN"]}))
       "created literal rule fails when literal token not present"))
 
-(deftest test-re-term
+(deftest re-term
   (is (= ((p/re-term #"\s*true\s*") {:remainder ["  true" "THEN"]})
          ["  true" {:remainder (list "THEN")}])
       "created re-term rule works when first token matches regex")
   (is (nil? ((p/re-term #"\s*true\s*") {:remainder ["false" "THEN"]}))
       "created re-term rule fails when first token does not match regex"))
 
-(deftest test-complex
+(deftest complex
   (is (= ((p/complex [a (p/lit "hi")] (str a "!")) {:remainder ["hi" "THEN"]})
          ["hi!" {:remainder (list "THEN")}])
       "created complex rule applies semantic hook to valid result of given rule")
@@ -49,17 +50,17 @@
           {:remainder ["hi" "bye" "boom"]}))
       "created complex rule fails when one subrule fails"))
 
-(deftest test-semantics
+(deftest semantics
   (is (= ((p/semantics (p/lit "hi") #(str % "!")) {:remainder ["hi" "THEN"]})
          ["hi!" {:remainder (list "THEN")}])
       "created simple semantic rule applies semantic hook to valid result of given rule"))
 
-(deftest test-constant-semantics
+(deftest constant-semantics
   (is (= ((p/constant-semantics (p/lit "hi") {:a 1}) {:remainder ["hi" "THEN"]})
          [{:a 1} {:remainder (list "THEN")}])
       "created constant sem rule returns constant value when given subrule does not fail"))
 
-(deftest test-validate
+(deftest validate
   (is (= ((p/validate (p/lit "hi") (partial = "hi")) {:remainder ["hi" "THEN"]})
          ["hi" {:remainder (list "THEN")}])
       "created validator rule succeeds when given subrule and validator succeed")
@@ -67,8 +68,12 @@
       "created validator rule fails when given subrule fails")
   (is (nil? ((p/validate (p/lit "hi") (partial = "hi")) {:remainder "hi"}))
       "created validator rule fails when given validator fails"))
- 
-;(deftest test-validate-remainder
+
+(deftest test-fetch-val
+  (is (= ((p/complex [remainder p/fetch-remainder] remainder) {:remainder ["hi" "THEN"]})
+         [["hi" "THEN"] {:remainder ["hi" "THEN"]}])))
+
+;(deftest validate-remainder
 ;  (is (= ((p/validate-remainder (p/lit "hi") (fn [r] (= "THEN" (first r))))
 ;          {:remainder ["hi" "THEN"]})
 ;         ["hi" (list "THEN") {}])
@@ -80,7 +85,7 @@
 ;          {:remainder ["hi" "WELL"]}))
 ;      "created remainder-validating rule fails when given validator fails"))
  
-;(deftest test-validate-info
+;(deftest validate-info
 ;  (let [subrule (p/lit "hi")]
 ;    (is (= ((p/validate-info subrule #(contains? % :b)) ["hi" "THEN"] {:b 1})
 ;           ["hi" (list "THEN") {:b 1}])
@@ -90,7 +95,7 @@
 ;    (is (= ((p/validate-info subrule #(contains? % :b)) ["hi" "THEN"] {}) nil)
 ;        "created info-validating rule fails when given validator fails")))
 ; 
-;(deftest test-conc
+;(deftest conc
 ;  (let [identifier (p/with-info (p/term string?) (fn [m p] (assoc m :b 1)))
 ;        equals-operator (p/semantics (p/lit "=") keyword)
 ;        answer (p/with-info (p/lit "42") (fn [m p] (assoc m :c 3)))
@@ -103,7 +108,7 @@
 ;    (is (= (truth ["answer" "42" "=" "THEN"] {}) nil)
 ;        "created concatenation rule fails when invalid symbols present")))
 ;
-(deftest test-alt
+(deftest alt
   (let [literal-true (p/lit "true")
         literal-false (p/lit "false")
         literal-boolean (p/alt literal-true literal-false)]
@@ -113,7 +118,7 @@
     (is (nil? (literal-boolean {:remainder ["aRSTIR"]}))
         "created alternatives rule fails when no valid rule product present")))
 
-(deftest test-opt
+(deftest opt
   (let [opt-true (p/opt (p/lit "true"))]
     ; Parse the first symbol in the program "true THEN"
     (is (= (opt-true {:remainder ["true" "THEN"]})
@@ -124,7 +129,9 @@
            [nil {:remainder (list "THEN")}])
         "created option rule works when symbol absent")))
 
-;(deftest test-rep*
+
+
+;(deftest rep*
 ;  (let [rep*-true (p/rep* (p/lit true))]
 ;    ; Parse the first symbol in the program "true THEN"
 ;    (is (= (rep*-true {:remainder [true "THEN"], :a 3})
@@ -155,7 +162,7 @@
 ;        (str "created zero-or-more-repetition rule works with a subrule that cannot accept "
 ;             "nil and no remainder"))))
 
-;(deftest test-rep+
+;(deftest rep+
 ;  (let [rep+-true (p/rep+ (p/constant-semantics (p/lit "true") true))]
 ;    ; Parse the first symbol in the program "true THEN"
 ;    (is (= (rep+-true ["true" "THEN"] {})
@@ -169,7 +176,7 @@
 ;    (is (nil? (rep+-true (list "THEN") {}))
 ;        "created one-or-more-repetition rule fails when symbol absent")))
 ;
-;(deftest test-except
+;(deftest except
 ;  ; except-rule = ("A" | "B" | "C") - "B" - "C";
 ;  (let [except-rule (p/except (p/alt (p/lit "A") (p/lit "B") (p/lit "C"))
 ;                              (p/lit "B") (p/with-info (p/lit "C") (fn [i p] {:b "wrong"})))]
@@ -180,7 +187,7 @@
 ;    (is (= (except-rule (list "D" "A" "B") {}) nil)
 ;        "created exception rule fails when symbol does not fulfill subrule")))
 ;
-;(deftest test-factor=
+;(deftest factor=
 ;  ; rep=-rule = 3 * "A";
 ;  (let [tested-rule-3 (p/factor= 3 (p/lit "A")), tested-rule-0 (p/factor= 0 (p/lit "A"))]
 ;    (is (= (tested-rule-3 (list "A" "A" "A" "A" "C") {})
@@ -195,7 +202,7 @@
 ;    (is (= (tested-rule-0 (list "D" "A" "B") {}) [[] (list "D" "A" "B") {}])
 ;        "created factor= rule works when symbol fulfils zero multiples and factor is zero")))
 ;
-;(deftest test-factor<
+;(deftest factor<
 ;  (let [tested-rule (p/factor< 3 (p/lit "A"))]
 ;    (is (= (tested-rule (list "A" "A" "A" "A" "C") {}) [["A" "A"] (list "A" "A" "C") {}])
 ;        "created factor< rule works when symbol fulfills all subrule multiples and leaves strict remainder")
@@ -206,7 +213,7 @@
 ;    (is (= (tested-rule (list "D" "A" "B") {}) [[] (list "D" "A" "B") {}])
 ;        "created factor< rule works when symbol does not fulfill subrule at all")))
 ;
-;(deftest test-factor<=
+;(deftest factor<=
 ;  (let [tested-rule (p/factor<= 3 (p/lit "A"))]
 ;    (is (= (tested-rule (list "A" "A" "A" "A" "C") {}) [["A" "A" "A"] (list "A" "C") {}])
 ;        "created factor<= rule works when symbol fulfills all subrule multiples and leaves strict remainder")
@@ -217,7 +224,7 @@
 ;    (is (= (tested-rule (list "D" "A" "B") {}) [[] (list "D" "A" "B") {}])
 ;        "created factor<= rule works when symbol does not fulfill subrule at all")))
 ;
-;(deftest test-rep-predicate
+;(deftest rep-predicate
 ;  (let [tested-rule-fn (p/rep-predicate (partial > 3) (p/lit "A"))]
 ;    (is (= (tested-rule-fn (list "A" "A" "C") {}) [["A" "A"] (list "C") {}])
 ;        "created rep rule works when predicate returns true")
@@ -226,7 +233,7 @@
 ;    (is (= (tested-rule-fn (list "D" "A" "B") {}) [[] (list "D" "A" "B") {}])
 ;        "created rep rule succeeds when symbol does not fulfill subrule at all")))
 ;
-;(deftest test-rep=
+;(deftest rep=
 ;  (let [tested-rule-fn (p/rep= 3 (p/lit "A"))]
 ;    (is (= (tested-rule-fn (list "A" "A" "A" "C") {}) [["A" "A" "A"] (list "C") {}])
 ;        "created rep= rule works when symbol only fulfills all subrule multiples")
@@ -237,7 +244,7 @@
 ;    (is (= (tested-rule-fn (list "D" "A" "B") {}) nil)
 ;        "created rep= rule fails when symbol does not fulfill subrule at all")))
 ;
-;(deftest test-rep<
+;(deftest rep<
 ;  (let [tested-rule-fn (p/rep< 3 (p/lit "A"))]
 ;    (is (= (tested-rule-fn (list "A" "A" "C") {}) [["A" "A"] (list "C") {}])
 ;        "created rep< rule works when number of fulfilled rules is less than limit")
@@ -248,7 +255,7 @@
 ;    (is (= (tested-rule-fn (list "D" "A" "B") {}) [[] (list "D" "A" "B") {}])
 ;        "created rep< rule succeeds when symbol does not fulfill subrule at all")))
 ;
-;(deftest test-rep<=
+;(deftest rep<=
 ;  (let [tested-rule-fn (p/rep<= 3 (p/lit "A"))]
 ;    (is (= (tested-rule-fn (list "A" "A" "C") {}) [["A" "A"] (list "C") {}])
 ;        "created rep< rule works when number of fulfilled rules is less than limit")
@@ -259,13 +266,13 @@
 ;    (is (= (tested-rule-fn (list "D" "A" "B") {}) [[] (list "D" "A" "B") {}])
 ;        "created rep< rule succeeds when symbol does not fulfill subrule at all")))
 ;
-;(deftest test-lit-conc-seq
+;(deftest lit-conc-seq
 ;  ; Parse the first four symbols in the program "THEN"
 ;  (is (= ((p/lit-conc-seq "THEN") (seq "THEN print 42;") {})
 ;         [(vec "THEN") (seq " print 42;") {}])
 ;      "created literal-sequence rule is based on sequence of given token sequencible"))
 ;
-;(deftest test-lit-alt-seq
+;(deftest lit-alt-seq
 ;  ; Parse the first four symbols in the program "B 2"
 ;  (is (= ((p/lit-alt-seq "ABCD") (seq "B 2") {})
 ;         [\B (seq " 2") {}])
@@ -273,13 +280,13 @@
 ;  (is (= ((p/lit-alt-seq "ABCD") (seq "E 2") {}) nil)
 ;      "created literal-alternative-sequence rule fails when literal symbol not present in sequence"))
 ;
-;(deftest test-emptiness
+;(deftest emptiness
 ;  ; Parse the emptiness before the first symbol
 ;  (is (= (p/emptiness (list "A" "B" "C") {})
 ;         [nil (list "A" "B" "C") {}])
 ;      "emptiness rule matches emptiness"))
 ;
-;(deftest test-followed-by
+;(deftest followed-by
 ;  (is (= ((p/followed-by (p/lit "0") (p/lit "A")) (list "0" "A" "B" "C") {})
 ;         ["0" (list "A" "B" "C") {}])
 ;      "created followed-by rule works when base and followed-by subrules fulfilled")
@@ -291,7 +298,7 @@
 ;  (is (= ((p/followed-by (p/lit "0") (p/lit "A")) (list "0" "B" "B") {}) nil)
 ;      "created followed-by rule fails when followed-by subrule fails"))
 ;
-;(deftest test-with-info
+;(deftest with-info
 ;  (is (= ((p/with-info (p/lit "true") (fn [i p] (assoc i :column (inc (:column i)))))
 ;          ["true" "THEN"] {:column 13, :line 2})
 ;         ["true" (list "THEN") {:column 14, :line 2}])
@@ -299,7 +306,7 @@
 ;  (is (= ((p/with-info (p/lit "true") (constantly {:a 5})) ["false"] {}) nil)
 ;      "created info rule fails when subrule fails"))
 ;
-;(deftest test-failpoint
+;(deftest failpoint
 ;  (let [failing-rule (p/failpoint (p/lit "A")
 ;                                  (fn [tokens info]
 ;                                    (throw-arg "ERROR at line %s" (:line info))))]
@@ -309,7 +316,7 @@
 ;          (failing-rule ["B"] {:line 3})
 ;        "failing rules fail with given exceptions when their subrules fail"))))
 ;
-;(deftest test-do-effects-before
+;(deftest do-effects-before
 ;  (let [effect-rule (p/do-effects-before (p/lit "A")
 ;                                         (fn [tokens info]
 ;                                           (println "YES" tokens info)))]
@@ -319,7 +326,7 @@
 ;           "YES [A B] {:line 3}\n")
 ;        "pre-effect rules should call their effect with tokens and info before processing")))
 ;
-;(deftest test-product-context
+;(deftest product-context
 ;  (let [receiving-rule-maker (fn rule-maker [n]
 ;                               (p/factor= (Integer/parseInt (str n)) (p/lit \a)))
 ;        digit (p/semantics p/anything #(Integer/parseInt (str %)))
@@ -338,7 +345,7 @@
 ;           [[{:type \+, :token \a} [\a \a]] (seq "sdf") {}]))
 ;    (is (= (rule (seq "+asdf") {}) nil))))
 ;
-;(deftest test-product-invisible-context
+;(deftest product-invisible-context
 ;  (let [digit (p/semantics p/anything #(Integer/parseInt (str %)))
 ;        receiving-rule-maker (fn rule-maker [n]
 ;                               (p/factor= (Integer/parseInt (str n)) p/anything))
@@ -349,7 +356,7 @@
 ;    (is (= ((p/conc digit rule) (seq "531aaaa") {})
 ;           [[5 [3 1 [\3 \1 \a \a]]] (seq "aa") {}]))))
 ;
-;(deftest test-match-remainder
+;(deftest match-remainder
 ;  (is (= ((p/match-remainder (p/lit "hi") (p/lit "THEN")) ["hi" "THEN"] {})
 ;         [["hi" "THEN"] (list "THEN") {}])
 ;      "created remainder-matching rule succeeds when given subrule and matching succeed")

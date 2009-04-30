@@ -74,6 +74,7 @@
       semantic-value))
 
   (def fetch-remainder (fetch-val :remainder))
+  (def fetch-info fetch-val)
 
   (defn alt
     [& subrules]
@@ -85,21 +86,21 @@
     [subrule]
     (m-plus subrule failure))
   
+  (declare rep+)
+  
+  (defn rep*
+    [subrule]
+    (opt (rep+ subrule)))
+  
+  (defn rep+
+    [subrule]
+    (complex [first-subproduct subrule
+              first-subremainder fetch-remainder
+              :when (seq first-subremainder)
+              rest-subproducts (rep* subrule)]
+      (cons first-subproduct rest-subproducts)))
+  
 )
-
-(declare rep+)
-
-(defn rep*
-  [subrule]
-  (opt (rep+ subrule)))
-
-(defn rep+
-  [subrule]
-  (complex [first-subproduct subrule
-            first-subremainder (fetch-remainder)
-            :when (seq first-subremainder)
-            rest-subproducts (rep* subrule)]
-    (cons first-subproduct rest-subproducts)))
 
 ;(defn validate-state
 ;  [subrule validator]
