@@ -52,7 +52,7 @@
 
   (defmacro complex
     [steps & product-expr]
-    `(domonad parser-m ~steps ~product-expr))
+    `(domonad parser-m ~steps ~@product-expr))
 
 )
 
