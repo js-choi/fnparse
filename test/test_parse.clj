@@ -3,13 +3,18 @@
   (:require [name.choi.joshua.fnparse :as p]))
 ;(set! *warn-on-reflection* true)
 
+(deftest test-anything
+  (is (= (p/anything "ABC" {})
+         [\A (seq "BC") {}])
+      "anything rule matches first token"))
+
 (deftest test-term
-  (is (= ((p/term #(= % "true")) ["true" "THEN"] {})
+  (is (= ((p/term (partial = "true")) ["true" "THEN"] {})
          ["true" (list "THEN") {}])
       "created terminal rule works when first token fulfills validator")
-  (is (nil? ((p/term #(= % "true")) ["false" "THEN"] {}))
+  (is (nil? ((p/term (partial = "true")) ["false" "THEN"] {}))
       "created terminal rule fails when first token fails validator")
-  (is (= ((p/term #(= % "true")) ["true"] {})
+  (is (= ((p/term (partial = "true")) ["true"] {})
          ["true" nil {}])
       "created terminal rule works when no remainder"))
 
@@ -300,12 +305,6 @@
 ;                 "pre-effect rules succeed when their subrules are fulfilled"))
 ;           "YES [A B] {:line 3}\n")
 ;        "pre-effect rules should call their effect with tokens and info before processing")))
-;
-;(deftest test-anything
-;  ; Parse the first symbol
-;  (is (= (p/anything (list "A" "B" "C") {})
-;         ["A" (list "B" "C") {}])
-;      "anything rule matches first token"))
 ;
 ;(deftest test-product-context
 ;  (let [receiving-rule-maker (fn rule-maker [n]

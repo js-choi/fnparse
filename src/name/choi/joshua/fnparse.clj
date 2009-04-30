@@ -1,5 +1,6 @@
 (ns name.choi.joshua.fnparse
-  (:use [clojure.contrib.except :only [throw-arg]]))
+  (:use [clojure.contrib.monads :only [domonad defmonad with-monad]]
+        [clojure.contrib.except :only [throw-arg]]))
 
 ; A rule is a delay object that contains a function that:
 ; - Takes a collection of tokens.
@@ -7,6 +8,31 @@
 ;   products and (1) a sequence of the remaining symbols or nil. In all documentation here,
 ;   "a rule's products" is the first element of a valid result from the rule.
 ; - If the given token sequence is invalid and the rule fails, it simply returns nil.
+
+; A "deepener" is my pet term for the functions that are called to get deeper into a monad:
+; (m-bind value deepener)
+
+(defmonad parser-m
+  [m-result (fn [product] (fn [tokens info] [product tokens info]))
+   m-bind (fn [parser deepener]
+            (fn [tokens info]
+              (let [[product remainder info :as result] (parser tokens info)]
+                (when-not (nil? result)
+                  ((deepener product) remainder info)))))
+   m-zero (constantly nil)])
+            
+
+(with-monad parser-m
+
+  (defn anything [tokens info]
+    [(first tokens) (next tokens) info])
+  
+  (defn term
+    [validator]
+    (domonad [first-token anything, :when (validator first-token)]
+      first-token))
+
+)
 
 ;(defn- identity-of-first
 ;  "Returns its first argument."
