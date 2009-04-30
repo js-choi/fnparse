@@ -83,8 +83,16 @@
   (complex [subproduct subrule]
     semantic-value))
 
-(defn validate-state
-  [subrule vl
+(def get-state (fetch-state))
+(def get-remainder (fetch-val :remainder))
+
+;(defn validate-state
+;  [subrule validator]
+;  (complex [subproduct subrule, substate get-state, :when (validator state)] subproduct))
+;
+;(defn validate-remainder
+;  [subrule validator]
+;  (complex
 
 ;(defn- identity-of-first
 ;  "Returns its first argument."
