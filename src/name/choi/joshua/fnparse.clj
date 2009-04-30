@@ -31,6 +31,16 @@
   (defn anything [{tokens :remainder, :as state}]
     [(first tokens) (assoc state :remainder (next tokens))])
   
+  (defn validate
+    "Creates a rule from attaching a product-validating function to the given subrule--that
+    is, any products of the subrule must fulfill the validator function.
+    (def a (validate b validator)) says that the rule a succeeds only when b succeeds and
+    when (validator b-product) is true. The new rule's product would be b-product. If b fails
+    or (validator b-product) is false, then nil is simply returned."
+    [subrule validator]
+    (domonad [subproduct subrule, :when (validator subproduct)]
+      subproduct))
+
   (defn term
     "Creates a rule metafunction that is a terminal rule of the given validator--that is, it
     accepts only tokens for whom (validator token) is true.
@@ -39,8 +49,7 @@
     The new rule's product would be the first token, if it fulfills the validator.
     If the token does not fulfill the validator, the new rule simply returns nil."
     [validator]
-    (domonad [first-token anything, :when (validator first-token)]
-      first-token))
+    (validate anything validator))
 
   (defn lit
     "Creates a rule metafunction that is the terminal rule of the given literal token--that
@@ -77,16 +86,6 @@
 ;    (complex [subproduct subrule]
     (domonad [subproduct subrule]
       semantic-value))
-
-  (defn validate
-    "Creates a rule from attaching a product-validating function to the given subrule--that
-    is, any products of the subrule must fulfill the validator function.
-    (def a (validate b validator)) says that the rule a succeeds only when b succeeds and
-    when (validator b-product) is true. The new rule's product would be b-product. If b fails
-    or (validator b-product) is false, then nil is simply returned."
-    [subrule validator]
-    (domonad [subproduct subrule, :when (validator subproduct)]
-      subproduct))
 
 )
 
