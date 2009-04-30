@@ -1,5 +1,5 @@
 (ns name.choi.joshua.fnparse
-  (:use [clojure.contrib.monads :only [domonad defmonad with-monad]]
+  (:use [clojure.contrib.monads :only [domonad with-monad maybe-t state-m]]
         [clojure.contrib.except :only [throw-arg]]))
 
 ; A rule is a delay object that contains a function that:
@@ -12,14 +12,7 @@
 ; A "deepener" is my pet term for the functions that are called to get deeper into a monad:
 ; (m-bind value deepener)
 
-(defmonad parser-m
-  [m-result (fn [product] (fn [tokens info] [product tokens info]))
-   m-bind (fn [rule deepener]
-            (fn [tokens info]
-              (let [[product remainder info :as result] (rule tokens info)]
-                (when-not (nil? result)
-                  ((deepener product) remainder info)))))
-   m-zero (constantly nil)])
+(def parser-m (maybe-t state-m))
             
 
 (with-monad parser-m
