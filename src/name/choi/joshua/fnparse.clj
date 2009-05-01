@@ -82,6 +82,10 @@
     (complex [remainder fetch-remainder]
       (first remainder)))
 
+  (defn conc
+    [& subrules]
+    (m-seq subrules))
+
   (defn alt
     [& subrules]
     (apply m-plus subrules))

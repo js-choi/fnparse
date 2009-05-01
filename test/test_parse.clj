@@ -106,12 +106,10 @@
          [\A {:remainder (seq "ABC")}])))
 
 (deftest conc
-  (is (= ((p/conc [a (p/lit "hi") b (p/lit "THEN")] [(str a "!") b])
-          {:remainder ["hi" "THEN" "bye"]})
-         [["hi!" "THEN"] {:remainder (list "bye")}])
+  (is (= ((p/conc (p/lit "hi") (p/lit "THEN")) {:remainder ["hi" "THEN" "bye"]})
+         [["hi" "THEN"] {:remainder (list "bye")}])
       "created concatenated rule succeeds when all subrules fulfilled in order")
-  (is (nil? ((p/conc [a (p/lit "hi") b (p/lit "THEN")] [(str a "!") b])
-          {:remainder ["hi" "bye" "boom"]}))
+  (is (nil? ((p/conc (p/lit "hi") (p/lit "THEN")) {:remainder ["hi" "bye" "boom"]}))
       "created concatenated rule fails when one subrule fails"))
 
 (deftest alt
