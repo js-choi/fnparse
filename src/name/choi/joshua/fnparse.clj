@@ -20,6 +20,8 @@
 
 (with-monad parser-m
 
+  (def emptiness (m-result nil))
+
   (defn anything [{tokens :remainder, :as state}]
     [(first tokens) (assoc state :remainder (next tokens))])
   
@@ -76,11 +78,13 @@
   (def fetch-remainder (fetch-val :remainder))
   (def fetch-info fetch-val)
 
+  (def remainder-peek
+    (complex [remainder fetch-remainder]
+      (first remainder)))
+
   (defn alt
     [& subrules]
     (apply m-plus subrules))
-
-  (def emptiness (m-result nil))
 
   (defn opt
     [subrule]

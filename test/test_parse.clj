@@ -4,6 +4,11 @@
   (:require [name.choi.joshua.fnparse :as p]))
 ;(set! *warn-on-reflection* true)
 
+(deftest emptiness
+  (is (= (p/emptiness {:remainder (list "A" "B" "C")})
+         [nil {:remainder (list "A" "B" "C")}])
+      "emptiness rule matches emptiness"))
+
 (deftest anything
   (is (= (p/anything {:remainder "ABC"})
          [\A {:remainder (seq "BC")}])
@@ -95,6 +100,11 @@
 ;    (is (= ((p/validate-info subrule #(contains? % :b)) ["hi" "THEN"] {}) nil)
 ;        "created info-validating rule fails when given validator fails")))
 ; 
+
+(deftest remainder-peek
+  (is (= (p/remainder-peek {:remainder (seq "ABC")})
+         [\A {:remainder (seq "ABC")}])))
+
 (deftest alt
   (let [literal-true (p/lit "true")
         literal-false (p/lit "false")
@@ -115,11 +125,6 @@
     (is (= (opt-true {:remainder (list "THEN")})
            [nil {:remainder (list "THEN")}])
         "created option rule works when symbol absent")))
-
-(deftest emptiness
-  (is (= (p/emptiness {:remainder (list "A" "B" "C")})
-         [nil {:remainder (list "A" "B" "C")}])
-      "emptiness rule matches emptiness"))
 
 (deftest rep*
   (let [rep*-true (p/rep* (p/lit true))]
