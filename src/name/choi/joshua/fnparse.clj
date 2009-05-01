@@ -102,7 +102,7 @@
               next-token remainder-peek
               rest-subproducts (rep* subrule)]
       (cons first-subproduct rest-subproducts)))
-  
+
 )
 
 ;(defn rep*
