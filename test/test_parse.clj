@@ -95,19 +95,6 @@
 ;    (is (= ((p/validate-info subrule #(contains? % :b)) ["hi" "THEN"] {}) nil)
 ;        "created info-validating rule fails when given validator fails")))
 ; 
-;(deftest conc
-;  (let [identifier (p/with-info (p/term string?) (fn [m p] (assoc m :b 1)))
-;        equals-operator (p/semantics (p/lit "=") keyword)
-;        answer (p/with-info (p/lit "42") (fn [m p] (assoc m :c 3)))
-;        truth (p/conc identifier equals-operator answer)]
-;    ; Parse the first symbols in the program "answer = 42 THEN"
-;    (is (= (truth ["answer" "=" "42" "THEN"] {:a 50})
-;           [["answer" := "42"] (list "THEN") {:a 50, :b 1, :c 3}])
-;        "created concatenation rule works when valid symbols are present in order")
-;    ; Parse the first symbols in the program "answer = 42 THEN"
-;    (is (= (truth ["answer" "42" "=" "THEN"] {}) nil)
-;        "created concatenation rule fails when invalid symbols present")))
-;
 (deftest alt
   (let [literal-true (p/lit "true")
         literal-false (p/lit "false")

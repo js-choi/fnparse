@@ -30,11 +30,9 @@
 (def minus-sign (lit \-))
 (def plus-sign (lit \+))
 (def decimal-point (lit \.))
-(def exponential-sign (alt (lit \e) (lit \E)))
+(def exponential-sign (lit-alt-seq "eE"))
 (def zero-digit (lit \0))
-(def nonzero-decimal-digit
-  (alt (lit \1) (lit \2) (lit \3) (lit \4) (lit \5) (lit \6) (lit \7)
-       (lit \8) (lit \9)))
+(def nonzero-decimal-digit (lit-alt-seq "123456789"))
 (def decimal-digit (alt zero-digit nonzero-decimal-digit))
 (def fractional-part (conc decimal-point (rep* decimal-digit)))
 (def exponential-part
@@ -45,96 +43,67 @@
             above-one (alt zero-digit (rep+ nonzero-decimal-digit))
             below-one (opt fractional part)
             power (opt exponential-part)]
-    (->
-      (Double/parseDouble (apply str (flatten [minus above-one below-one power]))
-      (if below-one identity int)
-      #(struct node-s :scalar %)))))
-;  (semantics
-;    (conc (opt minus-sign) (alt zero-digit (rep+ nonzero-decimal-digit))
-;          (opt fractional-part) (opt exponential-part))
-;    (fn [product]
-;        (if (or (product 2) (product 3))
-;            (hash-map :kind :scalar, :content (Double/parseDouble
-;                                      (apply str (flatten product))))
-;            (hash-map :kind :scalar, :content (Integer/parseInt
-;                                        (apply str (flatten product))))))))
+    (-> (Double/parseDouble (apply str (flatten [minus above-one below-one power]))
+        (if below-one identity int)
+        #(struct node-s :scalar %)))))
 
 (def hexadecimal-digit
   (alt decimal-digit (lit \A) (lit \B) (lit \C) (lit \D) (lit \E) (lit \F)))
 
-(def unescaped-char (term #(and (not= % \\) (not= % \"))))
+(def unescaped-char (except anything escape-indicator string-delimiter))
 
 (def unicode-char-sequence
   (semantics (conc (lit \u) hexadecimal-digit
                    hexadecimal-digit hexadecimal-digit hexadecimal-digit)
              #(char (Integer/parseInt (apply str (rest %)) 16))))
 
-(defn escape-sequence-rule
-  "Creates a rule for escape sequences--that is, the escape indicator followed by
-  the given escaped character, together turning into the given new character. The
-  new character is the same given escaped character by default."
-  ([escaped-character]
-   (escape-sequence-rule escaped-character escaped-character))
-  ([escaped-character new-character]
-   (semantics (lit escaped-character)
-              (fn [_] new-character))))
+(def escaped-characters
+  {\\ \\, \/ \/, \b \backspace, \f \formfeed, \n \newline, \r \return, \t \tab})
 
 (def escape-sequence
-  (semantics
-    (conc escape-indicator
-          (alt (escape-sequence-rule \")
-               (escape-sequence-rule \\)
-               (escape-sequence-rule \/)
-               (escape-sequence-rule \b \backspace)
-               (escape-sequence-rule \f \formfeed)
-               (escape-sequence-rule \n \newline)
-               (escape-sequence-rule \r \return)
-               (escape-sequence-rule \t \tab)
-               (escape-sequence-rule \\)
-               unicode-char-sequence))
-    #(% 1)))
+  (complex [_ escape-indicator, character (lit-alt-seq (keys escaped-characters))
+    (escaped-characters character)))
 
 (def string-char
   (alt unescaped-char escape-sequence))
 
 (def string-lit
-  (semantics (conc string-delimiter (rep* string-char) string-delimiter)
-             #(hash-map :kind :scalar, :content (apply str (% 1)))))
+  (complex [_ string-delimiter, contents (rep* string-char), _ string-delimiter]
+    (struct node-s :scalar (apply str contents))))
 
 (declare array)
 (declare object)
 
-(def value (alt string-lit number-lit keyword-lit #'array #'object))
+(def value (alt string-lit number-lit keyword-lit array object))
 
 (def additional-value
-  (semantics (conc value-separator value) #(% 1)))
+  (complex [_ value-separator, content value] content))
 
 (def array-contents
-  (semantics (conc value (rep* additional-value))
-             #(into [(% 0)] (% 1))))
+  (complex [first-value value, rest-values (rep* additional-value)]
+    (cons first-value rest-values)))
 
 (def array
-  (semantics (conc begin-array (opt array-contents) end-array)
-             #(hash-map :kind :array, :content (vec (% 1)))))
+  (complex [_ begin-array, contents (opt array-contents), _ end-array]
+    (struct node-s :array (vec contents))))
 
 (def entry
-  (semantics (conc string-lit name-separator value)
-             #(vector (% 0) (% 2))))
+  (complex [entry-key string-lit, _ name-separator, entry-val value]
+    [entry-key entry-val]))
 
 (def additional-entry
-  (semantics (conc value-separator entry) #(% 1)))
+  (complex [_ value-separator, content entry]
+    entry))
 
 (def object-contents
-  (semantics (conc entry (rep* additional-entry))
-             #(into [(% 0)] (% 1))))
+  (complex [first-entry entry, rest-entries (rep* additional-entry)]
+    (cons first-entry rest-entries)))
 
 (def object
-  (semantics (conc begin-object (opt object-contents) end-object)
-             #(hash-map :kind :object, :content (into {} (% 1)))))
+  (complex [_ begin-object, contents object-contents, _ end-object]
+    (struct node-s :object (into {} contents))))
 
 (def text (alt object array))
-
-(def lex seq)
 
 (defn parse [tokens]
   (let [[product remainder info] (text {:remainder tokens, :column 0, :line 0})]
