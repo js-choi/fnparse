@@ -102,7 +102,7 @@
 ; 
 
 (deftest remainder-peek
-  (is (= (p/remainder-peek {:remainder (seq "ABC")})
+  (is (= (p/remainder-peek {:remainder (seq "ABC")})
          [\A {:remainder (seq "ABC")}])))
 
 (deftest alt
