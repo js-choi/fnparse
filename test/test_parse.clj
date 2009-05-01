@@ -141,20 +141,18 @@
            [[true true true] {:remainder nil}])
         "created zero-or-more-repetition rule works with no remainder")))
 
-;(deftest rep+
-;  (let [rep+-true (p/rep+ (p/constant-semantics (p/lit "true") true))]
-;    ; Parse the first symbol in the program "true THEN"
-;    (is (= (rep+-true ["true" "THEN"] {})
-;           [[true] (list "THEN") {}])
-;        "created one-or-more-repetition rule works when symbol present singularly")
-;    ; Parse the first symbol in the program "true true true THEN"
-;    (is (= (rep+-true ["true" "true" "true" "THEN"] {})
-;           [[true true true] (list "THEN") {}])
-;        "created one-or-more-repetition rule works when symbol present multiply")
-;    ; Parse the first symbol in the program "THEN"
-;    (is (nil? (rep+-true (list "THEN") {}))
-;        "created one-or-more-repetition rule fails when symbol absent")))
-;
+(deftest rep+
+  (let [rep+-true (p/rep+ (p/lit true))]
+    (is (= (rep+-true {:remainder [true "THEN"]})
+           [[true] {:remainder (list "THEN")}])
+        "created one-or-more-repetition rule works when symbol present singularly")
+    (is (= (rep+-true {:remainder [true true true "THEN"]})
+           [[true true true] {:remainder (list "THEN")}])
+        "created one-or-more-repetition rule works when symbol present multiply")
+    ; Parse the first symbol in the program "THEN"
+    (is (nil? (rep+-true {:remainder (list "THEN")}))
+        "created one-or-more-repetition rule fails when symbol absent")))
+
 ;(deftest except
 ;  ; except-rule = ("A" | "B" | "C") - "B" - "C";
 ;  (let [except-rule (p/except (p/alt (p/lit "A") (p/lit "B") (p/lit "C"))
