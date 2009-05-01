@@ -116,7 +116,10 @@
            [nil {:remainder (list "THEN")}])
         "created option rule works when symbol absent")))
 
-
+(deftest emptiness
+  (is (= (p/emptiness (list "A" "B" "C") {})
+         [nil (list "A" "B" "C") {}])
+      "emptiness rule matches emptiness"))
 
 (deftest rep*
   (let [rep*-true (p/rep* (p/lit true))]
@@ -129,8 +132,8 @@
     (is (= (rep*-true {:remainder ["THEN"], :a 3})
            [nil {:remainder (list "THEN"), :a 3}])
      "created zero-or-more-repetition rule works when symbol absent")
-    (is (= (rep*-true {:remainder [true true]})
-           [[true true] {:remainder nil}])
+    (is (= (rep*-true {:remainder [true true true]})
+           [[true true true] {:remainder nil}])
         "created zero-or-more-repetition rule works with no remainder")))
 
 ;(deftest rep+

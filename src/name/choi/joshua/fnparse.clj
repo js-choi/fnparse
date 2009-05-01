@@ -96,11 +96,32 @@
     [subrule]
     (complex [first-subproduct subrule
               first-subremainder fetch-remainder
-              :when (seq first-subremainder)
-              rest-subproducts (rep* subrule)]
+              rest-subproducts (rep* subrule)
+              :when (seq first-subremainder)]
       (cons first-subproduct rest-subproducts)))
   
 )
+
+;(defn rep*
+;  "Creates a rule metafunction that is the zero-or-more repetition of the given subrule-
+;  that is, either zero or more of the subrule.
+;  (def a (rep* b)) would be equivalent to the EBNF
+;    a = {b};
+;  The new rule's products would be either the vector [b-product ...] for how many matches
+;  of b were found, or the empty vector [] if there was no match. Note that the latter
+;  actually means that the new rule would then return the vector [[] tokens]. The new rule
+;  can never simply return nil."
+;  [subrule]
+;  (fn [tokens info]
+;    (loop [products [], token-queue (seq tokens), cur-info info]
+;      (let [[subproduct subremainder subinfo :as subresult]
+;            (subrule token-queue cur-info)]
+;        (if (nil? subresult)
+;          [products token-queue cur-info]
+;          (if (nil? subremainder)
+;             [(conj products subproduct) subremainder subinfo]
+;            (recur (conj products subproduct) subremainder subinfo)))))))
+;
 
 ;(defn validate-state
 ;  [subrule validator]
