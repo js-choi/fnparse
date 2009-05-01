@@ -99,9 +99,8 @@
   (defn rep+
     [subrule]
     (complex [first-subproduct subrule
-              first-subremainder fetch-remainder
-              rest-subproducts (rep* subrule)
-              :when (seq first-subremainder)]
+              next-token remainder-peek
+              rest-subproducts (rep* subrule)]
       (cons first-subproduct rest-subproducts)))
   
 )
