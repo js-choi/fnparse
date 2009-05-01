@@ -117,8 +117,8 @@
         "created option rule works when symbol absent")))
 
 (deftest emptiness
-  (is (= (p/emptiness (list "A" "B" "C") {})
-         [nil (list "A" "B" "C") {}])
+  (is (= (p/emptiness {:remainder (list "A" "B" "C")})
+         [nil {:remainder (list "A" "B" "C")}])
       "emptiness rule matches emptiness"))
 
 (deftest rep*

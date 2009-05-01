@@ -80,11 +80,11 @@
     [& subrules]
     (apply m-plus subrules))
 
-  (def failure (m-result nil))
+  (def emptiness (m-result nil))
 
   (defn opt
     [subrule]
-    (m-plus subrule failure))
+    (m-plus subrule emptiness))
   
   (declare rep+)
   
