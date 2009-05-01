@@ -243,12 +243,11 @@
 ;    (is (= (tested-rule-fn (list "D" "A" "B") {}) [[] (list "D" "A" "B") {}])
 ;        "created rep< rule succeeds when symbol does not fulfill subrule at all")))
 ;
-;(deftest lit-conc-seq
-;  ; Parse the first four symbols in the program "THEN"
-;  (is (= ((p/lit-conc-seq "THEN") (seq "THEN print 42;") {})
-;         [(vec "THEN") (seq " print 42;") {}])
-;      "created literal-sequence rule is based on sequence of given token sequencible"))
-;
+(deftest lit-conc-seq
+  (is (= ((p/lit-conc-seq "THEN") {:remainder (seq "THEN print 42;")})
+         [(vec "THEN") {:remainder (seq " print 42;")}])
+      "created literal-sequence rule is based on sequence of given token sequencible"))
+
 ;(deftest lit-alt-seq
 ;  ; Parse the first four symbols in the program "B 2"
 ;  (is (= ((p/lit-alt-seq "ABCD") (seq "B 2") {})
