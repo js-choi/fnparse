@@ -82,9 +82,8 @@
     (complex [remainder fetch-remainder]
       (first remainder)))
 
-  (defn conc
-    [& subrules]
-    (m-seq subrules))
+  (defmacro conc [subrules]
+    `(with-monad parser-m (m-seq ~subrules)))
 
   (defn alt
     [& subrules]
@@ -93,6 +92,10 @@
   (defn opt
     [subrule]
     (m-plus subrule emptiness))
+  
+  (defn lit-conc-seq
+    [token-seq]
+    (conc (map lit token seq)))
   
   (declare rep+)
   

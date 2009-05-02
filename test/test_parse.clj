@@ -106,10 +106,10 @@
          [\A {:remainder (seq "ABC")}])))
 
 (deftest conc
-  (is (= ((p/conc (p/lit "hi") (p/lit "THEN")) {:remainder ["hi" "THEN" "bye"]})
+  (is (= ((p/conc [(p/lit "hi") (p/lit "THEN")]) {:remainder ["hi" "THEN" "bye"]})
          [["hi" "THEN"] {:remainder (list "bye")}])
       "created concatenated rule succeeds when all subrules fulfilled in order")
-  (is (nil? ((p/conc (p/lit "hi") (p/lit "THEN")) {:remainder ["hi" "bye" "boom"]}))
+  (is (nil? ((p/conc [(p/lit "hi") (p/lit "THEN")]) {:remainder ["hi" "bye" "boom"]}))
       "created concatenated rule fails when one subrule fails"))
 
 (deftest alt
@@ -250,10 +250,10 @@
 ;    (is (= (tested-rule-fn (list "D" "A" "B") {}) [[] (list "D" "A" "B") {}])
 ;        "created rep< rule succeeds when symbol does not fulfill subrule at all")))
 ;
-;(deftest lit-conc-seq
-;  (is (= ((p/lit-conc-seq "THEN") {:remainder (seq "THEN print 42;")})
-;         [(vec "THEN") {:remainder (seq " print 42;")}])
-;      "created literal-sequence rule is based on sequence of given token sequencible"))
+(deftest lit-conc-seq
+  (is (= ((p/lit-conc-seq "THEN") {:remainder (seq "THEN print 42;")})
+         [(vec "THEN") {:remainder (seq " print 42;")}])
+      "created literal-sequence rule is based on sequence of given token sequencible"))
 
 ;(deftest lit-alt-seq
 ;  ; Parse the first four symbols in the program "B 2"
