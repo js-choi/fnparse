@@ -83,10 +83,7 @@
       (first remainder)))
 
   (defmacro conc [subrules]
-    (println ">" (m-seq subrules))
     `(with-monad parser-m (m-seq ~subrules)))
-
-  (defmacro prr [n] `(constantly ~n))
 
   (defn alt
     [& subrules]
@@ -98,7 +95,7 @@
   
   (defn lit-conc-seq
     [token-seq]
-    (conc (map lit token-seq)))
+    (m-seq (map lit token-seq)))
   
   (declare rep+)
   

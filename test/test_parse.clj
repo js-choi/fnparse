@@ -123,17 +123,18 @@
         "created alternatives rule fails when no valid rule product present")))
 
 (deftest lit-conc-seq
-  (is (= ((p/lit-conc-seq "THEN") {:remainder (seq "THEN print 42;")})
+  (is (= ((p/lit-conc-seq "THEN") {:remainder "THEN print 42;"})
          [(vec "THEN") {:remainder (seq " print 42;")}])
       "created literal-sequence rule is based on sequence of given token sequencible"))
 
-;(deftest lit-alt-seq
-;  ; Parse the first four symbols in the program "B 2"
-;  (is (= ((p/lit-alt-seq "ABCD") (seq "B 2") {})
-;         [\B (seq " 2") {}])
-;      "created literal-alternative-sequence rule works when literal symbol present in sequence")
-;  (is (= ((p/lit-alt-seq "ABCD") (seq "E 2") {}) nil)
-;      "created literal-alternative-sequence rule fails when literal symbol not present in sequence"))
+(deftest lit-alt-seq
+  (is (= ((p/lit-alt-seq "ABCD") {:remainder (seq "B 2")})
+         [\B {:remainder (seq " 2")}])
+      (str "created literal-alternative-sequence rule works when literal symbol present in"
+           "sequence"))
+  (is (nil? ((p/lit-alt-seq "ABCD") {:remainder (seq "E 2")}))
+      (str "created literal-alternative-sequence rule fails when literal symbol not present"
+           "in sequence")))
 ;
 (deftest opt
   (let [opt-true (p/opt (p/lit "true"))]
