@@ -207,17 +207,21 @@
            [[] {:remainder (list "D" "A" "B")}])
         "created factor= rule works when symbol fulfils zero multiples and factor is zero")))
 
-;(deftest factor<
-;  (let [tested-rule (p/factor< 3 (p/lit "A"))]
-;    (is (= (tested-rule (list "A" "A" "A" "A" "C") {}) [["A" "A"] (list "A" "A" "C") {}])
-;        "created factor< rule works when symbol fulfills all subrule multiples and leaves strict remainder")
-;    (is (= (tested-rule (list "A" "A" "A" "C") {}) [["A" "A"] (list "A" "C") {}])
-;        "created factor< rule works when symbol fulfills all subrule multiples only")
-;    (is (= (tested-rule (list "A" "A" "C") {}) [["A" "A"] (list "C") {}])
-;        "created factor< rule works when symbol does not fulfill all subrule multiples")
-;    (is (= (tested-rule (list "D" "A" "B") {}) [[] (list "D" "A" "B") {}])
-;        "created factor< rule works when symbol does not fulfill subrule at all")))
-;
+(deftest factor<
+  (let [tested-rule (p/factor< 3 (p/lit "A"))]
+    (is (= (tested-rule {:remainder (list "A" "A" "A" "A" "C")})
+           [["A" "A"] {:remainder (list "A" "A" "C")}])
+        (str "created factor< rule works when symbol fulfills all subrule multiples and"
+             "leaves strict remainder"))
+    (is (= (tested-rule {:remainder (list "A" "A" "A" "C")})
+           [["A" "A"] {:remainder (list "A" "C")}])
+        "created factor< rule works when symbol fulfills all subrule multiples only")
+    (is (= (tested-rule {:remainder (list "A" "A" "C")}) [["A" "A"] {:remainder (list "C")}])
+        "created factor< rule works when symbol does not fulfill all subrule multiples")
+    (is (= (tested-rule {:remainder (list "D" "A" "B")})
+           [[] {:remainder (list "D" "A" "B")}])
+        "created factor< rule works when symbol does not fulfill subrule at all")))
+
 ;(deftest factor<=
 ;  (let [tested-rule (p/factor<= 3 (p/lit "A"))]
 ;    (is (= (tested-rule (list "A" "A" "A" "A" "C") {}) [["A" "A" "A"] (list "A" "C") {}])
