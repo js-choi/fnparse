@@ -138,6 +138,19 @@
               :when (not (subtrahend state))]
       minuend-product))
   
+  (defn factor=
+    "Creates a rule metafunction that is the syntactic factor of the given subrule by a given
+    integer--that is, it is equivalent to the subrule replicated by 1, 2, etc. times and
+    then concatenated.
+    (def a (factor= n b)) would be equivalent to the EBNF
+      a = n * b;
+    The new rule's products would be b-product. If b fails below n times, then nil is simply
+    returned.
+    (factor= 3 \"A\") would accept [\"A\" \"A\" \"A\" \"A\" \"B\"] and return
+    [[\"A\" \"A\" \"A\"] (\"A\" \"B\")."
+    [factor subrule]
+    (apply conc (replicate factor subrule)))
+  
 )
 
 ;(defn rep*

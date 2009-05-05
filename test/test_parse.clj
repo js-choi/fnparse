@@ -207,7 +207,7 @@
            [[] {:remainder (list "D" "A" "B")}])
         "created factor= rule works when symbol fulfils zero multiples and factor is zero")))
 
-(deftest factor<
+;(deftest factor<
 ;  (let [tested-rule (p/factor< 3 (p/lit "A"))]
 ;    (is (= (tested-rule (list "A" "A" "A" "A" "C") {}) [["A" "A"] (list "A" "A" "C") {}])
 ;        "created factor< rule works when symbol fulfills all subrule multiples and leaves strict remainder")
