@@ -106,10 +106,10 @@
          [\A {:remainder (seq "ABC")}])))
 
 (deftest conc
-  (is (= ((p/conc [(p/lit "hi") (p/lit "THEN")]) {:remainder ["hi" "THEN" "bye"]})
+  (is (= ((p/conc (p/lit "hi") (p/lit "THEN")) {:remainder ["hi" "THEN" "bye"]})
          [["hi" "THEN"] {:remainder (list "bye")}])
       "created concatenated rule succeeds when all subrules fulfilled in order")
-  (is (nil? ((p/conc [(p/lit "hi") (p/lit "THEN")]) {:remainder ["hi" "bye" "boom"]}))
+  (is (nil? ((p/conc (p/lit "hi") (p/lit "THEN")) {:remainder ["hi" "bye" "boom"]}))
       "created concatenated rule fails when one subrule fails"))
 
 (deftest alt
@@ -135,7 +135,7 @@
   (is (nil? ((p/lit-alt-seq "ABCD") {:remainder (seq "E 2")}))
       (str "created literal-alternative-sequence rule fails when literal symbol not present"
            "in sequence")))
-;
+
 (deftest opt
   (let [opt-true (p/opt (p/lit "true"))]
     ; Parse the first symbol in the program "true THEN"
