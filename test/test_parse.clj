@@ -74,8 +74,8 @@
   (is (nil? ((p/validate (p/lit "hi") (partial = "hi")) {:remainder "hi"}))
       "created validator rule fails when given validator fails"))
 
-(deftest test-fetch-val
-  (is (= ((p/complex [remainder p/fetch-remainder] remainder) {:remainder ["hi" "THEN"]})
+(deftest get-remainder
+  (is (= ((p/complex [remainder p/get-remainder] remainder) {:remainder ["hi" "THEN"]})
          [["hi" "THEN"] {:remainder ["hi" "THEN"]}])))
 
 ;(deftest validate-remainder

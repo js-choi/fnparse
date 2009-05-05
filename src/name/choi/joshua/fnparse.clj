@@ -80,15 +80,13 @@
   (def get-info fetch-val)
 
   (def remainder-peek
-    (complex [remainder fetch-remainder]
+    (complex [remainder get-remainder]
       (first remainder)))
 
   (defn conc [& subrules]
     (m-seq subrules))
 
-  (defn alt
-    [& subrules]
-    (apply m-plus subrules))
+  (def alt m-plus)
 
   (defn opt
     [subrule]
