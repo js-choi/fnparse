@@ -42,6 +42,10 @@
   (is (= ((p/followed-by (p/lit \a)) {:remainder "abc"}) [\a {:remainder "abc"}]))
   (is (nil? ((p/followed-by (p/lit \a)) {:remainder "bcd"}))))
 
+(deftest not-followed-by
+  (is (= ((p/not-followed-by (p/lit \a)) {:remainder "bcd"}) [true {:remainder "bcd"}]))
+  (is (nil? ((p/not-followed-by (p/lit \a)) {:remainder "abc"}))))
+
 (deftest complex
   (is (= ((p/complex [a (p/lit "hi")] (str a "!")) {:remainder ["hi" "THEN"]})
          ["hi!" {:remainder (list "THEN")}])

@@ -74,10 +74,11 @@
     (complex [state get-state, subproduct subrule, _ (set-state state)]
       subproduct))
   
-  (defn anti
+  (defn not-followed-by
     [subrule]
-    (complex [subproduct subrule, :when (not subproduct)]
-      false))
+    (fn [state]
+      (if (nil? (subrule state))
+        [true state])))
   
   (defn semantics
     [subrule semantic-hook]
