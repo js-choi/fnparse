@@ -20,6 +20,10 @@
 
 (with-monad parser-m
 
+  (def get-state (fetch-state))
+  (def get-remainder (fetch-val :remainder))
+  (def get-info fetch-val)
+
   (def emptiness (m-result nil))
 
   (defn anything [{tokens :remainder, :as state}]
@@ -65,9 +69,15 @@
     [token-re]
     (term (partial re-matches token-re)))
   
+  (defn followed-by
+    [subrule]
+    (complex [state get-state, subproduct subrule, _ (set-state state)]
+      subproduct))
+  
   (defn anti
     [subrule]
-    (term 
+    (complex [subproduct subrule, :when (not subproduct)]
+      false))
   
   (defn semantics
     [subrule semantic-hook]
@@ -78,10 +88,6 @@
     [subrule semantic-value]
     (complex [subproduct subrule]
       semantic-value))
-
-  (def get-state (fetch-state))
-  (def get-remainder (fetch-val :remainder))
-  (def get-info fetch-val)
 
   (def remainder-peek
     (complex [remainder get-remainder]

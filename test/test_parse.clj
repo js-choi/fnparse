@@ -39,7 +39,7 @@
       "created re-term rule fails when first token does not match regex"))
 
 (deftest followed-by
-  (is (= ((p/followed-by (p/lit \a)) {:remainder "abc"}) [\a {:remainder "cd"}]))
+  (is (= ((p/followed-by (p/lit \a)) {:remainder "abc"}) [\a {:remainder "abc"}]))
   (is (nil? ((p/followed-by (p/lit \a)) {:remainder "bcd"}))))
 
 (deftest complex
