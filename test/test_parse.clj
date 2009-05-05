@@ -38,6 +38,10 @@
   (is (nil? ((p/re-term #"\s*true\s*") {:remainder ["false" "THEN"]}))
       "created re-term rule fails when first token does not match regex"))
 
+(deftest anti
+  (is (= ((p/anti (p/lit \a)) {:remainder "bcd"}) [\b {:remainder "cd"}]))
+  (is (nil? ((p/anti (p/lit \a)) {:remainder "abc"}))))
+
 (deftest complex
   (is (= ((p/complex [a (p/lit "hi")] (str a "!")) {:remainder ["hi" "THEN"]})
          ["hi!" {:remainder (list "THEN")}])
