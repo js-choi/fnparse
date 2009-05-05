@@ -183,7 +183,7 @@
         "created one-or-more-repetition rule fails when symbol absent")))
 
 (deftest except
-  (let [except-rule (p/except (p/lit-alt-seq "ABC") (p/lit \B) (p/lit \C))]
+  (let [except-rule (p/except (p/lit-alt-seq "ABC") (p/alt (p/lit \B) (p/lit \C)))]
     (is (= (except-rule {:remainder (seq "ABC"), :a 1}) [\A {:remainder (seq "BC"), :a 1}])
         "created exception rule works when symbol is not one of the syntatic exceptions")
     (is (nil? (except-rule {:remainder (seq "BAC")}))

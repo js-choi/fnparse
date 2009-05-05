@@ -132,10 +132,10 @@
       a = b - c - d;
     The new rule's products would be b-product. If b fails or either c or d succeeds, then
     nil is simply returned."
-    [minuend & subtrahends]
+    [minuend subtrahend]
     (complex [state (fetch-state)
               minuend-product minuend
-              :when (not ((apply alt subtrahends) state))]
+              :when (not (subtrahend state))]
       minuend-product))
   
 )
