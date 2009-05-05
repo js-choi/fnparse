@@ -97,6 +97,10 @@
     [token-seq]
     (m-seq (map lit token-seq)))
   
+  (defn lit-alt-seq
+    [token-seq]
+    (apply alt (map lit token-seq)))
+  
   (declare rep+)
   
   (defn rep*
