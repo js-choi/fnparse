@@ -114,6 +114,20 @@
               rest-subproducts (rep* subrule)]
       (cons first-subproduct rest-subproducts)))
 
+  (defn except
+    "Creates a rule metafunction that is the exception from the first given subrules with the
+    rest of the given subrules--that is, it accepts only tokens that fulfill the first
+    subrule but fail the rest of the subrules.
+    (def a (except b c d)) would be equivalent to the EBNF
+      a = b - c - d;
+    The new rule's products would be b-product. If b fails or either c or d succeeds, then
+    nil is simply returned."
+    [minuend & subtrahends]
+    (fn [state]
+      (let [[minuend-product minuend-state] (minuend state)]
+        (when (and (not (nil? minuend-product)) (every? #(nil? (% state)) subtrahends))
+          [minuend-product minuend-state]))))
+  
 )
 
 ;(defn rep*
