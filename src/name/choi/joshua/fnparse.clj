@@ -65,6 +65,10 @@
     [token-re]
     (term (partial re-matches token-re)))
   
+  (defn anti
+    [subrule]
+    (term 
+  
   (defn semantics
     [subrule semantic-hook]
     (complex [subproduct subrule]
