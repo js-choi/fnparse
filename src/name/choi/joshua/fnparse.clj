@@ -75,8 +75,9 @@
     (complex [subproduct subrule]
       semantic-value))
 
-  (def fetch-remainder (fetch-val :remainder))
-  (def fetch-info fetch-val)
+  (def get-state (fetch-state))
+  (def get-remainder (fetch-val :remainder))
+  (def get-info fetch-val)
 
   (def remainder-peek
     (complex [remainder fetch-remainder]
@@ -123,10 +124,10 @@
     The new rule's products would be b-product. If b fails or either c or d succeeds, then
     nil is simply returned."
     [minuend & subtrahends]
-    (fn [state]
-      (let [[minuend-product minuend-state] (minuend state)]
-        (when (and (not (nil? minuend-product)) (every? #(nil? (% state)) subtrahends))
-          [minuend-product minuend-state]))))
+    (complex [state (fetch-state)
+              minuend-product minuend
+              :when (not ((apply alt subtrahends) state))]
+      minuend-product))
   
 )
 
