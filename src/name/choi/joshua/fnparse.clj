@@ -82,8 +82,8 @@
     (complex [remainder fetch-remainder]
       (first remainder)))
 
-  (defmacro conc [subrules]
-    `(with-monad parser-m (m-seq ~subrules)))
+  (defn conc [& subrules]
+    (m-seq subrules))
 
   (defn alt
     [& subrules]
