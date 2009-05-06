@@ -25,7 +25,12 @@
   (def set-info set-val)
   (def update-info update-val)
 
-  (def emptiness (m-result nil))
+  (def
+    #^{:doc "A rule metafunction that matches emptiness--that is, it always matches with
+       every given token sequence, and it always returns [nil tokens].
+       (def a emptiness) would be equivalent to the EBNF a = ;
+       This rule's product is always nil, and it therefore always returns [nil tokens]."}
+    emptiness (m-result nil))
 
   (defn anything [{tokens :remainder, :as state}]
     [(first tokens) (assoc state :remainder (next tokens))])
