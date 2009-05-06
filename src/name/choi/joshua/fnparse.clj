@@ -138,6 +138,10 @@
               :when (not (subtrahend state))]
       minuend-product))
   
+  (defn rep-predicate
+    [factor-predicate subrule]
+    (validate (rep* subrule) (comp factor-predicate count)))
+  
   (defn factor=
     "Creates a rule metafunction that is the syntactic factor of the given subrule by a given
     integer--that is, it is equivalent to the subrule replicated by 1, 2, etc. times and
