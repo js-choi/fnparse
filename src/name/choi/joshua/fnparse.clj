@@ -19,22 +19,30 @@
 
 (with-monad parser-m
 
-  (def get-state (fetch-state))
-  (def get-remainder (fetch-val :remainder))
-  (def get-info fetch-val)
+  (def
+    #^{:doc "A rule that consumes no tokens. It returns the entire current state."}
+    get-state (fetch-state))
+  (def
+    #^{:doc "A rule that consumes no tokens. It returns the remaining tokens."}
+    get-remainder (fetch-val :remainder))
+  (def
+    get-info fetch-val)
   (def set-info set-val)
   (def update-info update-val)
 
   (def
     #^{:doc "A rule that matches emptiness--that is, it always matches with every given token
        sequence, and it always returns [nil tokens].
+       
        (def a emptiness) would be equivalent to the EBNF a = ;
+       
        This rule's product is always nil, and it therefore always returns [nil tokens]."}
     emptiness (m-result nil))
 
   (defn anything
     "A rule that matches anything--that is, it matches the first token of the tokens it is
     given.
+    
     This rule's product is the first token it receives."
     [{tokens :remainder, :as state}]
     [(first tokens) (assoc state :remainder (next tokens))])
@@ -42,6 +50,7 @@
   (defn validate
     "Creates a rule from attaching a product-validating function to the given subrule--that
     is, any products of the subrule must fulfill the validator function.
+    
     (def a (validate b validator)) says that the rule a succeeds only when b succeeds and
     also when the evaluated value of (validator b-product) is true. The new rule's product 
     would be b-product."
@@ -84,26 +93,39 @@
       subproduct))
   
   (defn not-followed-by
+    "Creates a rule that does not consume any tokens, but fails when the given subrule
+    succeeds. On success, the new rule's product is always true."
     [subrule]
     (fn [state]
       (if (nil? (subrule state))
         [true state])))
   
   (defn semantics
+    "Creates a rule with a semantic hook: basically a simple version of a complex rule. The
+    semantic hook is a function that takes one argument: the product of the subrule."
     [subrule semantic-hook]
     (complex [subproduct subrule]
       (semantic-hook subproduct)))
   
   (defn constant-semantics
+    "Creates a rule with a constant semantic hook. Its product is always the given constant."
     [subrule semantic-value]
     (complex [subproduct subrule]
       semantic-value))
 
   (def remainder-peek
+    "A rule that does not consume any tokens. Its product is the very next token in the
+    remainder."
     (complex [remainder get-remainder]
       (first remainder)))
 
-  (defn conc [& subrules]
+  (defn conc
+    "Creates a rule that is the concatenation of the given subrules. Basically a simple
+    version of complex, each subrule consumes tokens in order, and if any fail, the entire
+    rule fails.
+    
+    (This function is equivalent to m-seq for the parser-m monad.)"
+    [& subrules]
     (m-seq subrules))
 
   (def alt m-plus)
