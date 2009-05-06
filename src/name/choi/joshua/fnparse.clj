@@ -20,15 +20,28 @@
 (with-monad parser-m
 
   (def
-    #^{:doc "A rule that consumes no tokens. It returns the entire current state."}
+    #^{:doc "A rule that consumes no tokens. Its product is the entire current state."}
     get-state (fetch-state))
   (def
-    #^{:doc "A rule that consumes no tokens. It returns the remaining tokens."}
+    #^{:doc "A rule that consumes no tokens. Its product is the sequence of the remaining
+       tokens."}
     get-remainder (fetch-val :remainder))
-  (def
-    get-info fetch-val)
-  (def set-info set-val)
-  (def update-info update-val)
+  (defn get-info
+    "Creates a rule that consumes no tokens. The new rule's product is the value of the given 
+    key in the current state."
+    [key]
+    (fetch-val key))
+  (defn set-info
+    "Creates a rule that consumes no tokens. The new rule directly changes the current state
+    by associating the given key with the given value. The product is nil."
+    [key value]
+    (set-val key value))
+  (defn update-info
+    "Creates a rule that consumes no tokens. The new rule changes the current state by
+    associating the given key with the evaluated result of applying the given updating
+    function to the key's current value. The product is nil."
+    [key val-update-fn]
+    (update-val key val-update-fn))
 
   (def
     #^{:doc "A rule that matches emptiness--that is, it always matches with every given token
