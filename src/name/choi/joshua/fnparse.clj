@@ -149,6 +149,14 @@
     [factor subrule]
     (rep-predicate (partial = factor) subrule))
   
+  (defn rep<
+    [factor subrule]
+    (rep-predicate (partial > factor) subrule))
+  
+  (defn rep<=
+    [factor subrule]
+    (rep-predicate (partial >= factor) subrule))
+  
   (defn factor=
     "Creates a rule metafunction that is the syntactic factor of the given subrule by a given
     integer--that is, it is equivalent to the subrule replicated by 1, 2, etc. times and

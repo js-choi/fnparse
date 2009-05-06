@@ -230,28 +230,6 @@
     (is (nil? (tested-rule-fn {:remainder (seq "DAB")}))
         "created rep= rule fails when symbol does not fulfill subrule at all")))
 
-;(deftest rep<
-;  (let [tested-rule-fn (p/rep< 3 (p/lit "A"))]
-;    (is (= (tested-rule-fn (seq "A" "A" "C") {}) [["A" "A"] (seq "C") {}])
-;        "created rep< rule works when number of fulfilled rules is less than limit")
-;    (is (= (tested-rule-fn (seq "A" "A" "A") {}) nil)
-;        "created rep< rule fails when number of fulfilled rules is equal to limit")
-;    (is (= (tested-rule-fn (seq "A" "A" "A" "A" "C") {}) nil)
-;        "created rep< rule fails when symbol of fulfilled rules is more than limit")
-;    (is (= (tested-rule-fn (seq "D" "A" "B") {}) [[] (seq "D" "A" "B") {}])
-;        "created rep< rule succeeds when symbol does not fulfill subrule at all")))
-;
-;(deftest rep<=
-;  (let [tested-rule-fn (p/rep<= 3 (p/lit "A"))]
-;    (is (= (tested-rule-fn (seq "A" "A" "C") {}) [["A" "A"] (seq "C") {}])
-;        "created rep< rule works when number of fulfilled rules is less than limit")
-;    (is (= (tested-rule-fn (seq "A" "A" "A" "C") {}) [["A" "A" "A"] (seq "C") {}])
-;        "created rep< rule works when number of fulfilled rules is equal to limit")
-;    (is (= (tested-rule-fn (seq "A" "A" "A" "A" "C") {}) nil)
-;        "created rep< rule fails when symbol of fulfilled rules is more than limit")
-;    (is (= (tested-rule-fn (seq "D" "A" "B") {}) [[] (seq "D" "A" "B") {}])
-;        "created rep< rule succeeds when symbol does not fulfill subrule at all")))
-
 ;(deftest factor<
 ;  (let [tested-rule (p/factor< 3 (p/lit \A))]
 ;    (is (= (tested-rule {:remainder (seq "AAAAC")})
