@@ -219,7 +219,7 @@
         "created rep rule succeeds when symbol does not fulfill subrule at all")))
 
 (deftest rep=
-  (let [tested-rule-fn (p/rep= 3 (p/lit "A"))]
+  (let [tested-rule-fn (p/rep= 3 (p/lit \A))]
     (is (= (tested-rule-fn {:remainder (seq "AAAC")})
            [[\A \A \A] {:remainder (seq "C")}])
         "created rep= rule works when symbol only fulfills all subrule multiples")
