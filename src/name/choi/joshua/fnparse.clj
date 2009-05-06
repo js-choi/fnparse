@@ -32,7 +32,11 @@
        This rule's product is always nil, and it therefore always returns [nil tokens]."}
     emptiness (m-result nil))
 
-  (defn anything [{tokens :remainder, :as state}]
+  (defn anything
+    "A rule metafunction that matches anything--that is, it matches the first token of the
+    tokens it is given.
+    This rule's product is the first token it receives."
+    [{tokens :remainder, :as state}]
     [(first tokens) (assoc state :remainder (next tokens))])
   
   (defn validate
