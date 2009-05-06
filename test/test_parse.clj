@@ -245,24 +245,16 @@
            [nil {:remainder (seq "DAB")}])
         "created factor< rule works when symbol does not fulfill subrule at all")))
 
-;(deftest with-info
-;  (is (= ((p/with-info (p/lit "true") (fn [i p] (assoc i :column (inc (:column i)))))
-;          ["true" "THEN"] {:column 13, :line 2})
-;         ["true" (list "THEN") {:column 14, :line 2}])
-;      "created info rule applies new info when valid")
-;  (is (= ((p/with-info (p/lit "true") (constantly {:a 5})) ["false"] {}) nil)
-;      "created info rule fails when subrule fails"))
-;
-;(deftest failpoint
-;  (let [failing-rule (p/failpoint (p/lit "A")
-;                                  (fn [tokens info]
-;                                    (throw-arg "ERROR at line %s" (:line info))))]
-;    (is (= (failing-rule ["A"] {:line 3}) ["A" nil {:line 3}])
-;        "failing rules succeed when their subrules are fulfilled")
-;    (is (thrown-with-msg? IllegalArgumentException #"ERROR at line 3"
-;          (failing-rule ["B"] {:line 3})
-;        "failing rules fail with given exceptions when their subrules fail"))))
-;
+(deftest failpoint
+  (let [failing-rule (p/failpoint (p/lit "A")
+                                  (fn [tokens state]
+                                    (throw-arg "ERROR at line %s" (:line state))))]
+    (is (= (failing-rule {:remainder ["A"], :line 3}) ["A" {:remainder nil, :line 3}])
+        "failing rules succeed when their subrules are fulfilled")
+    (is (thrown-with-msg? IllegalArgumentException #"ERROR at line 3"
+          (failing-rule {:remainder ["B"], :line 3})
+        "failing rules fail with given exceptions when their subrules fail"))))
+
 ;(deftest do-effects-before
 ;  (let [effect-rule (p/do-effects-before (p/lit "A")
 ;                                         (fn [tokens info]
