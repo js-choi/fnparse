@@ -170,6 +170,21 @@
     [factor subrule]
     (apply conc (replicate factor subrule)))
   
+  (defn factor<
+    "Creates a rule metafunction that is the syntactic factor (a nongreedy repetition) of the
+    given subrule by less than a given integer--that is, it accepts a certain number of
+    tokens that fulfill the subrule that is less than a certain factor, and leaves the rest
+    behind."
+    [factor subrule]
+    (alt (factor= (dec factor) subrule) (rep< factor subrule)))
+  
+  (defn factor<=
+    "Creates a rule metafunction that is the syntactic factor (a nongreedy repetition) of the
+    given subrule by a given integer or less--that is, it accepts a certain number of tokens
+    that fulfill the subrule that is a certain factor or less, and leaves the rest behind."
+    [factor subrule]
+    (alt (factor= factor subrule) (rep< factor subrule)))
+  
 )
 
 ;(defn rep*

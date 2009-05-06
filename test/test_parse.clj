@@ -230,20 +230,20 @@
     (is (nil? (tested-rule-fn {:remainder (seq "DAB")}))
         "created rep= rule fails when symbol does not fulfill subrule at all")))
 
-;(deftest factor<
-;  (let [tested-rule (p/factor< 3 (p/lit \A))]
-;    (is (= (tested-rule {:remainder (seq "AAAAC")})
-;           [[\A \A] {:remainder (seq "AAC")}])
-;        (str "created factor< rule works when symbol fulfills all subrule multiples and"
-;             "leaves strict remainder"))
-;    (is (= (tested-rule {:remainder (seq "AAAC")})
-;           [[\A \A] {:remainder (seq "AC")}])
-;        "created factor< rule works when symbol fulfills all subrule multiples only")
-;    (is (= (tested-rule {:remainder (seq "AAC")}) [[\A \A] {:remainder (seq "C")}])
-;        "created factor< rule works when symbol does not fulfill all subrule multiples")
-;    (is (= (tested-rule {:remainder (seq "DAB")})
-;           [nil {:remainder (seq "DAB")}])
-;        "created factor< rule works when symbol does not fulfill subrule at all")))
+(deftest factor<
+  (let [tested-rule (p/factor< 3 (p/lit \A))]
+    (is (= (tested-rule {:remainder (seq "AAAAC")})
+           [[\A \A] {:remainder (seq "AAC")}])
+        (str "created factor< rule works when symbol fulfills all subrule multiples and"
+             "leaves strict remainder"))
+    (is (= (tested-rule {:remainder (seq "AAAC")})
+           [[\A \A] {:remainder (seq "AC")}])
+        "created factor< rule works when symbol fulfills all subrule multiples only")
+    (is (= (tested-rule {:remainder (seq "AAC")}) [[\A \A] {:remainder (seq "C")}])
+        "created factor< rule works when symbol does not fulfill all subrule multiples")
+    (is (= (tested-rule {:remainder (seq "DAB")})
+           [nil {:remainder (seq "DAB")}])
+        "created factor< rule works when symbol does not fulfill subrule at all")))
 
 ;(deftest factor<=
 ;  (let [tested-rule (p/factor<= 3 (p/lit "A"))]
