@@ -247,7 +247,7 @@
 
 (deftest failpoint
   (let [failing-rule (p/failpoint (p/lit "A")
-                                  (fn [tokens state]
+                                  (fn [state]
                                     (throw-arg "ERROR at line %s" (:line state))))]
     (is (= (failing-rule {:remainder ["A"], :line 3}) ["A" {:remainder nil, :line 3}])
         "failing rules succeed when their subrules are fulfilled")
@@ -255,16 +255,16 @@
           (failing-rule {:remainder ["B"], :line 3})
         "failing rules fail with given exceptions when their subrules fail"))))
 
-;(deftest do-effects-before
-;  (let [effect-rule (p/do-effects-before (p/lit "A")
-;                                         (fn [tokens info]
-;                                           (println "YES" tokens info)))]
+;(deftest effects
+;  (let [rule (p/complex [subproduct (p/lit "A")
+;                         effects (p/effects (fn [tokens info]
+;                                                (println "YES" tokens info)))]
 ;    (is (= (with-out-str
-;             (is (= (effect-rule ["A" "B"] {:line 3}) ["A" (list "B") {:line 3}])
+;             (is (= (rule ["A" "B"] {:line 3}) ["A" (list "B") {:line 3}])
 ;                 "pre-effect rules succeed when their subrules are fulfilled"))
 ;           "YES [A B] {:line 3}\n")
 ;        "pre-effect rules should call their effect with tokens and info before processing")))
-;
+
 ;(deftest product-context
 ;  (let [receiving-rule-maker (fn rule-maker [n]
 ;                               (p/factor= (Integer/parseInt (str n)) (p/lit \a)))

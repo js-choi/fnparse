@@ -187,6 +187,13 @@
     [factor subrule]
     (alt (factor= factor subrule) (rep< factor subrule)))
   
+  (defn failpoint
+    [subrule failure-hook]
+    (fn [state]
+      (if-let [result (subrule state)]
+        result
+        (failure-hook state))))
+  
 )
 
 ;(defn rep*
