@@ -255,15 +255,16 @@
           (failing-rule {:remainder ["B"], :line 3})
         "failing rules fail with given exceptions when their subrules fail"))))
 
-;(deftest effects
-;  (let [rule (p/complex [subproduct (p/lit "A")
-;                         effects (p/effects (fn [tokens info]
-;                                                (println "YES" tokens info)))]
-;    (is (= (with-out-str
-;             (is (= (rule ["A" "B"] {:line 3}) ["A" (list "B") {:line 3}])
-;                 "pre-effect rules succeed when their subrules are fulfilled"))
-;           "YES [A B] {:line 3}\n")
-;        "pre-effect rules should call their effect with tokens and info before processing")))
+(deftest effects
+  (let [rule (p/complex [subproduct (p/lit "A")
+                         effects (p/effects (fn [tokens info]
+                                                (println "YES" tokens info)))]
+    (is (= (with-out-str
+             (is (= (rule {:remainder ["A" "B"], :line 3})
+                    ["A" {:remainder (list "B"), :line 3}])
+                 "pre-effect rules succeed when their subrules are fulfilled"))
+           "YES [A B] {:line 3}\n")
+        "effect rule should call their effect and return the same state")))
 
 ;(deftest product-context
 ;  (let [receiving-rule-maker (fn rule-maker [n]
