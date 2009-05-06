@@ -194,6 +194,11 @@
         result
         (failure-hook state))))
   
+  (defn effects
+    [effect-hook]
+    (fn [state]
+      [(effect-hook state) state]))
+    
 )
 
 ;(defn rep*

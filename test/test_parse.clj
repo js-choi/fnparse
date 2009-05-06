@@ -257,13 +257,13 @@
 
 (deftest effects
   (let [rule (p/complex [subproduct (p/lit "A")
-                         effects (p/effects (fn [tokens info]
-                                                (println "YES" tokens info)))]
+                         effects (p/effects #(println "YES" subproduct (:line %)))]
+               subproduct)]
     (is (= (with-out-str
              (is (= (rule {:remainder ["A" "B"], :line 3})
                     ["A" {:remainder (list "B"), :line 3}])
                  "pre-effect rules succeed when their subrules are fulfilled"))
-           "YES [A B] {:line 3}\n")
+           "YES A 3\n")
         "effect rule should call their effect and return the same state")))
 
 ;(deftest product-context
