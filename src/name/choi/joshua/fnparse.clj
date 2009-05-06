@@ -26,15 +26,15 @@
   (def update-info update-val)
 
   (def
-    #^{:doc "A rule metafunction that matches emptiness--that is, it always matches with
-       every given token sequence, and it always returns [nil tokens].
+    #^{:doc "A rule that matches emptiness--that is, it always matches with every given token
+       sequence, and it always returns [nil tokens].
        (def a emptiness) would be equivalent to the EBNF a = ;
        This rule's product is always nil, and it therefore always returns [nil tokens]."}
     emptiness (m-result nil))
 
   (defn anything
-    "A rule metafunction that matches anything--that is, it matches the first token of the
-    tokens it is given.
+    "A rule that matches anything--that is, it matches the first token of the tokens it is
+    given.
     This rule's product is the first token it receives."
     [{tokens :remainder, :as state}]
     [(first tokens) (assoc state :remainder (next tokens))])
@@ -43,43 +43,42 @@
     "Creates a rule from attaching a product-validating function to the given subrule--that
     is, any products of the subrule must fulfill the validator function.
     (def a (validate b validator)) says that the rule a succeeds only when b succeeds and
-    when (validator b-product) is true. The new rule's product would be b-product. If b fails
-    or (validator b-product) is false, then nil is simply returned."
+    also when the evaluated value of (validator b-product) is true. The new rule's product 
+    would be b-product."
     [subrule validator]
     (complex [subproduct subrule, :when (validator subproduct)]
       subproduct))
   
   (defn term
-    "Creates a rule metafunction that is a terminal rule of the given validator--that is, it
-    accepts only tokens for whom (validator token) is true.
+    "Creates a rule that is a terminal rule of the given validator--that is, it accepts only
+    tokens for whom (validator token) is true.
     (def a (term validator)) would be equivalent to the EBNF
       a = ? (validator %) evaluates to true ?;
-    The new rule's product would be the first token, if it fulfills the validator.
-    If the token does not fulfill the validator, the new rule simply returns nil."
+    The new rule's product would be the first token, if it fulfills the validator."
     [validator]
     (validate anything validator))
   
   (defn lit
-    "Creates a rule metafunction that is the terminal rule of the given literal token--that
-    is, it accepts only tokens that are equal to the given literal token.
+    "Creates a rule that is the terminal rule of the given literal token--that is, it accepts 
+    only tokens that are equal to the given literal token.
     (def a (lit \"...\")) would be equivalent to the EBNF
       a = \"...\";
-    The new rule's product would be the first token, if it equals the given literal token.
-    If the token does not equal the given literal token, the new rule simply returns nil."
+    The new rule's product would be the first token, if it equals the given literal token."
     [literal-token]
     (term (partial = literal-token)))
   
   (defn re-term
-    "Creates a rule metafunction that is the terminal rule of the given regex--that is, it
-    accepts only tokens that match the given regex.
+    "Creates a rule that is the terminal rule of the given regex--that is, it accepts only 
+    tokens that match the given regex.
     (def a (re-term #\"...\")) would be equivalent to the EBNF
       a = ? (re-matches #\"...\" %) evaluates to true ?;
-    The new rule's product would be the first token, if it matches the given regex.
-    If the token does not match the given regex, the new rule simply returns nil."
+    The new rule's product would be the first token, if it matches the given regex."
     [token-re]
     (term (partial re-matches token-re)))
   
   (defn followed-by
+    "Creates a rule that does not consume any tokens, but fails when the given subrule fails.
+    The new rule's product would be the subrule's product."
     [subrule]
     (complex [state get-state, subproduct subrule, _ (set-state state)]
       subproduct))
