@@ -266,45 +266,4 @@
            "YES A 3\n")
         "effect rule should call their effect and return the same state")))
 
-;(deftest product-context
-;  (let [receiving-rule-maker (fn rule-maker [n]
-;                               (p/factor= (Integer/parseInt (str n)) (p/lit \a)))
-;        digit (p/semantics p/anything #(Integer/parseInt (str %)))
-;        rule (p/product-context [n digit, m digit]
-;               (receiving-rule-maker (+ n m)))]
-;    (is (= (rule (seq "31aaaa23aa") {})
-;           [[3 1 [\a \a \a \a]] (seq "23aa") {}]))
-;    (is (= (rule (seq "31aaa23aa") {}) nil)))
-;  (let [receiving-rule-maker (fn rule-maker [x]
-;                               (p/rep+ (p/lit x)))
-;        header (p/semantics (p/conc p/anything p/anything)
-;                            #(hash-map :token (% 0), :type (% 1)))
-;        rule (p/product-context [{token :token} header]
-;               (receiving-rule-maker token))]
-;    (is (= (rule (seq "a+aasdf") {})
-;           [[{:type \+, :token \a} [\a \a]] (seq "sdf") {}]))
-;    (is (= (rule (seq "+asdf") {}) nil))))
-;
-;(deftest product-invisible-context
-;  (let [digit (p/semantics p/anything #(Integer/parseInt (str %)))
-;        receiving-rule-maker (fn rule-maker [n]
-;                               (p/factor= (Integer/parseInt (str n)) p/anything))
-;        rule (p/product-invisible-context [n digit, m digit]
-;               (receiving-rule-maker (+ n m)))]
-;    (is (= (rule (seq "31aaaa") {})
-;           [[3 1 [\3 \1 \a \a]] (seq "aa") {}]))
-;    (is (= ((p/conc digit rule) (seq "531aaaa") {})
-;           [[5 [3 1 [\3 \1 \a \a]]] (seq "aa") {}]))))
-;
-;(deftest match-remainder
-;  (is (= ((p/match-remainder (p/lit "hi") (p/lit "THEN")) ["hi" "THEN"] {})
-;         [["hi" "THEN"] (list "THEN") {}])
-;      "created remainder-matching rule succeeds when given subrule and matching succeed")
-;  (is (= ((p/match-remainder (p/lit "hi") (p/lit "THEN")) ["bye" "THEN"] {})
-;         nil)
-;      "created remainder-matching rule fails when given subrule fails")
-;  (is (= ((p/match-remainder (p/lit "hi") (p/lit "THEN")) ["hi" "WELL"] {})
-;         nil)
-;      "created remainder-matching rule fails when given matching fails"))
-
 (time (run-tests))

@@ -11,7 +11,6 @@
 ; A "deepener" is my pet term for the functions that are called to get deeper into a monad:
 ; (m-bind value deepener)
 
-;(def parser-m (maybe-t state-m))
 (def parser-m (state-t maybe-m))
 
 (defmacro complex
