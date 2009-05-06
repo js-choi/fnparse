@@ -23,6 +23,8 @@
   (def get-state (fetch-state))
   (def get-remainder (fetch-val :remainder))
   (def get-info fetch-val)
+  (def set-info set-val)
+  (def update-info update-val)
 
   (def emptiness (m-result nil))
 
