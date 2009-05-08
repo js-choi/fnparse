@@ -20,42 +20,46 @@
 (with-monad parser-m
 
   (def
-    #^{:doc "A rule that consumes no tokens. Its product is the entire current state."}
+    #^{:doc "A rule that consumes no tokens. Its product is the entire current state.
+       [Equivalent to the result of fetch-state from clojure.contrib.monads.]"}
     get-state (fetch-state))
   (def
     #^{:doc "A rule that consumes no tokens. Its product is the sequence of the remaining
-       tokens."}
+       tokens.
+       
+       (Equivalent to the result of (fetch-val :remainder) from clojure.contrib.monads.)"}
     get-remainder (fetch-val :remainder))
   (defn get-info
     "Creates a rule that consumes no tokens. The new rule's product is the value of the given 
-    key in the current state."
+    key in the current state.
+    [Equivalent to fetch-val from clojure.contrib.monads.]"
     [key]
     (fetch-val key))
   (defn set-info
     "Creates a rule that consumes no tokens. The new rule directly changes the current state
-    by associating the given key with the given value. The product is nil."
+    by associating the given key with the given value. The product is nil.
+    
+    [Equivalent to set-val from clojure.contrib.monads.]"
     [key value]
     (set-val key value))
   (defn update-info
     "Creates a rule that consumes no tokens. The new rule changes the current state by
     associating the given key with the evaluated result of applying the given updating
-    function to the key's current value. The product is nil."
+    function to the key's current value. The product is nil.
+    [Equivalent to update-val from clojure.contrib.monads.]"
     [key val-update-fn]
     (update-val key val-update-fn))
 
   (def
     #^{:doc "A rule that matches emptiness--that is, it always matches with every given token
        sequence, and it always returns [nil tokens].
-       
        (def a emptiness) would be equivalent to the EBNF a = ;
-       
        This rule's product is always nil, and it therefore always returns [nil tokens]."}
     emptiness (m-result nil))
 
   (defn anything
     "A rule that matches anything--that is, it matches the first token of the tokens it is
     given.
-    
     This rule's product is the first token it receives."
     [{tokens :remainder, :as state}]
     [(first tokens) (assoc state :remainder (next tokens))])
@@ -63,7 +67,6 @@
   (defn validate
     "Creates a rule from attaching a product-validating function to the given subrule--that
     is, any products of the subrule must fulfill the validator function.
-    
     (def a (validate b validator)) says that the rule a succeeds only when b succeeds and
     also when the evaluated value of (validator b-product) is true. The new rule's product 
     would be b-product."
@@ -136,32 +139,65 @@
     "Creates a rule that is the concatenation of the given subrules. Basically a simple
     version of complex, each subrule consumes tokens in order, and if any fail, the entire
     rule fails.
-    
-    (This function is equivalent to m-seq for the parser-m monad.)"
+    (def a (conc b c d)) would be equivalent to the EBNF:
+      a = b, c, d;
+    This function is equivalent to m-seq for the parser-m monad."
     [& subrules]
     (m-seq subrules))
 
-  (def alt m-plus)
+  (def
+    #^{:doc "Creates a rule that is the alternation of the given subrules. It succeeds when
+       any of its subrules succeed, and fails when none do. Its result is that of the first
+       subrule that succeeds, so the order of the subrules that this function receives
+       matters.
+       (def a (alt b c d)) would be equivalent to the EBNF:
+         a = b | c | d;
+       This function is equivalent to m-plus for the parser-m monad."}
+    alt m-plus)
 
   (defn opt
+    "Creates a rule that is the optional form of the subrule. It always succeeds. Its result
+    is either the subrule's (if the subrule succeeds), or else its product is nil, and the
+    rule acts as the emptiness rule.
+    (def a (opt b)) would be equivalent to the EBNF:
+      a = b?;"
     [subrule]
     (m-plus subrule emptiness))
   
   (defn lit-conc-seq
+    "A convenience function: it creates a rule that is the concatenation of the literals
+    formed from the given sequence of literal tokens.
+    (def a (lit-conc-seq [\"a\" \"b\" \"c\"])) would be equivalent to the EBNF:
+      a = \"a\", \"b\", \"c\";"
     [token-seq]
     (m-seq (map lit token-seq)))
   
   (defn lit-alt-seq
+    "A convenience function: it creates a rule that is the alternation of the literals
+    formed from the given sequence of literal tokens.
+    (def a (lit-alt-seq [\"a\" \"b\" \"c\"])) would be equivalent to the EBNF:
+      a = \"a\" | \"b\" | \"c\";"
     [token-seq]
     (apply alt (map lit token-seq)))
   
   (declare rep+)
   
   (defn rep*
+    "Creates a rule that is the zero-or-more greedy repetition of the given subrule. It
+    always succeeds. It consumes tokens with its subrule until its subrule fails.
+    Its result is the sequence of results from the subrule's repetitions, (or nil if the
+    subrule fails immediately).
+    (def a (rep* b)) is equivalent to the EBNF:
+      a = {b};"
     [subrule]
     (opt (rep+ subrule)))
   
   (defn rep+
+    "Creates a rule that is the zero-or-more greedy repetition of the given subrule. It
+    fails only when its subrule fails immediately. It consumes tokens with its subrule until
+    its subrule fails. Its result is the sequence of results from the subrule's repetitions.
+    (def a (rep* b)) is equivalent to the EBNF:
+      a = {b}-;"
     [subrule]
     (complex [first-subproduct subrule
               next-token remainder-peek
