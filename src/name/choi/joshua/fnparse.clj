@@ -16,9 +16,10 @@
 (def
   #^{:doc "The function, symbol, or other callable object that is used to access the
      remainder inside a state object. In other words, (*remainder-accessor* a-state) has to
-     return the remainder inside a-state. By default, it is :remainder, but it's rebindable,
-     so that you can use different kinds of state objects in your parsing application.
-     Myself, I usually put a struct-map accessor for :remainder in here."}
+     return the remainder inside a-state. By default, the remainder-accessor is :remainder 
+     (meaning that FnParse's default states are maps containing :remainder). But the accessor
+     is rebindable, so that you can use different kinds of state objects in your parsing
+     application. Myself, I usually put a struct-map accessor for :remainder in here."}
   *remainder-accessor*
   :remainder)
 
