@@ -13,6 +13,8 @@
 ; - (2) is called the rule's state.
 ; - (3) is called the rule's remainder.
 
+(def *remainder-accessor* :remainder)
+
 (def parser-m (state-t maybe-m))
 
 (defmacro complex
