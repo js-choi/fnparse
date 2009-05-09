@@ -27,18 +27,17 @@
     #^{:doc "A rule that consumes no tokens. Its product is the entire current state.
        [Equivalent to the result of fetch-state from clojure.contrib.monads.]"}
     get-state (fetch-state))
-  (def
-    #^{:doc "A rule that consumes no tokens. Its product is the sequence of the remaining
-       tokens.
-       
-       (Equivalent to the result of (fetch-val :remainder) from clojure.contrib.monads.)"}
-    get-remainder (fetch-val :remainder))
   (defn get-info
     "Creates a rule that consumes no tokens. The new rule's product is the value of the given 
     key in the current state.
     [Equivalent to fetch-val from clojure.contrib.monads.]"
     [key]
     (fetch-val key))
+  (def
+    #^{:doc "A rule that consumes no tokens. Its product is the sequence of the remaining
+       tokens.
+       (Equivalent to the result of (fetch-val :remainder) from clojure.contrib.monads.)"}
+    get-remainder (fetch-val :remainder))
   (defn set-info
     "Creates a rule that consumes no tokens. The new rule directly changes the current state
     by associating the given key with the given value. The product is nil.
@@ -133,9 +132,10 @@
     (complex [subproduct subrule]
       semantic-value))
 
-  (def remainder-peek
-    "A rule that does not consume any tokens. Its product is the very next token in the
-    remainder."
+  (def
+    #^{:doc "A rule that does not consume any tokens. Its product is the very next token in 
+       the remainder."}
+    remainder-peek
     (complex [remainder get-remainder]
       (first remainder)))
 
