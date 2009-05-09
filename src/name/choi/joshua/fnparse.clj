@@ -158,15 +158,23 @@
     [& subrules]
     (m-seq subrules))
 
-  (def
-    #^{:doc "Creates a rule that is the alternation of the given subrules. It succeeds when
-       any of its subrules succeed, and fails when none do. Its result is that of the first
-       subrule that succeeds, so the order of the subrules that this function receives
-       matters.
-       (def a (alt b c d)) would be equivalent to the EBNF:
-         a = b | c | d;
-       This function is equivalent to m-plus for the parser-m monad."}
-    alt m-plus)
+  (defmacro alt
+    "Creates a rule that is the alternation of the given subrules. It succeeds when
+     any of its subrules succeed, and fails when none do. Its result is that of the first
+     subrule that succeeds, so the order of the subrules that this function receives
+     matters.
+     (def a (alt b c d)) would be equivalent to the EBNF:
+       a = b | c | d;
+     This macro is almost equivalent to m-plus for the parser-m monad. The difference is that
+     it defers evaluation of whatever variables it receives, so that it accepts expressions
+     containing unbound variables that are defined later."
+    [& subrules]
+    `(with-monad parser-m
+       (~'m-plus ~@subrules)))
+;    (apply m-plus subrules))
+;    `(with-monad parser-m
+;       (fn [state#]
+;         ((~'m-plus ~@subrules) state#))))
 
   (defn opt
     "Creates a rule that is the optional form of the subrule. It always succeeds. Its result
@@ -191,7 +199,7 @@
     (def a (lit-alt-seq [\"a\" \"b\" \"c\"])) would be equivalent to the EBNF:
       a = \"a\" | \"b\" | \"c\";"
     [token-seq]
-    (apply alt (map lit token-seq)))
+    (apply m-plus (map lit token-seq)))
   
   (declare rep+)
   
@@ -279,7 +287,7 @@
     [factor subrule]
     (apply conc (replicate factor subrule)))
   
-  (defn factor<
+  (defmacro factor<
     "Same as the factor= function, except that the new rule eats up tokens only until the
     given subrule is fulfilled one less times than the factor. The new rule would never fail.
     (factor< 3 :a) would eat the first two tokens [:a :a :a :a :b] and return:
@@ -287,9 +295,9 @@
     (factor< 3 :a) would eat the first three tokens [:b] and return:
       [nil (list :b)]"
     [factor subrule]
-    (alt (factor= (dec factor) subrule) (rep< factor subrule)))
+    `(alt (factor= ~(dec factor) ~subrule) (rep< ~factor ~subrule)))
   
-  (defn factor<=
+  (defmacro factor<=
     "Same as the factor= function, except that the new rule always succeeds, consuming tokens
     until the subrule is fulfilled the same amount of times as the given factor. The new rule
     would never fail.
@@ -298,7 +306,7 @@
     (factor<= 3 :a) would eat the first three tokens [:b] and return:
       [nil (list :b)]"
     [factor subrule]
-    (alt (factor= factor subrule) (rep< factor subrule)))
+    `(alt (factor= ~factor ~subrule) (rep< ~factor ~subrule)))
   
   (defn failpoint
     "Creates a rule that applies a failpoint to a subrule. When the subrule fails—i.e., it
