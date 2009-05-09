@@ -5,7 +5,7 @@
 ; - Takes a collection of tokens.
 ; - If the token sequence is valid, it returns a (0) vector containing the (1) consumed
 ;   symbols' products and (2) a state data object, usually a map. The state contains the (3)
-;   sequence of remaining tokens, usually with the key :remainder.
+;   sequence of remaining tokens, usually with the key *remainder-accessor*.
 ; - If the given token sequence is invalid and the rule fails, it simply returns nil.
 
 ; - (0) is called the rule's result.
@@ -36,8 +36,8 @@
   (def
     #^{:doc "A rule that consumes no tokens. Its product is the sequence of the remaining
        tokens.
-       (Equivalent to the result of (fetch-val :remainder) from clojure.contrib.monads.)"}
-    get-remainder (fetch-val :remainder))
+       (Equivalent to the result of (fetch-val *remainder-accessor*) from clojure.contrib.monads.)"}
+    get-remainder (fetch-val *remainder-accessor*))
   (defn set-info
     "Creates a rule that consumes no tokens. The new rule directly changes the current state
     by associating the given key with the given value. The product is nil.
@@ -64,8 +64,8 @@
     "A rule that matches anything--that is, it matches the first token of the tokens it is
     given.
     This rule's product is the first token it receives."
-    [{tokens :remainder, :as state}]
-    [(first tokens) (assoc state :remainder (next tokens))])
+    [{tokens *remainder-accessor*, :as state}]
+    [(first tokens) (assoc state *remainder-accessor* (next tokens))])
   
   (defn validate
     "Creates a rule from attaching a product-validating function to the given subrule--that
