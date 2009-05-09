@@ -74,7 +74,6 @@
     given.
     This rule's product is the first token it receives."
     [{tokens *remainder-accessor*, :as state}]
-    (println ">" state)
     [(first tokens) (assoc state *remainder-accessor* (next tokens))])
   
   (defn validate

@@ -86,29 +86,6 @@
   (is (= ((p/complex [remainder p/get-remainder] remainder) {:remainder ["hi" "THEN"]})
          [["hi" "THEN"] {:remainder ["hi" "THEN"]}])))
 
-;(deftest validate-remainder
-;  (is (= ((p/validate-remainder (p/lit "hi") (fn [r] (= "THEN" (first r))))
-;          {:remainder ["hi" "THEN"]})
-;         ["hi" (list "THEN") {}])
-;      "created remainder-validating rule succeeds when given subrule and validator succeed")
-;  (is (nil? ((p/validate-remainder (p/lit "hi") (fn [r] (= "THEN" (first r))))
-;          {:remainder ["bye" "THEN"]}))
-;      "created remainder-validating rule fails when given subrule fails")
-;  (is (= ((p/validate-remainder (p/lit "hi") (fn [r] (= "THEN" (first r))))
-;          {:remainder ["hi" "WELL"]}))
-;      "created remainder-validating rule fails when given validator fails"))
- 
-;(deftest validate-info
-;  (let [subrule (p/lit "hi")]
-;    (is (= ((p/validate-info subrule #(contains? % :b)) ["hi" "THEN"] {:b 1})
-;           ["hi" (list "THEN") {:b 1}])
-;        "created info-validating rule succeeds when given subrule and validator succeed")
-;    (is (= ((p/validate-info subrule #(contains? % :b)) ["bye" "THEN"] {:b 1}) nil)
-;        "created info-validating rule fails when given subrule fails")
-;    (is (= ((p/validate-info subrule #(contains? % :b)) ["hi" "THEN"] {}) nil)
-;        "created info-validating rule fails when given validator fails")))
-; 
-
 (deftest remainder-peek
   (is (= (p/remainder-peek {:remainder (seq "ABC")})
          [\A {:remainder (seq "ABC")}])))
