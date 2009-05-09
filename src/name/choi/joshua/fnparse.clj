@@ -188,7 +188,10 @@
     Its result is the sequence of results from the subrule's repetitions, (or nil if the
     subrule fails immediately).
     (def a (rep* b)) is equivalent to the EBNF:
-      a = {b};"
+      a = {b};
+    The new rule's products would be either the vector [b-product ...] for how many matches
+    of b were found, or nil if there was no match. (Note that this means that, in the latter
+    case, the result would be [nil given-state].) The new rule can never simply return nil."
     [subrule]
     (opt (rep+ subrule)))
   
@@ -197,7 +200,9 @@
     fails only when its subrule fails immediately. It consumes tokens with its subrule until
     its subrule fails. Its result is the sequence of results from the subrule's repetitions.
     (def a (rep* b)) is equivalent to the EBNF:
-      a = {b}-;"
+      a = {b}-;
+    The new rule's products would be either the vector [b-product ...] for how many matches
+    of b were found. If there was no match, then nil is simply returned."
     [subrule]
     (complex [first-subproduct subrule
               next-token remainder-peek
@@ -205,13 +210,13 @@
       (cons first-subproduct rest-subproducts)))
 
   (defn except
-    "Creates a rule metafunction that is the exception from the first given subrules with the
-    rest of the given subrules--that is, it accepts only tokens that fulfill the first
-    subrule but fail the rest of the subrules.
-    (def a (except b c d)) would be equivalent to the EBNF
-      a = b - c - d;
-    The new rule's products would be b-product. If b fails or either c or d succeeds, then
-    nil is simply returned."
+    "Creates a rule that is the exception from the first given subrules with the second given
+    subrule--that is, it accepts only tokens that fulfill the first subrule but fails the
+    second of the subrules.
+    (def a (except b c)) would be equivalent to the EBNF
+      a = b - c;
+    The new rule's products would be b-product. If b fails or c succeeds, then nil is simply
+    returned."
     [minuend subtrahend]
     (complex [state (fetch-state)
               minuend-product minuend
@@ -223,45 +228,60 @@
     (validate (rep* subrule) (comp factor-predicate count)))
   
   (defn rep=
-    "Creates a rule metafunction that is the greedy repetition of the given subrule by the
-    given positive integer factor--that is, it accepts only a certain number of tokens that
-    fulfill the subrule, no more and no less."
+    "Creates a rule that is the greedy repetition of the given subrule by the given factor (a
+    positive integer)--that is, it eats up all the tokens that fulfill the subrule, and it
+    then succeeds only if the number of times the subrule was fulfilled is equal to the
+    given factor, no more and no less.
+    (rep= 3 :a) would eat the first three tokens of [:a :a :a :b] and return:
+      [[:a :a :a] (list :a :b)].
+    (rep= 3 :a) would eat the first four tokens of [:a :a :a :a :b] and fail."
     [factor subrule]
     (rep-predicate (partial = factor) subrule))
   
   (defn rep<
+    "A similiar function to rep=, only that the instead the new rule succeeds if the number
+    of times that the subrule is fulfilled is less than and not equal to the given factor."
     [factor subrule]
     (rep-predicate (partial > factor) subrule))
   
   (defn rep<=
+    "A similiar function to rep=, only that the instead the new rule succeeds if the number
+    of times that the subrule is fulfilled is less than or equal to the given factor."
     [factor subrule]
     (rep-predicate (partial >= factor) subrule))
   
   (defn factor=
-    "Creates a rule metafunction that is the syntactic factor of the given subrule by a given
-    integer--that is, it is equivalent to the subrule replicated by 1, 2, etc. times and
-    then concatenated.
+    "Creates a rule that is the syntactic factor (that is, a non-greedy repetition) of the
+    given subrule by a given integer--that is, it is equivalent to the subrule replicated by
+    1, 2, etc. times and then concatenated.
     (def a (factor= n b)) would be equivalent to the EBNF
       a = n * b;
     The new rule's products would be b-product. If b fails below n times, then nil is simply
     returned.
-    (factor= 3 \"A\") would accept [\"A\" \"A\" \"A\" \"A\" \"B\"] and return
-    [[\"A\" \"A\" \"A\"] (\"A\" \"B\")."
+    (factor= 3 :a) would eat the first three tokens [:a :a :a :a :b] and return:
+      [[:a :a :a] (list :a :b)].
+    (factor= 3 :a) would eat the first three tokens [:a :a :b] and fail."
     [factor subrule]
     (apply conc (replicate factor subrule)))
   
   (defn factor<
-    "Creates a rule metafunction that is the syntactic factor (a nongreedy repetition) of the
-    given subrule by less than a given integer--that is, it accepts a certain number of
-    tokens that fulfill the subrule that is less than a certain factor, and leaves the rest
-    behind."
+    "Same as the factor= function, except that the new rule eats up tokens only until the
+    given subrule is fulfilled one less times than the factor. The new rule would never fail.
+    (factor< 3 :a) would eat the first two tokens [:a :a :a :a :b] and return:
+      [[:a :a] (list :a :a :b)].
+    (factor< 3 :a) would eat the first three tokens [:b] and return:
+      [nil (list :b)]"
     [factor subrule]
     (alt (factor= (dec factor) subrule) (rep< factor subrule)))
   
   (defn factor<=
-    "Creates a rule metafunction that is the syntactic factor (a nongreedy repetition) of the
-    given subrule by a given integer or less--that is, it accepts a certain number of tokens
-    that fulfill the subrule that is a certain factor or less, and leaves the rest behind."
+    "Same as the factor= function, except that the new rule always succeeds, consuming tokens
+    until the subrule is fulfilled the same amount of times as the given factor. The new rule
+    would never fail.
+    (factor<= 3 :a) would eat the first two tokens [:a :a :a :a :b] and return:
+      [[:a :a :a] (list :a :b)].
+    (factor<= 3 :a) would eat the first three tokens [:b] and return:
+      [nil (list :b)]"
     [factor subrule]
     (alt (factor= factor subrule) (rep< factor subrule)))
   
@@ -273,6 +293,7 @@
         (failure-hook state))))
   
   (defn effects
+    "Creates a rule "
     [effect-hook]
     (fn [state]
       [(effect-hook state) state]))
