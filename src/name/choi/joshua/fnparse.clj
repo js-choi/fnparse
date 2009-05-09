@@ -13,7 +13,14 @@
 ; - (2) is called the rule's state.
 ; - (3) is called the rule's remainder.
 
-(def *remainder-accessor* :remainder)
+(def
+  #^{:doc "The function, symbol, or other callable object that is used to access the
+     remainder inside a state object. In other words, (*remainder-accessor* a-state) has to
+     return the remainder inside a-state. By default, it is :remainder, but it's rebindable,
+     so that you can use different kinds of state objects in your parsing application.
+     Myself, I usually put a struct-map accessor for :remainder in here."}
+  *remainder-accessor*
+  :remainder)
 
 (def parser-m (state-t maybe-m))
 
@@ -36,7 +43,8 @@
   (def
     #^{:doc "A rule that consumes no tokens. Its product is the sequence of the remaining
        tokens.
-       (Equivalent to the result of (fetch-val *remainder-accessor*) from clojure.contrib.monads.)"}
+       (Equivalent to the result of (fetch-val *remainder-accessor*) from
+       clojure.contrib.monads.)"}
     get-remainder (fetch-val *remainder-accessor*))
   (defn set-info
     "Creates a rule that consumes no tokens. The new rule directly changes the current state
