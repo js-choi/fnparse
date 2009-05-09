@@ -169,12 +169,11 @@
      it defers evaluation of whatever variables it receives, so that it accepts expressions
      containing unbound variables that are defined later."
     [& subrules]
-    `(with-monad parser-m
-       (~'m-plus ~@subrules)))
-;    (apply m-plus subrules))
 ;    `(with-monad parser-m
-;       (fn [state#]
-;         ((~'m-plus ~@subrules) state#))))
+;       (~'m-plus ~@subrules)))
+    `(with-monad parser-m
+       (fn [state#]
+         ((~'m-plus ~@subrules) state#))))
 
   (defn opt
     "Creates a rule that is the optional form of the subrule. It always succeeds. Its result
