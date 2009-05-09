@@ -7,9 +7,9 @@
 
 (def string-delimiter (lit \"))
 (def escape-indicator (lit \\))
-(def false-lit (constant-semantics (lit-conc-seq "false") (struct node :scalar false)))
-(def true-lit (constant-semantics (lit-conc-seq "true") (struct node :scalar true)))
-(def null-lit (constant-semantics (lit-conc-seq "null") (struct node :scalar nil)))
+(def false-lit (constant-semantics (lit-conc-seq "false") (struct node-s :scalar false)))
+(def true-lit (constant-semantics (lit-conc-seq "true") (struct node-s :scalar true)))
+(def null-lit (constant-semantics (lit-conc-seq "null") (struct node-s :scalar nil)))
 (def keyword-lit (alt false-lit true-lit null-lit))
 
 (def space (lit \space))
@@ -41,16 +41,18 @@
 (def number-lit
   (complex [minus (opt minus-sign)
             above-one (alt zero-digit (rep+ nonzero-decimal-digit))
-            below-one (opt fractional part)
+            below-one (opt fractional-part)
             power (opt exponential-part)]
-    (-> (Double/parseDouble (apply str (flatten [minus above-one below-one power]))
-        (if below-one identity int)
-        #(struct node-s :scalar %)))))
+    (-> [minus above-one below-one power]
+        ((partial struct node-s :scalar)))))
+;    (-> (Double/parseDouble (apply str (flatten [minus above-one below-one power]))
+;        (if below-one identity int)
+;        #(struct node-s :scalar %)))))
 
 (def hexadecimal-digit
   (alt decimal-digit (lit \A) (lit \B) (lit \C) (lit \D) (lit \E) (lit \F)))
 
-(def unescaped-char (except anything escape-indicator string-delimiter))
+(def unescaped-char (except anything (alt escape-indicator string-delimiter)))
 
 (def unicode-char-sequence
   (semantics (conc (lit \u) hexadecimal-digit
@@ -61,7 +63,7 @@
   {\\ \\, \/ \/, \b \backspace, \f \formfeed, \n \newline, \r \return, \t \tab})
 
 (def escape-sequence
-  (complex [_ escape-indicator, character (lit-alt-seq (keys escaped-characters))
+  (complex [_ escape-indicator, character (lit-alt-seq (keys escaped-characters))]
     (escaped-characters character)))
 
 (def string-char
