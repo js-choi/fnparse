@@ -74,6 +74,7 @@
     given.
     This rule's product is the first token it receives."
     [{tokens *remainder-accessor*, :as state}]
+    (println ">" state)
     [(first tokens) (assoc state *remainder-accessor* (next tokens))])
   
   (defn validate
@@ -148,15 +149,19 @@
     (complex [remainder get-remainder]
       (first remainder)))
 
-  (defn conc
+  (defmacro conc
     "Creates a rule that is the concatenation of the given subrules. Basically a simple
     version of complex, each subrule consumes tokens in order, and if any fail, the entire
     rule fails.
     (def a (conc b c d)) would be equivalent to the EBNF:
       a = b, c, d;
-    This function is equivalent to m-seq for the parser-m monad."
+     This macro is almost equivalent to m-seq for the parser-m monad. The difference is that
+     it defers evaluation of whatever variables it receives, so that it accepts expressions
+     containing unbound variables that are defined later."
     [& subrules]
-    (m-seq subrules))
+    `(with-monad parser-m
+       (fn [state#]
+         ((~'m-seq ~subrules) state#))))
 
   (defmacro alt
     "Creates a rule that is the alternation of the given subrules. It succeeds when
@@ -169,8 +174,6 @@
      it defers evaluation of whatever variables it receives, so that it accepts expressions
      containing unbound variables that are defined later."
     [& subrules]
-;    `(with-monad parser-m
-;       (~'m-plus ~@subrules)))
     `(with-monad parser-m
        (fn [state#]
          ((~'m-plus ~@subrules) state#))))
@@ -284,7 +287,7 @@
       [[:a :a :a] (list :a :b)].
     (factor= 3 :a) would eat the first three tokens [:a :a :b] and fail."
     [factor subrule]
-    (apply conc (replicate factor subrule)))
+    (m-seq (replicate factor subrule)))
   
   (defmacro factor<
     "Same as the factor= function, except that the new rule eats up tokens only until the
