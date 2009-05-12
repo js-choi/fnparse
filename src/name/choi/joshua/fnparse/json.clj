@@ -11,6 +11,8 @@
 (def apply-str (partial apply str))
 (defn- nb-char-lit [lit-token]
   (invisi-conc (lit lit-token) (update-info :column inc)))
+(defn- b-char-lit [lit-token]
+  (invisi-conc (lit lit-token) (update-info :line inc)))
 
 (def string-delimiter (nb-char-lit \"))
 (def escape-indicator (nb-char-lit \\))
@@ -22,8 +24,8 @@
 
 (def space (nb-char-lit \space))
 (def tab (nb-char-lit \tab))
-(def newline-lit (lit \newline))
-(def return-lit (lit \return))
+(def newline-lit (b-char-lit \newline))
+(def return-lit (b-char-lit \return))
 (def line-break (rep+ (alt newline-lit return-lit)))
 
 (def ws (constant-semantics (rep* (alt space tab line-break)) :ws))
@@ -38,7 +40,7 @@
 (def minus-sign (nb-char-lit \-))
 (def plus-sign (nb-char-lit \+))
 (def decimal-point (nb-char-lit \.))
-(def exponential-sign (lit-alt-seq "eE"))
+(def exponential-sign (lit-alt-seq "eE" nb-char-lit))
 (def zero-digit (nb-char-lit \0))
 (def nonzero-decimal-digit (lit-alt-seq "123456789" nb-char-lit))
 (def decimal-digit (alt zero-digit nonzero-decimal-digit))
@@ -52,7 +54,7 @@
             below-one (opt fractional-part)
             power (opt exponential-part)]
     (-> [minus above-one below-one power] flatten apply-str Double/parseDouble
-        ((if below-one identity int)) make-scalar-node)))
+        ((if (or below-one power) identity int)) make-scalar-node)))
 
 (def hexadecimal-digit
   (alt decimal-digit (lit-alt-seq "ABCDEF")))
