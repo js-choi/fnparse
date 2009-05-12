@@ -194,7 +194,7 @@
     This is useful for applying set-info and update-info to a rule, without having to deal
     with set-info or update-info's products."
     [first-subrule & rest-subrules]
-    `(conc ~first-subrule ~@rest-subrules))
+    `(semantics (conc ~first-subrule ~@rest-subrules) first))
   
   (defn lit-conc-seq
     "A convenience function: it creates a rule that is the concatenation of the literals

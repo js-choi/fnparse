@@ -116,7 +116,7 @@
 
 (deftest invisi-conc
   (is (= ((p/invisi-conc (p/lit \a) (p/update-info :column inc)) (make-state "abc" 3))
-         [\a (make-state (seq "bc") 3)])))
+         [\a (make-state (seq "bc") 4)])))
 
 (deftest lit-conc-seq
   (is (= ((p/lit-conc-seq "THEN") {:remainder "THEN print 42;"})
