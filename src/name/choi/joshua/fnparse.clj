@@ -214,8 +214,10 @@
     formed from the given sequence of literal tokens.
     (def a (lit-alt-seq [\"a\" \"b\" \"c\"])) would be equivalent to the EBNF:
       a = \"a\" | \"b\" | \"c\";"
-    [token-seq]
-    (apply m-plus (map lit token-seq)))
+    ([token-seq]
+     (lit-alt-seq token-seq lit))
+    ([token-seq rule-maker]
+     (apply m-plus (map rule-maker token-seq))))
   
   (declare rep+)
   
