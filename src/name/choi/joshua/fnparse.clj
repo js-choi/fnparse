@@ -158,13 +158,10 @@
      it defers evaluation of whatever variables it receives, so that it accepts expressions
      containing unbound variables that are defined later."
     [& subrules]
-    (println subrules)
     `(with-monad parser-m
        (m-seq ~(vec subrules))))
 ;       (fn [state#]
 ;         ((m-seq ~subrules) state#))))
-  
-  (println ">>" (macroexpand-1 '(conc (lit "P") (lit "Q"))))
   
   (defmacro alt
     "Creates a rule that is the alternation of the given subrules. It succeeds when
