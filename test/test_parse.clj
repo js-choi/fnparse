@@ -123,7 +123,8 @@
          [(vec "THEN") {:remainder (seq " print 42;")}])
       "created literal-sequence rule is based on sequence of given token sequencible")
   (is (= ((p/lit-conc-seq "THEN" (fn [lit-token]
-                                     (p/conc (p/lit lit-token) (p/update-info :column inc))))
+                                     (p/invisi-conc (p/lit lit-token)
+                                                    (p/update-info :column inc))))
           {:remainder "THEN print 42;", :column 1})
          [(vec "THEN") {:remainder (seq " print 42;"), :column 5}])
       "created literal-sequence rule uses given rule-maker"))
