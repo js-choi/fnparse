@@ -10,11 +10,12 @@
 (def make-object-node (partial make-node :object))
 (def apply-str (partial apply str))
 (defn- nb-char-lit [lit-token]
-  (conc (lit lit-token) (update-info :column inc)))
+  (invisi-conc (lit lit-token) (update-info :column inc)))
 
 (def string-delimiter (nb-char-lit \"))
 (def escape-indicator (nb-char-lit \\))
-(def false-lit (constant-semantics (lit-conc-seq "false") (struct node-s :scalar false)))
+(def false-lit
+  (constant-semantics (lit-conc-seq "false" nb-char-lit) (struct node-s :scalar false)))
 (def true-lit (constant-semantics (lit-conc-seq "true") (struct node-s :scalar true)))
 (def null-lit (constant-semantics (lit-conc-seq "null") (struct node-s :scalar nil)))
 (def keyword-lit (alt false-lit true-lit null-lit))
@@ -39,7 +40,7 @@
 (def decimal-point (nb-char-lit \.))
 (def exponential-sign (lit-alt-seq "eE"))
 (def zero-digit (nb-char-lit \0))
-(def nonzero-decimal-digit (lit-alt-seq "123456789"))
+(def nonzero-decimal-digit (lit-alt-seq "123456789" nb-char-lit))
 (def decimal-digit (alt zero-digit nonzero-decimal-digit))
 (def fractional-part (conc decimal-point (rep* decimal-digit)))
 (def exponential-part
