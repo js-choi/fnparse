@@ -10,11 +10,11 @@
 (deftest number-lit
   (is (= (j/number-lit (make-state "123]" 3 4))
          [(make-node :scalar 123) (make-state (seq "]") 6 4)]))
-  (is (= (j/number-lit (make-state "-123]"))
+  (is (= (j/number-lit (make-state "-123]" 3 4))
          [(make-node :scalar -123) (make-state (seq "]") 7 4)]))
-  (is (= (j/number-lit (make-state "-123e3]"))
+  (is (= (j/number-lit (make-state "-123e3]" 3 4))
          [(make-node :scalar -123e3) (make-state (seq "]") 9 4)]))
-  (is (= (j/number-lit (make-state "-123.9e3]"))
+  (is (= (j/number-lit (make-state "-123.9e3]" 3 4))
          [(make-node :scalar -123.9e3) (make-state (seq "]") 11 4)])))
 
 ;(deftest load-stream
