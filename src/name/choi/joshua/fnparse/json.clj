@@ -5,6 +5,9 @@
 
 (defstruct node-s :kind :content)
 (def make-node (partial struct node-s))
+(def make-scalar-node (partial make-node :scalar))
+(def make-array-node (partial make-node :array))
+(def make-object-node (partial make-node :object))
 (def apply-str (partial apply str))
 
 (def string-delimiter (lit \"))
@@ -45,11 +48,8 @@
             above-one (alt zero-digit (rep+ nonzero-decimal-digit))
             below-one (opt fractional-part)
             power (opt exponential-part)]
-    (-> [minus above-one below-one power] flatten apply-str
-        ((partial struct node-s :scalar)))))
-;    (-> (Double/parseDouble (apply str (flatten [minus above-one below-one power]))
-;        ((if below-one identity int))
-;        ((partial make-node :scalar))))))
+    (-> [minus above-one below-one power] flatten apply-str Double/parseDouble
+        ((if below-one identity int)) make-scalar-node)))
 
 (def hexadecimal-digit
   (alt decimal-digit (lit \A) (lit \B) (lit \C) (lit \D) (lit \E) (lit \F)))
