@@ -9,24 +9,29 @@
 (def make-array-node (partial make-node :array))
 (def make-object-node (partial make-node :object))
 (def apply-str (partial apply str))
-(defn- nb-char-lit [lit-token]
-  (invisi-conc (lit lit-token) (update-info :column inc)))
-(defn- b-char-lit [lit-token]
-  (invisi-conc (lit lit-token) (update-info :line inc)))
+(defn- nb-char [subrule]
+  (invisi-conc subrule (update-info :column inc)))
+(def nb-char-lit (comp nb-char lit))
+(defn- b-char [subrule]
+  (invisi-conc subrule (update-info :line inc)))
 
 (def string-delimiter (nb-char-lit \"))
 (def escape-indicator (nb-char-lit \\))
 (def false-lit
   (constant-semantics (lit-conc-seq "false" nb-char-lit) (struct node-s :scalar false)))
-(def true-lit (constant-semantics (lit-conc-seq "true") (struct node-s :scalar true)))
-(def null-lit (constant-semantics (lit-conc-seq "null") (struct node-s :scalar nil)))
+(def true-lit
+  (constant-semantics (lit-conc-seq "true" nb-char-lit) (struct node-s :scalar true)))
+(def null-lit
+  (constant-semantics (lit-conc-seq "null" nb-char-lit) (struct node-s :scalar nil)))
 (def keyword-lit (alt false-lit true-lit null-lit))
 
 (def space (nb-char-lit \space))
 (def tab (nb-char-lit \tab))
-(def newline-lit (b-char-lit \newline))
-(def return-lit (b-char-lit \return))
-(def line-break (rep+ (alt newline-lit return-lit)))
+(def newline-lit (lit \newline))
+(def return-lit (lit \return))
+(def line-break (b-char (rep+ (alt newline-lit return-lit))))
+
+(def json-char (alt line-break (nb-char anything)))
 
 (def ws (constant-semantics (rep* (alt space tab line-break)) :ws))
 
@@ -57,12 +62,12 @@
         ((if (or below-one power) identity int)) make-scalar-node)))
 
 (def hexadecimal-digit
-  (alt decimal-digit (lit-alt-seq "ABCDEF")))
+  (alt decimal-digit (lit-alt-seq "ABCDEF" nb-char-lit)))
 
-(def unescaped-char (except anything (alt escape-indicator string-delimiter)))
+(def unescaped-char (except json-char (alt escape-indicator string-delimiter)))
 
 (def unicode-char-sequence
-  (semantics (conc (lit \u) hexadecimal-digit
+  (semantics (conc (nb-char-lit \u) hexadecimal-digit
                    hexadecimal-digit hexadecimal-digit hexadecimal-digit)
              #(char (Integer/parseInt (apply str (rest %)) 16))))
 
@@ -70,11 +75,12 @@
   {\\ \\, \/ \/, \b \backspace, \f \formfeed, \n \newline, \r \return, \t \tab})
 
 (def escape-sequence
-  (complex [_ escape-indicator, character (lit-alt-seq (keys escaped-characters))]
+  (complex [_ escape-indicator
+            character (lit-alt-seq (keys escaped-characters) nb-char-lit)]
     (escaped-characters character)))
 
 (def string-char
-  (alt unescaped-char escape-sequence))
+  (alt escape-sequence unescaped-char))
 
 (def string-lit
   (complex [_ string-delimiter, contents (rep* string-char), _ string-delimiter]
