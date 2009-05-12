@@ -186,12 +186,12 @@
     [subrule]
     (m-plus subrule emptiness))
   
-  (defmacro inivis-conc
+  (defmacro invsi-conc
     "Like conc, only that the product is the first subrule's product only, not a vector of
     all the products of the subrules--effectively hiding the products of the other subrules.
     The rest of the subrules consume tokens too; their products simply aren't accessible.
-    This is useful for applying set-info and alter-info to a rule, without having to deal
-    with set-info or alter-info's products."
+    This is useful for applying set-info and update-info to a rule, without having to deal
+    with set-info or update-info's products."
     [first-subrule & rest-subrules]
     `(conc ~first-subrule ~@rest-subrules))
   
