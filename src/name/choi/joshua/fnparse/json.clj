@@ -52,7 +52,7 @@
         ((if below-one identity int)) make-scalar-node)))
 
 (def hexadecimal-digit
-  (alt decimal-digit (lit \A) (lit \B) (lit \C) (lit \D) (lit \E) (lit \F)))
+  (alt decimal-digit (lit-alt-seq "ABCDEF")))
 
 (def unescaped-char (except anything (alt escape-indicator string-delimiter)))
 

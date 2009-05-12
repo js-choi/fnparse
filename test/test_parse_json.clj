@@ -6,7 +6,13 @@
 (def make-node (partial struct node-s))
 
 (deftest number-lit
-  (is (= (j/number-lit {:remainder "123]"}) [(make-node :scalar 123) {:remainder (seq "]")}])))
+  (is (= (j/number-lit {:remainder "123]"}) [(make-node :scalar 123) {:remainder (seq "]")}]))
+  (is (= (j/number-lit {:remainder "-123]"})
+         [(make-node :scalar -123) {:remainder (seq "]")}]))
+  (is (= (j/number-lit {:remainder "-123e3]"})
+         [(make-node :scalar -123e3) {:remainder (seq "]")}]))
+  (is (= (j/number-lit {:remainder "-123.9e3]"})
+         [(make-node :scalar -123.9e3) {:remainder (seq "]")}])))
 
 ;(deftest load-stream
 ;  (is (= (j/load-stream "[1, 2, 3]") [1 2 3])
