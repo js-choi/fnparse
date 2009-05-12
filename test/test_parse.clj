@@ -136,7 +136,13 @@
            "sequence"))
   (is (nil? ((p/lit-alt-seq "ABCD") {:remainder (seq "E 2")}))
       (str "created literal-alternative-sequence rule fails when literal symbol not present"
-           "in sequence")))
+           "in sequence"))
+  (is (= ((p/lit-alt-seq "ABCD" (fn [lit-token]
+                                    (p/invisi-conc (p/lit lit-token)
+                                                   (p/update-info :column inc))))
+          {:remainder "B 2", :column 1})
+         [\B {:remainder (seq " 2"), :column 2}])
+      "created literal-alternative-sequence rule uses given rule-maker"))
 
 (deftest opt
   (let [opt-true (p/opt (p/lit "true"))]
