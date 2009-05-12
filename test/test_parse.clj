@@ -4,6 +4,9 @@
   (:require [name.choi.joshua.fnparse :as p]))
 ;(set! *warn-on-reflection* true)
 
+(defstruct state-s :remainder :column)
+(def make-state (partial struct state-s))
+
 (deftest emptiness
   (is (= (p/emptiness {:remainder (list "A" "B" "C")})
          [nil {:remainder (list "A" "B" "C")}])
@@ -107,10 +110,19 @@
     (is (nil? (literal-boolean {:remainder ["aRSTIR"]}))
         "created alternatives rule fails when no valid rule product present")))
 
+(deftest invisble-conc 
+  (is (= ((invisible-conc (p/lit \a) (p/alter-info :column inc)) (make-state "abc" 3))
+         [\a (make-state (seq "bc") 3)])))
+
 (deftest lit-conc-seq
   (is (= ((p/lit-conc-seq "THEN") {:remainder "THEN print 42;"})
          [(vec "THEN") {:remainder (seq " print 42;")}])
-      "created literal-sequence rule is based on sequence of given token sequencible"))
+      "created literal-sequence rule is based on sequence of given token sequencible")
+  (is (= ((p/lit-conc-seq "THEN" (fn [lit-token]
+                                     (p/conc (p/lit lit-token) (p/update-info :column inc))))
+          {:remainder "THEN print 42;", :column 1})
+         [(vec "THEN") {:remainder (seq " print 42;"), :column 5}])
+      "created literal-sequence rule uses given rule-maker"))
 
 (deftest lit-alt-seq
   (is (= ((p/lit-alt-seq "ABCD") {:remainder (seq "B 2")})

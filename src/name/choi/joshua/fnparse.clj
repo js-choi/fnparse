@@ -190,9 +190,14 @@
     "A convenience function: it creates a rule that is the concatenation of the literals
     formed from the given sequence of literal tokens.
     (def a (lit-conc-seq [\"a\" \"b\" \"c\"])) would be equivalent to the EBNF:
-      a = \"a\", \"b\", \"c\";"
-    [token-seq]
-    (m-seq (map lit token-seq)))
+      a = \"a\", \"b\", \"c\";
+    The function has an optional argument: a rule-making function. By default it is the lit
+    function. This is the function that is used to create the literal rules from each element
+    in the given token sequence."
+    ([token-seq]
+     (lit-conc-seq token-seq lit))
+    ([token-seq rule-maker]
+     (m-seq (map rule-maker token-seq))))
   
   (defn lit-alt-seq
     "A convenience function: it creates a rule that is the alternation of the literals
