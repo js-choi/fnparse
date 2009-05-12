@@ -19,9 +19,9 @@
 
 (deftest escape-sequence
   (is (= (j/escape-sequence (make-state "\\\\a\"]" 3 4))
-         [\\ (make-state (seq "a\"]") 5 4)])))
-;  (is (= (j/escape-sequence (make-state "\\u1111\"]" 3 4))
-;         [(make-node :scalar "hello\u1111") (make-state (seq "]") 10 4)])))
+         [\\ (make-state (seq "a\"]") 5 4)]))
+  (is (= (j/escape-sequence (make-state "\\u1111\"]" 3 4))
+         [\u1111 (make-state (seq "]") 10 4)])))
 
 (deftest string-lit
   (is (= (j/string-lit (make-state "\"hello\"]" 3 4))
