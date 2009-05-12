@@ -49,7 +49,8 @@
     get-remainder (fetch-val *remainder-accessor*))
   (defn set-info
     "Creates a rule that consumes no tokens. The new rule directly changes the current state
-    by associating the given key with the given value. The product is nil.
+    by associating the given key with the given value. The product is the old value of the
+    changed key.
     
     [Equivalent to set-val from clojure.contrib.monads.]"
     [key value]
@@ -57,7 +58,7 @@
   (defn update-info
     "Creates a rule that consumes no tokens. The new rule changes the current state by
     associating the given key with the evaluated result of applying the given updating
-    function to the key's current value. The product is nil.
+    function to the key's current value. The product is the old value of the changed key.
     [Equivalent to update-val from clojure.contrib.monads.]"
     [key val-update-fn]
     (update-val key val-update-fn))
@@ -186,7 +187,7 @@
     [subrule]
     (m-plus subrule emptiness))
   
-  (defmacro invsi-conc
+  (defmacro invisi-conc
     "Like conc, only that the product is the first subrule's product only, not a vector of
     all the products of the subrules--effectively hiding the products of the other subrules.
     The rest of the subrules consume tokens too; their products simply aren't accessible.
