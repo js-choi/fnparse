@@ -186,6 +186,15 @@
     [subrule]
     (m-plus subrule emptiness))
   
+  (defmacro inivis-conc
+    "Like conc, only that the product is the first subrule's product only, not a vector of
+    all the products of the subrules--effectively hiding the products of the other subrules.
+    The rest of the subrules consume tokens too; their products simply aren't accessible.
+    This is useful for applying set-info and alter-info to a rule, without having to deal
+    with set-info or alter-info's products."
+    [first-subrule & rest-subrules]
+    `(conc ~first-subrule ~@rest-subrules))
+  
   (defn lit-conc-seq
     "A convenience function: it creates a rule that is the concatenation of the literals
     formed from the given sequence of literal tokens.

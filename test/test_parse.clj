@@ -110,8 +110,8 @@
     (is (nil? (literal-boolean {:remainder ["aRSTIR"]}))
         "created alternatives rule fails when no valid rule product present")))
 
-(deftest invisble-conc 
-  (is (= ((invisible-conc (p/lit \a) (p/alter-info :column inc)) (make-state "abc" 3))
+(deftest invisi-conc 
+  (is (= ((invisi-conc (p/lit \a) (p/alter-info :column inc)) (make-state "abc" 3))
          [\a (make-state (seq "bc") 3)])))
 
 (deftest lit-conc-seq
