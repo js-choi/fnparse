@@ -122,8 +122,9 @@
 (def text (alt object array))
 
 (defn parse [tokens]
-  (let [[product state] (text {:remainder tokens, :column 0, :line 0})]
+  (let [[product state :as result] (text {:remainder tokens, :column 0, :line 0})]
     (println "FINISHED PARSING:" state)
+    (if (nil? result) (throw (IllegalArgumentException. "invalid document")))
     product))
 
 (defmulti represent :kind)
