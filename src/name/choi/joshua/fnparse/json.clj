@@ -4,6 +4,7 @@
         [clojure.contrib.seq-utils :only [flatten]]))
 
 (defstruct node-s :kind :content)
+(defstruct state-s :remainder :column :line)
 (def make-node (partial struct node-s))
 (def make-scalar-node (partial make-node :scalar))
 (def make-array-node (partial make-node :array))
@@ -122,7 +123,7 @@
 (def text (alt object array))
 
 (defn parse [tokens]
-  (let [[product state :as result] (text {:remainder tokens, :column 0, :line 0})]
+  (let [[product state :as result] (text (struct state-s tokens 0 0))]
     (println "FINISHED PARSING:" state)
     (if (nil? result) (throw (IllegalArgumentException. "invalid document")))
     product))
