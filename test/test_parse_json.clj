@@ -17,11 +17,15 @@
   (is (= (j/number-lit (make-state "-123.9e3]" 3 4))
          [(make-node :scalar -123.9e3) (make-state (seq "]") 11 4)])))
 
+(deftest unicode-char-sequence
+  (is (= (j/unicode-char-sequence (make-state "u11A3a\"]" 3 4))
+         [\u11A3 (make-state (seq "a\"]") 8 4)])))
+
 (deftest escape-sequence
   (is (= (j/escape-sequence (make-state "\\\\a\"]" 3 4))
          [\\ (make-state (seq "a\"]") 5 4)]))
-  (is (= (j/escape-sequence (make-state "\\u1111\"]" 3 4))
-         [\u1111 (make-state (seq "]") 10 4)])))
+  (is (= (j/escape-sequence (make-state "\\u1111a\"]" 3 4))
+         [\u1111 (make-state (seq "a\"]") 10 4)])))
 
 (deftest string-lit
   (is (= (j/string-lit (make-state "\"hello\"]" 3 4))
