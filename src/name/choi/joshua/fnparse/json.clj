@@ -109,10 +109,10 @@
 
 (def additional-entry
   (complex [_ value-separator, content entry]
-    entry))
+    content))
 
 (def object-contents
-  (complex [first-entry entry, rest-entries (rep* additional-entry)]
+  (complex [first-entry entry, rest-entries (rep* additional-entry), _ (effects (println ">" rest-entries))]
     (cons first-entry rest-entries)))
 
 (def object

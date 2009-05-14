@@ -38,6 +38,11 @@
          [[(make-node :scalar "hello") (make-node :scalar 55)]
           (make-state (seq "}") 14 4)])))
 
+(deftest additional-entry
+  (is (= (j/additional-entry (make-state ", \"hello\": 55}" 3 4))
+         [[(make-node :scalar "hello") (make-node :scalar 55)]
+          (make-state (seq "}") 16 4)])))
+
 (deftest object
   (is (= (j/object (make-state "{\"hello\": 55}]" 3 4))
          [(make-node :object {(make-node :scalar "hello") (make-node :scalar 55)})
