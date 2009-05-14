@@ -34,9 +34,9 @@
          [(make-node :scalar "hello\u1111") (make-state (seq "]") 16 4)])))
 
 (deftest entry
-  (is (= (j/string-lit (make-state "\"hello\": 55}" 3 4))
+  (is (= (j/entry (make-state "\"hello\": 55}" 3 4))
          [[(make-node :scalar "hello") (make-node :scalar 55)]
-          (make-state (seq "}") 10 4)])))
+          (make-state (seq "}") 14 4)])))
 
 (deftest load-stream
   (is (= (j/load-stream "[1, 2, 3]") [1 2 3])
