@@ -341,6 +341,6 @@
     consume any tokens or modify the state in any other way."
     [& effect-body]
     `(fn [state#]
-       [(fn [] ~@effect-body) state#]))
+       [((fn [] ~@effect-body)) state#]))
     
 )
