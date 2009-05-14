@@ -76,11 +76,12 @@
 (def escaped-characters
   {\\ \\, \/ \/, \b \backspace, \f \formfeed, \n \newline, \r \return, \t \tab})
 
+(def normal-escape-sequence
+  (semantics (lit-alt-seq (keys escaped-characters) nb-char-lit) escaped-characters))
+
 (def escape-sequence
-  (complex [_ escape-indicator
-            character (alt (lit-alt-seq (keys escaped-characters) nb-char-lit)
-                           unicode-char-sequence)]
-    (escaped-characters character)))
+  (complex [_ escape-indicator, character (alt normal-escape-sequence unicode-char-sequence)]
+    character))
 
 (def string-char
   (alt escape-sequence unescaped-char))
