@@ -22,6 +22,16 @@
      application. Myself, I usually put a struct-map accessor for :remainder in here."}
   *remainder-accessor*
   :remainder)
+(def
+  #^{:doc "The function, symbol, or other callable object that is used to change the
+     remainder inside a state object. In other words,
+     (*remainder-setter* a-state new-remainder) has to return the remainder inside a-state.
+     By default, the remainder-accessor is #(assoc %1 :remainder %2), which means that
+     FnParse's default states are maps containing :remainder. But the accessor is rebindable,
+     so that you can use different kinds of state objects in your parsing application.
+     Myself, I usually leave this variable alone."}
+  *remainder-setter*
+  #(assoc %1 :remainder %2))
 
 (def parser-m (state-t maybe-m))
 
@@ -74,8 +84,10 @@
     "A rule that matches anything--that is, it matches the first token of the tokens it is
     given.
     This rule's product is the first token it receives."
-    [{tokens *remainder-accessor*, :as state}]
-    [(first tokens) (assoc state *remainder-accessor* (next tokens))])
+;    [{tokens *remainder-accessor*, :as state}]
+    [state]
+    (let [tokens (*remainder-accessor* state)]
+      [(first tokens) (*remainder-setter* state (next tokens))]))
   
   (defn validate
     "Creates a rule from attaching a product-validating function to the given subrule--that

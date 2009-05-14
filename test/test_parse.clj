@@ -269,7 +269,7 @@
         "effect rule should call their effect and return the same state")))
 
 (deftest remainder-accessor
-  (binding [p/*remainder-accessor* (accessor state-s :remainder )]
-    (is (= ((p/lit \a) (make-state "abc")) [\a (seq "bc")]))))
+  (binding [p/*remainder-accessor* (accessor state-s :remainder)]
+    (is (= ((p/lit \a) (make-state "abc")) [\a (make-state (seq "bc"))]))))
 
 (time (run-tests))
