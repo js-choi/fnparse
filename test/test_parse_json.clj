@@ -49,7 +49,7 @@
   (is (= (j/load-stream "[\"a\", \"b\\n\", \"\\u1234\"]")
          ["a" "b\n" "\u1234"])
       "loading a flat vector containing strings")
-  (is (= (j/load-stream "{\"a\": 1, \"b\\n\": 2, \"\\u1234\": 3")
+  (is (= (j/parse "{\"a\": 1, \"b\\n\": 2, \"\\u1234\": 3")
          {"a" 1, "b\n" 2, "\u1234" 3})
       "loading a flat object containing strings and integers"))
 
