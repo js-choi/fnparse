@@ -336,11 +336,11 @@
         result
         (failure-hook state))))
   
-  (defn effects
-    "Creates a rule that calls a function for side effects. It does not consume any tokens
-    or modify the state in any other way."
-    [effect-hook]
-    (fn [state]
-      [(effect-hook state) state]))
+  (defmacro effects
+    "Creates a rule that calls the lists given in its body for side effects. It does not
+    consume any tokens or modify the state in any other way."
+    [& effect-body]
+    `(fn [state#]
+       [(fn [] ~@effect-body) state#]))
     
 )

@@ -258,7 +258,7 @@
 (deftest effects
   (let [rule (p/complex [subproduct (p/lit "A")
                          line-number (p/get-info :line)
-                         effects (p/effects (println "!" subproudct)
+                         effects (p/effects (println "!" subproduct)
                                             (println "YES" line-number))]
                subproduct)]
     (is (= (with-out-str
