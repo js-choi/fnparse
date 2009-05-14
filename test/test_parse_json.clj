@@ -38,6 +38,11 @@
          [[(make-node :scalar "hello") (make-node :scalar 55)]
           (make-state (seq "}") 14 4)])))
 
+(deftest object
+  (is (= (j/object (make-state "{\"hello\": 55}]" 3 4))
+         [(make-node :object {(make-node :scalar "hello") (make-node :scalar 55)})
+          (make-state (seq "]") 16 4)])))
+
 (deftest load-stream
   (is (= (j/load-stream "[1, 2, 3]") [1 2 3])
       "loading a flat vector containing integers")
