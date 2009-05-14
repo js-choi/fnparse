@@ -33,6 +33,11 @@
   (is (= (j/string-lit (make-state "\"hello\\u1111\"]" 3 4))
          [(make-node :scalar "hello\u1111") (make-state (seq "]") 16 4)])))
 
+(deftest entry
+  (is (= (j/string-lit (make-state "\"hello\": 55}" 3 4))
+         [[(make-node :scalar "hello") (make-node :scalar 55)]
+          (make-state (seq "}") 10 4)])))
+
 (deftest load-stream
   (is (= (j/load-stream "[1, 2, 3]") [1 2 3])
       "loading a flat vector containing integers")
