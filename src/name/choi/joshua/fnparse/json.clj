@@ -85,7 +85,7 @@
 
 (def string-lit
   (complex [_ string-delimiter, contents (rep* string-char), _ string-delimiter]
-    (struct node-s :scalar (apply str contents))))
+    (-> contents apply-str make-scalar-node)))
 
 (declare array)
 (declare object)
