@@ -122,8 +122,8 @@
 (def text (alt object array))
 
 (defn parse [tokens]
-  (let [[product remainder info] (text {:remainder tokens, :column 0, :line 0})]
-    (println "FINISHED PARSING:" info)
+  (let [[product state] (text {:remainder tokens, :column 0, :line 0})]
+    (println "FINISHED PARSING:" state)
     product))
 
 (defmulti represent :kind)
