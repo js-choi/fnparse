@@ -101,7 +101,7 @@
 
 (def array
   (complex [_ begin-array, contents (opt array-contents), _ end-array]
-    (struct node-s :array (vec contents))))
+    (-> contents vec make-array-node)))
 
 (def entry
   (complex [entry-key string-lit, _ name-separator, entry-val value]
