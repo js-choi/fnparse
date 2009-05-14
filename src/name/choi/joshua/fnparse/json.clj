@@ -5,6 +5,7 @@
 
 (defstruct node-s :kind :content)
 (defstruct state-s :remainder :column :line)
+(def remainder-a (accessor state-s :remainder))
 (def make-node (partial struct node-s))
 (def make-scalar-node (partial make-node :scalar))
 (def make-array-node (partial make-node :array))
@@ -123,10 +124,11 @@
 (def text (alt object array))
 
 (defn parse [tokens]
-  (let [[product state :as result] (text (struct state-s tokens 0 0))]
-    (println "FINISHED PARSING:" state)
-    (if (nil? result) (throw (IllegalArgumentException. "invalid document")))
-    product))
+  (binding [*remainder-accessor* remainder-a] ; this is completely optional
+    (let [[product state :as result] (text (struct state-s tokens 0 0))]
+      (println "FINISHED PARSING:" state)
+      (if (nil? result) (throw (IllegalArgumentException. "invalid document")))
+      product)))
 
 (defmulti represent :kind)
 
