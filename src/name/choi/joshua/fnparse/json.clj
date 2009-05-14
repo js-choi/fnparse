@@ -69,9 +69,6 @@
 (def unicode-char-sequence
   (complex [_ (nb-char-lit \u), digits (factor= 4 hexadecimal-digit)]
     (-> digits apply-str (Integer/parseInt 16) char)))
-;  (semantics (conc (nb-char-lit \u) hexadecimal-digit
-;                   hexadecimal-digit hexadecimal-digit hexadecimal-digit)
-;             #(char (Integer/parseInt (apply str (rest %)) 16))))
 
 (def escaped-characters
   {\\ \\, \/ \/, \b \backspace, \f \formfeed, \n \newline, \r \return, \t \tab})
