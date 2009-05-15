@@ -13,6 +13,8 @@
 ; - (2) is called the rule's state.
 ; - (3) is called the rule's remainder.
 
+(set! *warn-on-reflection* true)
+
 (def
   #^{:doc "The function, symbol, or other callable object that is used to access the
      remainder inside a state object. In other words, (*remainder-accessor* a-state) has to
