@@ -2,7 +2,6 @@
   (:use clojure.contrib.test-is clojure.contrib.monads
         [clojure.contrib.except :only [throw-arg]])
   (:require [name.choi.joshua.fnparse :as p]))
-;(set! *warn-on-reflection* true)
 
 (defstruct state-s :remainder :column)
 (def make-state (partial struct state-s))
