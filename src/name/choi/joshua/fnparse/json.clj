@@ -59,7 +59,7 @@
 (def zero-digit (nb-char-lit \0))
 (def nonzero-decimal-digit (lit-alt-seq "123456789" nb-char-lit))
 (def decimal-digit
-  (failpoint (alt zero-digit nonzero-decimal-digit)))
+  (failpoint (alt zero-digit nonzero-decimal-digit) (expectation-error-fn "decimal digit")))
 (def fractional-part (conc decimal-point (rep* decimal-digit)))
 (def exponential-part
   (conc exponential-sign (opt (alt plus-sign minus-sign)) (rep+ decimal-digit)))
