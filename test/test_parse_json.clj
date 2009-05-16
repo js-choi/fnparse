@@ -19,7 +19,10 @@
 
 (deftest unicode-char-sequence
   (is (= (j/unicode-char-sequence (make-state "u11A3a\"]" 3 4))
-         [\u11A3 (make-state (seq "a\"]") 8 4)])))
+         [\u11A3 (make-state (seq "a\"]") 8 4)]))
+  (is (thrown-with-message? IllegalArgumentException
+        #"JSON error at line 4, column 7: invalid hexadecimal digit \"T\" in Unicode escape"
+        (j/unicode-char-sequence (make-state "u11ATa\"]" 3 4)))))
 
 (deftest escape-sequence
   (is (= (j/escape-sequence (make-state "\\\\a\"]" 3 4))
