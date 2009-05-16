@@ -11,7 +11,7 @@
 (def make-array-node (partial make-node :array))
 (def make-object-node (partial make-node :object))
 (deferror parse-error [] [state message message-args]
-  {:msg (str (format "JSON error at line %s, column %s: " (:line info) (:column info))
+  {:msg (str (format "JSON error at line %s, column %s: " (:line state) (:column state))
              (apply format message message-args))
    :unhandled (throw-msg IllegalArgumentException)})
 (def raise-parse-error (partial raise parse-error))
