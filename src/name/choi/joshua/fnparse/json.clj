@@ -1,6 +1,6 @@
 (ns name.choi.joshua.fnparse.json
   (:refer-clojure)
-  (:use name.choi.joshua.fnparse
+  (:use name.choi.joshua.fnparse clojure.contrib.error-kit
         [clojure.contrib.seq-utils :only [flatten]]))
 
 (defstruct node-s :kind :content)
