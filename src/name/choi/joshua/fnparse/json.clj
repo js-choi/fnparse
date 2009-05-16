@@ -70,15 +70,13 @@
 
 (def hexadecimal-digit
   (failpoint (alt decimal-digit (lit-alt-seq "ABCDEF" nb-char-lit))
-    #(raise-parse-error % "invalid hexadecimal digit")))
+    #(raise-parse-error %2 "hexadecimal digit expected where \"%s\" is" (first %1))))
 
 (def unescaped-char (except json-char (alt escape-indicator string-delimiter)))
 
 (def unicode-char-sequence
   (complex [_ (nb-char-lit \u)
-            digits (failpoint (factor= 4 hexadecimal-digit)
-                              #(raise-parse-error %
-                                 "invalid hexadecimal digit \"%s\" in Unicode escape" ))]
+            digits (factor= 4 hexadecimal-digit)]
     (-> digits apply-str (Integer/parseInt 16) char)))
 
 (def escaped-characters
