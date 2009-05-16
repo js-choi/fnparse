@@ -14,7 +14,6 @@
   {:msg (str (format "JSON error at line %s, column %s: " (:line state) (:column state))
              (apply format message message-args))
    :unhandled (throw-msg IllegalArgumentException)})
-(def raise-parse-error (partial raise parse-error))
 (def apply-str (partial apply str))
 (defn- nb-char [subrule]
   (invisi-conc subrule (update-info :column inc)))
@@ -70,7 +69,7 @@
 
 (def hexadecimal-digit
   (failpoint (alt decimal-digit (lit-alt-seq "ABCDEF" nb-char-lit))
-    #(raise-parse-error %2 "hexadecimal digit expected where \"%s\" is" (first %1))))
+    #(raise parse-error %2 "hexadecimal digit expected where \"%s\" is" [(first %1)])))
 
 (def unescaped-char (except json-char (alt escape-indicator string-delimiter)))
 

@@ -3,7 +3,7 @@
   (:require [name.choi.joshua.fnparse.json :as j]))
 
 (defstruct node-s :kind :content)
-(defstruct state-s :remainder :column :row)
+(defstruct state-s :remainder :column :line)
 (def make-node (partial struct node-s))
 (def make-state (partial struct state-s))
 
@@ -20,7 +20,7 @@
 (deftest unicode-char-sequence
   (is (= (j/unicode-char-sequence (make-state "u11A3a\"]" 3 4))
          [\u11A3 (make-state (seq "a\"]") 8 4)]))
-  (is (thrown-with-message? IllegalArgumentException
+  (is (thrown-with-msg? IllegalArgumentException
         #"JSON error at line 4, column 7: hexadecimal digit expected where \"T\" is"
         (j/unicode-char-sequence (make-state "u11ATa\"]" 3 4)))))
 
