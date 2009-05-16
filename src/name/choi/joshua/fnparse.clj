@@ -346,7 +346,7 @@
     (fn [state]
       (if-let [result (subrule state)]
         result
-        (failure-hook state))))
+        (failure-hook (*remainder-accessor* state) state))))
   
   (defmacro effects
     "Creates a rule that calls the lists given in its body for side effects. It does not
