@@ -3,10 +3,6 @@
   (:use name.choi.joshua.fnparse
         [clojure.contrib.seq-utils :only [flatten]]))
 
-(deferror parse-error [] [info message message-args]
-  {:msg (str (format "JSON error at line %s, column %s: " (:line info) (:column info))
-             (apply format message message-args))
-   :unhandled (throw-msg IllegalArgumentException)})
 (defstruct node-s :kind :content)
 (defstruct state-s :remainder :column :line)
 (def remainder-a (accessor state-s :remainder))
@@ -14,6 +10,11 @@
 (def make-scalar-node (partial make-node :scalar))
 (def make-array-node (partial make-node :array))
 (def make-object-node (partial make-node :object))
+(deferror parse-error [] [state message message-args]
+  {:msg (str (format "JSON error at line %s, column %s: " (:line info) (:column info))
+             (apply format message message-args))
+   :unhandled (throw-msg IllegalArgumentException)})
+(def raise-parse-error (partial raise parse-error))
 (def apply-str (partial apply str))
 (defn- nb-char [subrule]
   (invisi-conc subrule (update-info :column inc)))
@@ -68,14 +69,16 @@
         ((if (or below-one power) identity int)) make-scalar-node)))
 
 (def hexadecimal-digit
-  (alt decimal-digit (lit-alt-seq "ABCDEF" nb-char-lit)))
+  (failpoint (alt decimal-digit (lit-alt-seq "ABCDEF" nb-char-lit))
+    #(raise-parse-error % "invalid hexadecimal digit")))
 
 (def unescaped-char (except json-char (alt escape-indicator string-delimiter)))
 
 (def unicode-char-sequence
   (complex [_ (nb-char-lit \u)
             digits (failpoint (factor= 4 hexadecimal-digit)
-                              (fn [state] (the )))]
+                              #(raise-parse-error %
+                                 "invalid hexadecimal digit \"%s\" in Unicode escape" ))]
     (-> digits apply-str (Integer/parseInt 16) char)))
 
 (def escaped-characters
