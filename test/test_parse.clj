@@ -246,8 +246,9 @@
 
 (deftest failpoint
   (let [failing-rule (p/failpoint (p/lit "A")
-                                  (fn [state]
-                                    (throw-arg "ERROR at line %s" (:line state))))]
+                                  (fn [remainder state]
+                                    (throw-arg "ERROR %s at line %s"
+                                      (first remainder) (:line state))))]
     (is (= (failing-rule {:remainder ["A"], :line 3}) ["A" {:remainder nil, :line 3}])
         "failing rules succeed when their subrules are fulfilled")
     (is (thrown-with-msg? IllegalArgumentException #"ERROR at line 3"
