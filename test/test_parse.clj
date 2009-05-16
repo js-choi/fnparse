@@ -251,7 +251,7 @@
                                       (first remainder) (:line state))))]
     (is (= (failing-rule {:remainder ["A"], :line 3}) ["A" {:remainder nil, :line 3}])
         "failing rules succeed when their subrules are fulfilled")
-    (is (thrown-with-msg? IllegalArgumentException #"ERROR at line 3"
+    (is (thrown-with-msg? IllegalArgumentException #"ERROR B at line 3"
           (failing-rule {:remainder ["B"], :line 3})
         "failing rules fail with given exceptions when their subrules fail"))))
 
