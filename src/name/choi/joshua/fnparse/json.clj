@@ -21,6 +21,10 @@
 (defn- b-char [subrule]
   (invisi-conc subrule (update-info :line inc)))
 
+(defn- expectation-error-fn [expectation]
+  (fn [remainder state]
+    (throw parse-error state "%s expected where \"%s\" is" expectation (first remainder))))
+
 (def string-delimiter (nb-char-lit \"))
 (def escape-indicator (nb-char-lit \\))
 (def false-lit
@@ -54,7 +58,8 @@
 (def exponential-sign (lit-alt-seq "eE" nb-char-lit))
 (def zero-digit (nb-char-lit \0))
 (def nonzero-decimal-digit (lit-alt-seq "123456789" nb-char-lit))
-(def decimal-digit (alt zero-digit nonzero-decimal-digit))
+(def decimal-digit
+  (failpoint (alt zero-digit nonzero-decimal-digit)))
 (def fractional-part (conc decimal-point (rep* decimal-digit)))
 (def exponential-part
   (conc exponential-sign (opt (alt plus-sign minus-sign)) (rep+ decimal-digit)))
