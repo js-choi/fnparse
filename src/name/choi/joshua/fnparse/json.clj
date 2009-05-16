@@ -3,6 +3,10 @@
   (:use name.choi.joshua.fnparse
         [clojure.contrib.seq-utils :only [flatten]]))
 
+(deferror parse-error [] [info message message-args]
+  {:msg (str (format "JSON error at line %s, column %s: " (:line info) (:column info))
+             (apply format message message-args))
+   :unhandled (throw-msg IllegalArgumentException)})
 (defstruct node-s :kind :content)
 (defstruct state-s :remainder :column :line)
 (def remainder-a (accessor state-s :remainder))
@@ -69,7 +73,9 @@
 (def unescaped-char (except json-char (alt escape-indicator string-delimiter)))
 
 (def unicode-char-sequence
-  (complex [_ (nb-char-lit \u), digits (factor= 4 hexadecimal-digit)]
+  (complex [_ (nb-char-lit \u)
+            digits (failpoint (factor= 4 hexadecimal-digit)
+                              (fn [state] (the )))]
     (-> digits apply-str (Integer/parseInt 16) char)))
 
 (def escaped-characters
