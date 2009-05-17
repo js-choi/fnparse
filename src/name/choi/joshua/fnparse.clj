@@ -6,7 +6,8 @@
 ; - If the token sequence is valid, it returns a (0) vector containing the (1) consumed
 ;   symbols' products and (2) a state data object, usually a map. The state contains the (3)
 ;   sequence of remaining tokens, usually with the key *remainder-accessor*.
-; - If the given token sequence is invalid and the rule fails, it simply returns nil.
+; - If the given token sequence is invalid, then the rule Fails, meaning that it either 
+;   simply returns nil or raises an error.
 
 ; - (0) is called the rule's result.
 ; - (1) is called the rule's product.

@@ -75,7 +75,7 @@
 
 (def hexadecimal-digit
   (failpoint (alt decimal-digit (lit-alt-seq "ABCDEF" nb-char-lit))
-    #(raise parse-error %2 "hexadecimal digit expected where \"%s\" is" [(first %1)])))
+    (expectation-error-fn "hexadecimal digit")))
 
 (def unescaped-char (except json-char (alt escape-indicator string-delimiter)))
 
