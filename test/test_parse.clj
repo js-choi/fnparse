@@ -1,10 +1,14 @@
 (ns name.choi.joshua.fnparse.parse
-  (:use clojure.contrib.test-is clojure.contrib.monads
+  (:use clojure.contrib.test-is clojure.contrib.monads clojure.contrib.error-kit
         [clojure.contrib.except :only [throw-arg]])
   (:require [name.choi.joshua.fnparse :as p]))
 
 (defstruct state-s :remainder :column)
 (def make-state (partial struct state-s))
+(deferror parse-error [] [state message message-args]
+  {:msg (str (format "JSON error at line %s, column %s: " (:line state) (:column state))
+             (apply format message message-args))
+   :unhandled (throw-msg IllegalArgumentException)})
 
 (deftest emptiness
   (is (= (p/emptiness {:remainder (list "A" "B" "C")})
@@ -144,15 +148,17 @@
       "created literal-alternative-sequence rule uses given rule-maker"))
 
 (deftest opt
-  (let [opt-true (p/opt (p/lit "true"))]
-    ; Parse the first symbol in the program "true THEN"
+  (let [opt-true (p/opt (p/lit "true"))
+        opt-fail (p/failpoint (p/lit "true") (fn [_ _] (raise parse-error "WHEE")))]
     (is (= (opt-true {:remainder ["true" "THEN"]})
            ["true" {:remainder (list "THEN")}])
         "created option rule works when symbol present")
-    ; Parse the first symbol in the program "THEN"
     (is (= (opt-true {:remainder (list "THEN")})
            [nil {:remainder (list "THEN")}])
-        "created option rule works when symbol absent")))
+        "created option rule works when symbol absent")
+    (is (= (opt-fail {:remainder (list "THEN")})
+           [nil {:remainder (list "THEN")}])
+        "created option rule works when subrule raises error")))
 
 (deftest rep*
   (let [rep*-true (p/rep* (p/lit true))]

@@ -61,9 +61,7 @@
 (def decimal-digit (alt zero-digit nonzero-decimal-digit))
 (def fractional-part (conc decimal-point (rep* decimal-digit)))
 (def exponential-part
-  (conc exponential-sign
-        (opt (alt plus-sign minus-sign))
-        (failpoint (rep+ decimal-digit) (expectation-error-fn "decimal digit"))))
+  (conc exponential-sign (opt (alt plus-sign minus-sign)) (rep+ decimal-digit)))
 
 (def number-lit
   (complex [minus (opt minus-sign)
