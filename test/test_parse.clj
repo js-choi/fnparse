@@ -147,7 +147,7 @@
 
 (deftest opt
   (let [opt-true (p/opt (p/lit "true"))
-        opt-fail (p/failpoint (p/lit "true") (fn [_ _] (raise parse-error)))]
+        opt-fail (p/opt (p/failpoint (p/lit "true") (fn [_ _] (raise parse-error))))]
     (is (= (opt-true {:remainder ["true" "THEN"]})
            ["true" {:remainder (list "THEN")}])
         "created option rule works when symbol present")
