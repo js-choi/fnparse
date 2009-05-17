@@ -5,10 +5,8 @@
 
 (defstruct state-s :remainder :column)
 (def make-state (partial struct state-s))
-(deferror parse-error [] [state message message-args]
-  {:msg (str (format "JSON error at line %s, column %s: " (:line state) (:column state))
-             (apply format message message-args))
-   :unhandled (throw-msg IllegalArgumentException)})
+(deferror parse-error [] []
+  {:msg "WHEEE", :unhandled (throw-msg IllegalArgumentException)})
 
 (deftest emptiness
   (is (= (p/emptiness {:remainder (list "A" "B" "C")})
@@ -149,7 +147,7 @@
 
 (deftest opt
   (let [opt-true (p/opt (p/lit "true"))
-        opt-fail (p/failpoint (p/lit "true") (fn [_ _] (raise parse-error "WHEE")))]
+        opt-fail (p/failpoint (p/lit "true") (fn [_ _] (raise parse-error)))]
     (is (= (opt-true {:remainder ["true" "THEN"]})
            ["true" {:remainder (list "THEN")}])
         "created option rule works when symbol present")

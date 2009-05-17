@@ -28,11 +28,11 @@
 (def string-delimiter (nb-char-lit \"))
 (def escape-indicator (nb-char-lit \\))
 (def false-lit
-  (constant-semantics (lit-conc-seq "false" nb-char-lit) (struct node-s :scalar false)))
+  (constant-semantics (lit-conc-seq "false" nb-char-lit) (make-scalar-node false)))
 (def true-lit
-  (constant-semantics (lit-conc-seq "true" nb-char-lit) (struct node-s :scalar true)))
+  (constant-semantics (lit-conc-seq "true" nb-char-lit) (make-scalar-node true)))
 (def null-lit
-  (constant-semantics (lit-conc-seq "null" nb-char-lit) (struct node-s :scalar nil)))
+  (constant-semantics (lit-conc-seq "null" nb-char-lit) (make-scalar-node nil)))
 (def keyword-lit (alt false-lit true-lit null-lit))
 
 (def space (nb-char-lit \space))
