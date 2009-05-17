@@ -24,6 +24,9 @@
 (defn- expectation-error-fn [expectation]
   (fn [remainder state]
     (raise parse-error state "%s expected where \"%s\" is" [expectation (first remainder)])))
+(defn- within-error-fn [within]
+  (fn [remainder state]
+    (raise 
 
 (def string-delimiter (nb-char-lit \"))
 (def escape-indicator (nb-char-lit \\))
@@ -78,9 +81,11 @@
 (def unescaped-char (except json-char (alt escape-indicator string-delimiter)))
 
 (def unicode-char-sequence
-  (complex [_ (nb-char-lit \u)
-            digits (factor= 4 hexadecimal-digit)]
-    (-> digits apply-str (Integer/parseInt 16) char)))
+  (failpoint
+    (complex [_ (nb-char-lit \u)
+              digits (factor= 4 hexadecimal-digit)]
+      (-> digits apply-str (Integer/parseInt 16) char))
+    (within-error-fn "Unicode character escape")))
 
 (def escaped-characters
   {\\ \\, \/ \/, \b \backspace, \f \formfeed, \n \newline, \r \return, \t \tab})
