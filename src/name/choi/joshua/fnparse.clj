@@ -375,7 +375,7 @@
      [((fn [] ~@effect-body)) state#]))
 
 (defn intercept
-  "This rule is intended for catching exceptions and handling errors.
+  "This rule is intended for intercepting and continuing exceptions and errors.
   It creates a rule that calls the intercept hook. The intercept hook is a function that
   receives only one argument: a function to be called with no arguments that calls the
   subrule with the current state. If you don't call this argument in the intercept hook, the
@@ -384,22 +384,6 @@
     intercept-rule (p/intercept subrule-that-can-throw-an-exception
                      (fn [rule-call]
                        (try (rule-call)
-                         (catch Exception e :error))))
-  When subrule-that-can-raise-an-exception throws an Exception, the product of rule will "
+                         (catch Exception e (throw another-exception)))))"
   [subrule intercept-hook]
   (fn [state] (intercept-hook (partial subrule state))))
-
-;(defn handlepoint
-;  [subrule error-type handle-hook]
-;  (fn [state]
-;    (with-handler (subrule state)
-;      (handle error-type [error]
-;        (handle-hook error)))))
-
-
-
-
-
-
-
-

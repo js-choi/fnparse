@@ -265,7 +265,7 @@
   (let [parse-error-rule (p/semantics (p/lit \A) (fn [_] (throw (Exception.))))
         intercept-rule (p/intercept parse-error-rule
                          (fn [rule-call] (try (rule-call) (catch Exception e :error))))]
-    (is (= (intercept-rule (make-state "ABC")) [:error (make-state (seq "BC"))]))))
+    (is (= (intercept-rule (make-state "ABC")) :error))))
 
 (deftest effects
   (let [rule (p/complex [subproduct (p/lit "A")
