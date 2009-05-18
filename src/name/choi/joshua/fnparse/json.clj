@@ -13,7 +13,7 @@
 (deferror parse-error [] [state message message-args]
   {:msg (str (format "JSON error at line %s, column %s: " (:line state) (:column state))
              (apply format message message-args))
-   :unhandled (throw-msg IllegalArgumentException)})
+   :unhandled (throw-msg Exception)})
 (def apply-str (partial apply str))
 (defn- nb-char [subrule]
   (invisi-conc subrule (update-info :column inc)))
@@ -63,7 +63,7 @@
 (def exponential-part
   (conc exponential-sign (opt (alt plus-sign minus-sign))
         (failpoint (rep+ decimal-digit)
-          (expectation-error-fn "decimal digit after exponential "))))
+          (expectation-error-fn "in number literal, after an exponent sign, decimal digit"))))
 
 (def number-lit
   (complex [minus (opt minus-sign)
