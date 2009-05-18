@@ -24,9 +24,6 @@
 (defn- expectation-error-fn [expectation]
   (fn [remainder state]
     (raise parse-error state "%s expected where \"%s\" is" [expectation (first remainder)])))
-(defn- within-error-fn [within]
-  (fn [remainder state]
-    (raise 
 
 (def string-delimiter (nb-char-lit \"))
 (def escape-indicator (nb-char-lit \\))
