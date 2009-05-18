@@ -267,24 +267,6 @@
                          (fn [rule-call] (try (rule-call) (catch Exception e :error))))]
     (is (= (intercept-rule (make-state "ABC")) [:error (make-state (seq "BC"))]))))
 
-;(deftest handlepoint
-;  (let [parse-error-rule (p/semantics (p/lit \A) (fn [_] (raise parse-error)))
-;        weird-error-rule (p/semantics (p/lit \B) (fn [_] (raise weird-error)))
-;        handlepoint-rule (p/raisepoint (opt parse-error-rule weird-error-rule) parse-error
-;                          (fn [error] (continue-with :error)))]
-;    (is (= (raisepoint-rule (make-state "ABC")) [:error (make-state (seq "BC"))]))))
-;    (is (thrown-with-msg? IllegalArgumentException #"BOOM"
-;          (raisepoint-rule (make-state "BCC"])) [:error (make-state (seq "CC"))]))))
-
-;(deftest raisepoint
-;  (let [error-rule (p/failpoint (p/lit "A") (fn [remainder state] (raise parse-error)))
-;        error-handling-rule (p/failpoint error-rule (fn [remainder state] (with-)))
-;    (is (= (exception-rule {:remainder ["A"], :line 3}) ["A" {:remainder nil, :line 3}])
-;        "failing rules succeed when their subrules are fulfilled")
-;    (is (thrown-with-msg? IllegalArgumentException #"ERROR B at line 3"
-;          (exception-rule {:remainder ["B"], :line 3})
-;        "failing rules fail with given exceptions when their subrules fail"))))
-
 (deftest effects
   (let [rule (p/complex [subproduct (p/lit "A")
                          line-number (p/get-info :line)
