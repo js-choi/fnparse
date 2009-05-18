@@ -7,6 +7,8 @@
 (def make-state (partial struct state-s))
 (deferror parse-error [] []
   {:msg "WHEEE", :unhandled (throw-msg IllegalArgumentException)})
+(deferror weird-error [] []
+  {:msg "BOOM", :unhandled (throw-msg IllegalArgumentException)})
 
 (deftest emptiness
   (is (= (p/emptiness {:remainder (list "A" "B" "C")})
@@ -250,16 +252,25 @@
 
 (deftest failpoint
   (let [exception-rule (p/failpoint (p/lit "A")
-                                    (fn [remainder state]
-                                      (throw-arg "ERROR %s at line %s"
-                                        (first remainder) (:line state))))]
+                          (fn [remainder state]
+                            (throw-arg "ERROR %s at line %s"
+                              (first remainder) (:line state))))]
     (is (= (exception-rule {:remainder ["A"], :line 3}) ["A" {:remainder nil, :line 3}])
         "failing rules succeed when their subrules are fulfilled")
     (is (thrown-with-msg? IllegalArgumentException #"ERROR B at line 3"
           (exception-rule {:remainder ["B"], :line 3})
         "failing rules fail with given exceptions when their subrules fail"))))
 
-;(deftest errorpoint
+(deftest raisepoint
+  (let [parse-error-rule (p/semantics (p/lit \A) (fn [_] (raise parse-error)))
+        weird-error-rule (p/semantics (p/lit \B) (fn [_] (raise weird-error)))
+        raisepoint-rule (p/raisepoint (opt parse-error-rule weird-error-rule) parse-error
+                          (fn [error] (continue-with :error)))]
+    (is (= (raisepoint-rule (make-state "ABC")) [:error (make-state (seq "BC"))]))))
+;    (is (thrown-with-msg? IllegalArgumentException #"BOOM"
+;          (raisepoint-rule (make-state "BCC"])) [:error (make-state (seq "CC"))]))))
+
+;(deftest raisepoint
 ;  (let [error-rule (p/failpoint (p/lit "A") (fn [remainder state] (raise parse-error)))
 ;        error-handling-rule (p/failpoint error-rule (fn [remainder state] (with-)))
 ;    (is (= (exception-rule {:remainder ["A"], :line 3}) ["A" {:remainder nil, :line 3}])
