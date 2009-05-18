@@ -58,12 +58,12 @@
 (def exponential-sign (lit-alt-seq "eE" nb-char-lit))
 (def zero-digit (nb-char-lit \0))
 (def nonzero-decimal-digit (lit-alt-seq "123456789" nb-char-lit))
-(def decimal-digit
-  (failpoint (alt zero-digit nonzero-decimal-digit) (expectation-error-fn "decimal digit")))
+(def decimal-digit (alt zero-digit nonzero-decimal-digit))
 (def fractional-part (conc decimal-point (rep* decimal-digit)))
 (def exponential-part
   (conc exponential-sign (opt (alt plus-sign minus-sign))
-        (failpoint (rep+ decimal-digit) (expectation-error-fn "decimal digit"))))
+        (failpoint (rep+ decimal-digit)
+          (expectation-error-fn "decimal digit after exponential "))))
 
 (def number-lit
   (complex [minus (opt minus-sign)
@@ -73,15 +73,14 @@
     (-> [minus above-one below-one power] flatten apply-str Double/parseDouble
         ((if (or below-one power) identity int)) make-scalar-node)))
 
-(def hexadecimal-digit
-  (failpoint (alt decimal-digit (lit-alt-seq "ABCDEF" nb-char-lit))
-    (expectation-error-fn "hexadecimal digit")))
+(def hexadecimal-digit (alt decimal-digit (lit-alt-seq "ABCDEF" nb-char-lit)))
 
 (def unescaped-char (except json-char (alt escape-indicator string-delimiter)))
 
 (def unicode-char-sequence
   (complex [_ (nb-char-lit \u)
-              digits (factor= 4 hexadecimal-digit)]
+              digits (factor= 4 (failpoint hexadecimal-digit
+                                  (expectation-error-fn "hexadecimal digit")))]
     (-> digits apply-str (Integer/parseInt 16) char)))
 
 (def escaped-characters
