@@ -113,7 +113,9 @@
     (cons first-value rest-values)))
 
 (def array
-  (complex [_ begin-array, contents (opt array-contents), _ end-array]
+  (complex [_ begin-array
+            contents (opt array-contents)
+            _ (failpoint end-array (expectation-error-fn "an array is unclosed; \"]\""))]
     (-> contents vec make-array-node)))
 
 (def entry
