@@ -8,7 +8,7 @@
 (deferror parse-error [] []
   {:msg "WHEEE", :unhandled (throw-msg IllegalArgumentException)})
 (deferror weird-error [] []
-  {:msg "BOOM", :unhandled (throw-msg IllegalArgumentException)})
+  {:msg "BOOM", :unhandled (throw-msg Exception)})
 
 (deftest emptiness
   (is (= (p/emptiness {:remainder (list "A" "B" "C")})
@@ -261,12 +261,21 @@
           (exception-rule {:remainder ["B"], :line 3})
         "failing rules fail with given exceptions when their subrules fail"))))
 
-(deftest handlepoint
+(deftest intercept
   (let [parse-error-rule (p/semantics (p/lit \A) (fn [_] (raise parse-error)))
         weird-error-rule (p/semantics (p/lit \B) (fn [_] (raise weird-error)))
-        handlepoint-rule (p/raisepoint (opt parse-error-rule weird-error-rule) parse-error
-                          (fn [error] (continue-with :error)))]
-    (is (= (raisepoint-rule (make-state "ABC")) [:error (make-state (seq "BC"))]))))
+        intercept-rule (p/intercept (alt parse-error-rule weird-error-rule)
+                         (fn [rule-call]
+                           (with-handler (rule-call)
+                             (handle parse-error [e] e))))]
+    (is (= (intercept-rule (make-state "ABC")) [:error (make-state (seq "BC"))]))))
+
+;(deftest handlepoint
+;  (let [parse-error-rule (p/semantics (p/lit \A) (fn [_] (raise parse-error)))
+;        weird-error-rule (p/semantics (p/lit \B) (fn [_] (raise weird-error)))
+;        handlepoint-rule (p/raisepoint (opt parse-error-rule weird-error-rule) parse-error
+;                          (fn [error] (continue-with :error)))]
+;    (is (= (raisepoint-rule (make-state "ABC")) [:error (make-state (seq "BC"))]))))
 ;    (is (thrown-with-msg? IllegalArgumentException #"BOOM"
 ;          (raisepoint-rule (make-state "BCC"])) [:error (make-state (seq "CC"))]))))
 

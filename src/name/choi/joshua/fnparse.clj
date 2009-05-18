@@ -1,5 +1,5 @@
 (ns name.choi.joshua.fnparse
-  (:use clojure.contrib.monads clojure.contrib.except))
+  (:use clojure.contrib.monads clojure.contrib.except clojure.contrib.error-kit))
 
 ; A rule is a delay object that contains a function that:
 ; - Takes a collection of tokens.
@@ -373,13 +373,18 @@
   [& effect-body]
   `(fn [state#]
      [((fn [] ~@effect-body)) state#]))
-  
-(defn handlepoint
-  [subrule error-type handle-hook]
+
+(defn intercept
+  [subrule intercept-hook]
   (fn [state]
-    (with-handler (subrule state)
-      (handle error-type [error]
-        (handle-hook error)))))
+    (intercept-hook (partial subrule intercept-hook))))
+  
+;(defn handlepoint
+;  [subrule error-type handle-hook]
+;  (fn [state]
+;    (with-handler (subrule state)
+;      (handle error-type [error]
+;        (handle-hook error)))))
 
 
 
