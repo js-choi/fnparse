@@ -91,7 +91,7 @@
   (semantics (lit-alt-seq (keys escaped-characters) nb-char-lit) escaped-characters))
 
 (def escape-sequence
-  (complex [_ escape-indicator, character (alt normal-escape-sequence unicode-char-sequence)]
+  (complex [_ escape-indicator, character (alt unicode-char-sequence normal-escape-sequence)]
     character))
 
 (def string-char
@@ -116,7 +116,8 @@
 (def array
   (complex [_ begin-array
             contents (opt array-contents)
-            _ (failpoint end-array (expectation-error-fn "an array is unclosed; \"]\""))]
+            _ (failpoint end-array
+                (expectation-error-fn "an array is unclosed; \"]\""))]
     (-> contents vec make-array-node)))
 
 (def entry
@@ -132,7 +133,10 @@
     (cons first-entry rest-entries)))
 
 (def object
-  (complex [_ begin-object, contents object-contents, _ end-object]
+  (complex [_ begin-object
+            contents object-contents
+            _ (failpoint end-object
+                (expectation-error-fn "either \"}\" or another object entry (which always starts with a string)"))]
     (struct node-s :object (into {} contents))))
 
 (def text (alt object array))
