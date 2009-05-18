@@ -262,12 +262,9 @@
         "failing rules fail with given exceptions when their subrules fail"))))
 
 (deftest intercept
-  (let [parse-error-rule (p/semantics (p/lit \A) (fn [_] (raise parse-error)))
+  (let [parse-error-rule (p/semantics (p/lit \A) (fn [_] (throw (Exception.))))
         intercept-rule (p/intercept parse-error-rule
-                         (fn [rule-call]
-                           (with-handler (rule-call)
-                             (handle parse-error [e]
-                               (continue-with :error)))))]
+                         (fn [rule-call] (try (rule-call) (catch Exception e :error))))]
     (is (= (intercept-rule (make-state "ABC")) [:error (make-state (seq "BC"))]))))
 
 ;(deftest handlepoint
