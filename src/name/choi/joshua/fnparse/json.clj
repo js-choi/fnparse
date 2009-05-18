@@ -23,7 +23,8 @@
 
 (defn- expectation-error-fn [expectation]
   (fn [remainder state]
-    (raise parse-error state "%s expected where \"%s\" is" [expectation (first remainder)])))
+    (raise parse-error state "%s expected where \"%s\" is"
+      [expectation (or (first remainder) "the end of the file")])))
 
 (def string-delimiter (nb-char-lit \"))
 (def escape-indicator (nb-char-lit \\))
