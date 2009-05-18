@@ -376,8 +376,7 @@
 
 (defn intercept
   [subrule intercept-hook]
-  (fn [state]
-    (intercept-hook (partial subrule intercept-hook))))
+  (fn [state] (intercept-hook (partial subrule state))))
   
 ;(defn handlepoint
 ;  [subrule error-type handle-hook]

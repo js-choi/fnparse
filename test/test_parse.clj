@@ -264,10 +264,11 @@
 (deftest intercept
   (let [parse-error-rule (p/semantics (p/lit \A) (fn [_] (raise parse-error)))
         weird-error-rule (p/semantics (p/lit \B) (fn [_] (raise weird-error)))
-        intercept-rule (p/intercept (alt parse-error-rule weird-error-rule)
+        intercept-rule (p/intercept parse-error-rule
                          (fn [rule-call]
                            (with-handler (rule-call)
-                             (handle parse-error [e] e))))]
+                             (handle parse-error [e]
+                               (continue-with :error)))))]
     (is (= (intercept-rule (make-state "ABC")) [:error (make-state (seq "BC"))]))))
 
 ;(deftest handlepoint
