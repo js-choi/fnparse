@@ -374,3 +374,17 @@
   `(fn [state#]
      [((fn [] ~@effect-body)) state#]))
   
+(defn handlepoint
+  [subrule error-type handle-hook]
+  (fn [state]
+    (with-handler (subrule state)
+      (handle error-type [error]
+        (handle-hook error)))))
+
+
+
+
+
+
+
+

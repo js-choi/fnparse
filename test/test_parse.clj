@@ -261,10 +261,10 @@
           (exception-rule {:remainder ["B"], :line 3})
         "failing rules fail with given exceptions when their subrules fail"))))
 
-(deftest raisepoint
+(deftest handlepoint
   (let [parse-error-rule (p/semantics (p/lit \A) (fn [_] (raise parse-error)))
         weird-error-rule (p/semantics (p/lit \B) (fn [_] (raise weird-error)))
-        raisepoint-rule (p/raisepoint (opt parse-error-rule weird-error-rule) parse-error
+        handlepoint-rule (p/raisepoint (opt parse-error-rule weird-error-rule) parse-error
                           (fn [error] (continue-with :error)))]
     (is (= (raisepoint-rule (make-state "ABC")) [:error (make-state (seq "BC"))]))))
 ;    (is (thrown-with-msg? IllegalArgumentException #"BOOM"
