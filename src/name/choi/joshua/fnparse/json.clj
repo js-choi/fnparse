@@ -58,10 +58,12 @@
 (def exponential-sign (lit-alt-seq "eE" nb-char-lit))
 (def zero-digit (nb-char-lit \0))
 (def nonzero-decimal-digit (lit-alt-seq "123456789" nb-char-lit))
-(def decimal-digit (alt zero-digit nonzero-decimal-digit))
+(def decimal-digit
+  (failpoint (alt zero-digit nonzero-decimal-digit) (expectation-error-fn "decimal digit")))
 (def fractional-part (conc decimal-point (rep* decimal-digit)))
 (def exponential-part
-  (conc exponential-sign (opt (alt plus-sign minus-sign)) (rep+ decimal-digit)))
+  (conc exponential-sign (opt (alt plus-sign minus-sign))
+        (failpoint (rep+ decimal-digit) (expectation-error-fn "decimal digit"))))
 
 (def number-lit
   (complex [minus (opt minus-sign)
@@ -78,11 +80,9 @@
 (def unescaped-char (except json-char (alt escape-indicator string-delimiter)))
 
 (def unicode-char-sequence
-  (failpoint
-    (complex [_ (nb-char-lit \u)
+  (complex [_ (nb-char-lit \u)
               digits (factor= 4 hexadecimal-digit)]
-      (-> digits apply-str (Integer/parseInt 16) char))
-    (within-error-fn "Unicode character escape")))
+    (-> digits apply-str (Integer/parseInt 16) char)))
 
 (def escaped-characters
   {\\ \\, \/ \/, \b \backspace, \f \formfeed, \n \newline, \r \return, \t \tab})

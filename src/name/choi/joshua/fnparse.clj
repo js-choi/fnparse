@@ -7,29 +7,19 @@
 ;   symbols' products and (2) a state data object, usually a map. The state contains the (3)
 ;   sequence of remaining tokens, usually with the key *remainder-accessor*.
 ; - If the given token sequence is invalid, then the rule Fails, meaning that it either 
-;   simply returns nil or throws an Exception.
+;   simply returns nil.
 
-; - (0) is called the rule's result.
-; - (1) is called the rule's product.
-; - (2) is called the rule's state.
-; - (3) is called the rule's remainder.
+; - (0) is called the rule's Result.
+; - (1) is called the rule's Product.
+; - (2) is called the rule's State.
+; - (3) is called the rule's Remainder.
 
 (defn call-parser-maybe-fn [state]
   (fn [parser]
     (try (parser state)
       (catch Exception e nil))))
 
-(defmonad parser-m
-  [m-result (fn [product] (fn [state] [product state])) 
-   m-bind (fn [rule func]
-            (fn [state]
-              (let [result (rule state)]
-                (when-not (nil? result)
-                  ((func (first result)) (second result))))))
-   m-zero (constantly nil)
-   m-plus (fn [& rules]
-            (fn [state]
-              (first (drop-while nil? (map (call-parser-maybe-fn state) rules)))))])
+(def parser-m (state-t maybe-m))
 
 (def
   #^{:doc "The function, symbol, or other callable object that is used to access the

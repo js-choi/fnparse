@@ -148,17 +148,13 @@
       "created literal-alternative-sequence rule uses given rule-maker"))
 
 (deftest opt
-  (let [opt-true (p/opt (p/lit "true"))
-        opt-fail (p/opt (p/failpoint (p/lit "true") (fn [_ _] (raise parse-error))))]
+  (let [opt-true (p/opt (p/lit "true"))]
     (is (= (opt-true {:remainder ["true" "THEN"]})
            ["true" {:remainder (list "THEN")}])
         "created option rule works when symbol present")
     (is (= (opt-true {:remainder (list "THEN")})
            [nil {:remainder (list "THEN")}])
-        "created option rule works when symbol absent")
-    (is (= (opt-fail {:remainder (list "THEN")})
-           [nil {:remainder (list "THEN")}])
-        "created option rule works when subrule raises error")))
+        "created option rule works when symbol absent")))
 
 (deftest rep*
   (let [rep*-true (p/rep* (p/lit true))]
