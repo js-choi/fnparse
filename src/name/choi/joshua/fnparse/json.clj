@@ -10,6 +10,8 @@
 (def make-scalar-node (partial make-node :scalar))
 (def make-array-node (partial make-node :array))
 (def make-object-node (partial make-node :object))
+; A couple of parse errors have been put here and there. It's nowhere complete, but rather
+; it's to show examples of how to implement errors.
 (deferror parse-error [] [state message message-args]
   {:msg (str (format "JSON error at line %s, column %s: " (:line state) (:column state))
              (apply format message message-args))
