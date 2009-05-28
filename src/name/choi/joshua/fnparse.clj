@@ -326,7 +326,7 @@
   (with-monad parser-m
     (m-seq (replicate factor subrule))))
 
-(defmacro factor<
+(defn factor<
   "Same as the factor= function, except that the new rule eats up tokens only until the
   given subrule is fulfilled one less times than the factor. The new rule would never fail.
   (factor< 3 :a) would eat the first two tokens [:a :a :a :a :b] and return:
@@ -334,9 +334,9 @@
   (factor< 3 :a) would eat the first three tokens [:b] and return:
     [nil (list :b)]"
   [factor subrule]
-  `(alt (factor= ~(dec factor) ~subrule) (rep< ~factor ~subrule)))
+  (alt (factor= (dec factor) subrule) (rep< factor subrule)))
 
-(defmacro factor<=
+(defn factor<=
   "Same as the factor= function, except that the new rule always succeeds, consuming tokens
   until the subrule is fulfilled the same amount of times as the given factor. The new rule
   would never fail.
@@ -345,7 +345,7 @@
   (factor<= 3 :a) would eat the first three tokens [:b] and return:
     [nil (list :b)]"
   [factor subrule]
-  `(alt (factor= ~factor ~subrule) (rep< ~factor ~subrule)))
+  (alt (factor= factor subrule) (rep< factor subrule)))
 
 (defn failpoint
   "Creates a rule that applies a failpoint to a subrule. When the subrule fails—i.e., it
