@@ -206,7 +206,7 @@
         "created factor= rule fails when symbol does not fulfill subrule at all")
     (is (= (tested-rule-0 {:remainder (list "D" "A" "B")})
            [[] {:remainder (list "D" "A" "B")}])
-        "created factor= rule works when symbol fulfils zero multiples and factor is zero")))
+        "created factor= rule works when symbol fulfils no multiples and factor is zero")))
 
 (deftest rep-predicate
   (let [tested-rule-fn (p/rep-predicate (partial > 3) (p/lit "A"))]
