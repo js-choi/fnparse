@@ -169,6 +169,9 @@
      "created zero-or-more-repetition rule works when symbol absent")
     (is (= (rep*-true {:remainder [true true true]})
            [[true true true] {:remainder nil}])
+        "created zero-or-more-repetition rule works with no remainder after symbols")
+    (is (= (rep*-true {:remainder nil})
+           [nil {:remainder nil}])
         "created zero-or-more-repetition rule works with no remainder")))
 
 (deftest rep+
