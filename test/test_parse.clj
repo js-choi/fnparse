@@ -157,7 +157,8 @@
         "created option rule works when symbol absent")))
 
 (deftest rep*
-  (let [rep*-true (p/rep* (p/lit true))]
+  (let [rep*-true (p/rep* (p/lit true))
+        rep*-untrue (p/rep* (p/except p/anything (p/lit true)))]
     (is (= (rep*-true {:remainder [true "THEN"], :a 3})
            [[true] {:remainder (list "THEN"), :a 3}])
         "created zero-or-more-repetition rule works when symbol present singularly")
@@ -172,7 +173,10 @@
         "created zero-or-more-repetition rule works with no remainder after symbols")
     (is (= (rep*-true {:remainder nil})
            [nil {:remainder nil}])
-        "created zero-or-more-repetition rule works with no remainder")))
+        "created zero-or-more-repetition rule works with no remainder")
+    (is (= (rep*-untrue {:remainder nil})
+           [nil {:remainder nil}])
+        "created zero-or-more-repetition negative rule works with no remainder")))
 
 (deftest rep+
   (let [rep+-true (p/rep+ (p/lit true))]
