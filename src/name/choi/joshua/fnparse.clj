@@ -264,8 +264,9 @@
   The new rule's products would be either the vector [b-product ...] for how many matches
   of b were found. If there was no match, then nil is simply returned."
   [subrule]
-  (complex [first-subproduct subrule
-            next-token remainder-peek
+  (complex [cur-remainder get-remainder
+            :when (seq cur-remainder)
+            first-subproduct subrule
             rest-subproducts (rep* subrule)]
     (cons first-subproduct rest-subproducts)))
 
