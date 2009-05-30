@@ -25,9 +25,10 @@
   #^{:doc "The function, symbol, or other callable object that is used to access the
      remainder inside a state object. In other words, (*remainder-accessor* a-state) has to
      return the remainder inside a-state. By default, the remainder-accessor is :remainder 
-     (meaning that FnParse's default states are maps containing :remainder). But the accessor
-     is rebindable, so that you can use different kinds of state objects in your parsing
-     application. Myself, I usually put a struct-map accessor for :remainder in here."}
+     (meaning that FnParse's default states are maps containing :remainder). But the
+     accessor is rebindable, so that you can use different kinds of state objects in your
+     parsing application. Myself, I usually put a struct-map accessor for :remainder in
+     here."}
   *remainder-accessor*
   :remainder)
 (def
@@ -377,3 +378,23 @@
                          (catch Exception e (throw another-exception)))))"
   [subrule intercept-hook]
   (fn [state] (intercept-hook (partial subrule state))))
+
+(defn validate-state
+  "Creates a rule from attaching a state-validating function to the given subrule--that
+  is, any products of the subrule must fulfill the validator function.
+  (def a (validate-state b validator)) says that the rule a succeeds only when b succeeds
+  and also when the evaluated value of (validator b-state) is true. The new rule's product 
+  would be b-product."
+  [subrule validator]
+  (complex [subproduct subrule, substate get-state, :when (validator substate)]
+    subproduct))
+
+(defn validate-remainder
+  "Creates a rule from attaching a remainder-validating function to the given subrule--that
+  is, any products of the subrule must fulfill the validator function.
+  (def a (validate-remainder b validator)) says that the rule a succeeds only when b
+  succeeds and also when the evaluated value of (validator b-remainder) is true. The new
+  rule's product would be b-product."
+  [subrule validator]
+  (complex [subproduct subrule, subremainder get-remainder, :when (validator subremainder)]
+    subproduct))
