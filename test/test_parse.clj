@@ -292,6 +292,7 @@
   (let [rule (p/lit "A")
         matcher (p/rule-matcher rule identity vector)]
     (is (= (matcher (make-state ["A"])) "A"))
-    (is (= (matcher (make-state ["B"])) (make-state ["B"])))))
+    (is (= (matcher (make-state ["B"])) (make-state ["B"])))
+    (is (= (matcher (make-state ["A" "B"])) [(make-state ["A" "B"]) (make-state ["B"])]))))
 
 (time (run-tests))
