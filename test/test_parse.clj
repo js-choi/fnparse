@@ -216,7 +216,8 @@
         "created factor= rule works when symbol fulfils no multiples and factor is zero")))
 
 (deftest rep-predicate
-  (let [tested-rule-fn (p/rep-predicate (partial > 3) (p/lit "A"))]
+  (let [tested-rule-fn (p/rep-predicate (partial > 3) (p/lit "A"))
+        infinity-rule (p/rep-predicate (partial > Double/POSITIVE_INFINITY) (p/lit "A"))]
     (is (= (tested-rule-fn {:remainder (list "A" "A" "C")})
            [["A" "A"] {:remainder (list "C")}])
         "created rep rule works when predicate returns true")
@@ -286,5 +287,11 @@
 (deftest remainder-accessor
   (binding [p/*remainder-accessor* (accessor state-s :remainder)]
     (is (= ((p/lit \a) (make-state "abc")) [\a (make-state (seq "bc"))]))))
+
+(deftest rule-matcher
+  (let [rule (p/lit "A")
+        matcher (p/rule-matcher rule identity vector)]
+    (is (= (matcher (make-state ["A"])) "A"))
+    (is (= (matcher (make-state ["B"])) (make-state ["B"])))))
 
 (time (run-tests))
