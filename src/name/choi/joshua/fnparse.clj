@@ -400,17 +400,27 @@
   (complex [subproduct subrule, subremainder get-remainder, :when (validator subremainder)]
     subproduct))
 
-(defn rule-matcher
+(defn rule-match
   "Creates a function that tries to completely match the given rule to the given state, with
   no remainder left.
   - If (rule given-state) fails, then (failure-fn given-state) is called.
   - If the remainder of (rule given-state) is not empty, then
     (incomplete-fn given-state new-state-after-rule) is called.
   - If the new remainder is empty, then the product of the rule is returned."
+  [rule failure-fn incomplete-fn state]
+  (if-let [[product new-state] (rule state)]
+    (if (empty? (*remainder-accessor* new-state))
+      product
+      (incomplete-fn state new-state))
+    (failure-fn state)))
+
+(defn rule-matcher
+  "DEPRECATED: Use rule-match instead.
+  Creates a function that tries to completely match the given rule to the given state, with
+  no remainder left.
+  - If (rule given-state) fails, then (failure-fn given-state) is called.
+  - If the remainder of (rule given-state) is not empty, then
+    (incomplete-fn given-state new-state-after-rule) is called.
+  - If the new remainder is empty, then the product of the rule is returned."
   [rule failure-fn incomplete-fn]
-  (fn [state]
-    (if-let [[product new-state] (rule state)]
-      (if (empty? (*remainder-accessor* new-state))
-        product
-        (incomplete-fn state new-state))
-      (failure-fn state))))
+  (partial rule-match rule failure-fn incomplete-fn))
