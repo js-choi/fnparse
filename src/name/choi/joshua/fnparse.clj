@@ -1,11 +1,13 @@
 (ns name.choi.joshua.fnparse
-  (:use clojure.contrib.monads clojure.contrib.except clojure.contrib.error-kit))
+  [:use clojure.contrib.monads clojure.contrib.except
+        clojure.contrib.error-kit])
 
 ; A rule is a delay object that contains a function that:
 ; - Takes a collection of tokens.
-; - If the token sequence is valid, it returns a (0) vector containing the (1) consumed
-;   symbols' products and (2) a state data object, usually a map. The state contains the (3)
-;   sequence of remaining tokens, usually with the key *remainder-accessor*.
+; - If the token sequence is valid, it returns a (0) vector containing the (1)
+;   consumed symbols' products and (2) a state data object, usually a map. The
+;   state contains the (3) sequence of remaining tokens, usually with the key
+;   *remainder-accessor*.
 ; - If the given token sequence is invalid, then the rule Fails, meaning that it either
 ;   simply returns nil.
 
@@ -22,23 +24,25 @@
 (def parser-m (state-t maybe-m))
 
 (def
-  #^{:doc "The function, symbol, or other callable object that is used to access the
-     remainder inside a state object. In other words, (*remainder-accessor* a-state) has to
-     return the remainder inside a-state. By default, the remainder-accessor is :remainder
-     (meaning that FnParse's default states are maps containing :remainder). But the
-     accessor is rebindable, so that you can use different kinds of state objects in your
-     parsing application. Myself, I usually put a struct-map accessor for :remainder in
-     here."}
+  #^{:doc "The function, symbol, or other callable object that is used to access
+     the remainder inside a state object. In other words,
+     (*remainder-accessor* a-state) has to return the remainder inside a-state.
+     By default, the remainder-accessor is :remainder (meaning that FnParse's
+     default states are maps containing :remainder). But the accessor is
+     rebindable, so that you can use different kinds of state objects in your
+     parsing application. Myself, I usually put a struct-map accessor for
+     :remainder in here."}
   *remainder-accessor*
   :remainder)
 (def
-  #^{:doc "The function, symbol, or other callable object that is used to change the
-     remainder inside a state object. In other words,
-     (*remainder-setter* a-state new-remainder) has to return the remainder inside a-state.
-     By default, the remainder-accessor is #(assoc %1 :remainder %2), which means that
-     FnParse's default states are maps containing :remainder. But the accessor is rebindable,
-     so that you can use different kinds of state objects in your parsing application.
-     Myself, I usually leave this variable alone."}
+  #^{:doc "The function, symbol, or other callable object that is used to change
+     the remainder inside a state object. In other words,
+     (*remainder-setter* a-state new-remainder) has to return the remainder
+     inside a-state. By default, the remainder-accessor is
+     #(assoc %1 :remainder %2), which means that FnParse's default states are
+     maps containing :remainder. But the accessor is rebindable, so that you can
+     use different kinds of state objects in your parsing application. Myself, I
+     usually leave this variable alone."}
   *remainder-setter*
   #(assoc %1 :remainder %2))
 
@@ -47,7 +51,8 @@
   `(domonad parser-m ~steps ~@product-expr))
 
 (def
-  #^{:doc "A rule that consumes no tokens. Its product is the entire current state.
+  #^{:doc "A rule that consumes no tokens. Its product is the entire current
+     state.
      [Equivalent to the result of fetch-state from clojure.contrib.monads.]"}
   get-state (fetch-state))
 (defn get-info
