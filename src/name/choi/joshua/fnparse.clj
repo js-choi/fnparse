@@ -124,7 +124,7 @@
   (term (partial = literal-token)))
 
 (defn re-term
-  "Creates a rule that is the terminal rule of the given regex--that is, it accepts only 
+  "Creates a rule that is the terminal rule of the given regex--that is, it accepts only
   tokens that match the given regex.
   (def a (re-term #\"...\")) would be equivalent to the EBNF
     a = ? (re-matches #\"...\" %) evaluates to true ?;

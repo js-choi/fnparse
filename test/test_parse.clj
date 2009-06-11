@@ -7,8 +7,8 @@
 (def make-state (partial struct state-s))
 (deferror parse-error [] []
   {:msg "WHEEE", :unhandled (throw-msg IllegalArgumentException)})
-(deferror weird-error [] []
-  {:msg "BOOM", :unhandled (throw-msg Exception)})
+(deferror weird-error [] [n]
+  {:msg (str "BOOM " n), :unhandled (throw-msg Exception)})
 
 (deftest emptiness
   (is (= (p/emptiness {:remainder (list "A" "B" "C")})
@@ -289,10 +289,12 @@
     (is (= ((p/lit \a) (make-state "abc")) [\a (make-state (seq "bc"))]))))
 
 (deftest rule-matcher
-  (let [rule (p/lit "A")
-        matcher (p/rule-matcher rule identity vector)]
-    (is (= (matcher (make-state ["A"])) "A"))
-    (is (= (matcher (make-state ["B"])) (make-state ["B"])))
-    (is (= (matcher (make-state ["A" "B"])) [(make-state ["A" "B"]) (make-state ["B"])]))))
+  (let [rule (p/errorpoint (p/lit "A") (raise weird-error 55))
+        matcher1 (p/rule-matcher rule identity vector)
+        matcher2 (p/rule-matcher rule identity identity vector)]
+    (is (= (matcher1 (make-state ["A"])) "A"))
+    (is (= (matcher1 (make-state ["B"])) (make-state ["B"])))
+    (is (= (matcher1 (make-state ["A" "B"])) [(make-state ["A" "B"]) (make-state ["B"])]))
+    (is (= (matcher1 (make-state ["B"])) 55))))
 
 (time (run-tests))
