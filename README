@@ -1,0 +1,24 @@
+FnParse is a library for creating functional parsers in the Clojure programming
+language. It presents an easy, functional way to create parsers from EBNF rules and
+was inspired by the paper Using Functional Parsing to Achieve Quality in Software
+Maintenance (http://citeseer.ist.psu.edu/148293.html).
+
+FnParse's distribution has src and test folders. To use FnParse, download this
+distribution and include its src folder in your program's classpath—for instance,
+  java -cp $CLOJURE_PATH:path-to-FnParse-folder/src/ ...
+
+FnParse's namespace is name.choi.joshua.fnparse.
+
+FnParse's unit tests are stored in the tests folder and use the test-is library
+from clojure-contrib, the Clojure standard library.
+
+For documentation, go to: http://github.com/joshua-choi/fnparse/wikis
+
+ *   FnParse
+ *   Copyright (c) 2009 Joshua Choi. All rights reserved.
+ *   The use and distribution terms for this software are covered by the
+ *   Eclipse Public License 1.0 (http://opensource.org/licenses/eclipse-1.0.php)
+ *   which can be found in the file epl-v10.html at the root of this distribution.
+ *   By using this software in any fashion, you are agreeing to be bound by
+ * 	 the terms of this license.
+ *   You must not remove this notice, or any other, from this software.

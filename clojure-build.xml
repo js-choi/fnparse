@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- You may freely edit this file. See commented blocks below for -->
+<!-- some examples of how to customize the build. -->
+<!-- (If you delete it and reopen the project it will be recreated.) -->
+<!-- By default, only the Clean and Build commands use this build script. -->
+<!-- Commands such as Run, Debug, and Test only use this build script if -->
+<!-- the Compile on Save feature is turned off for the project. -->
+<!-- You can turn off the Compile on Save (or Deploy on Save) setting -->
+<!-- in the project's Project Properties dialog box.-->
+<!DOCTYPE project [
+       <!ENTITY argfile SYSTEM "./argfile.xml">
+]>
+
+<project name="clojure-build" default="default" basedir=".">
+
+
+    <description>Builds, tests, and runs the project org.enclojure.ide.</description>
+    <import file="nbproject/build-impl.xml"/>
+
+	 <!-- Begin Clojure ANT Tasks -->
+	  <property name="argfilename" location = "argfile.xml"/>
+
+      <target name="clojure-init">
+	    <tstamp/>
+	    <mkdir dir="${build.classes.dir}"/>
+		<available file="${src.dir}" type="dir"
+	           property="java.files.present"/>
+	  </target>
+
+	  <target name="clojure-compile_java" depends="clojure-init" if="java.files.present"
+	            description="Compile Java sources.">
+	    <javac srcdir="${src.dir}" destdir="${build.classes.dir}" includeJavaRuntime="yes"
+	           debug="true" target="1.5"/>
+	  </target>
+
+	  <target name="clojure-prepare_clojure_compile" depends="clojure-compile_java"
+			description="prepares for clojure compiling">
+
+			<fileset dir="${src.dir}" id="project-files.clj">
+				<include name="**/*.clj"/>
+			</fileset>
+			<pathconvert pathsep="&#34; /> &#13;&#10;&lt;arg value = &#34;" property="cljfiles" refid="project-files.clj"/>
+			<delete file="${argfilename}"/>
+			<echo file="${argfilename}"> &lt;arg value = "${cljfiles}"/></echo>
+	        <replace file="${argfilename}"
+	                         token="${basedir}${file.separator}"
+	                         value=""
+                             summary="yes"/>
+	        <replace file="${argfilename}"
+	                         token="${src.dir}${file.separator}"
+	                         value=""
+                             summary="yes"/>
+	        <replace file="${argfilename}"
+	                         token="_"
+                             value="-"
+                             summary="yes"/>
+	        <replace file="${argfilename}"
+	                         token=".clj"
+	                         value=""
+                             summary="yes"/>
+	        <replace file="${argfilename}"
+	                         token="${file.separator}"
+	                         value="."
+                             summary="yes"/>
+	        <replace file="${argfilename}"
+	                         token=".>"
+	                         value="/>"
+                             summary="yes"/>
+			<loadfile property="newargs" srcFile="${argfilename}"/>
+<!--
+            <echo>cljfiles = ${cljfiles}</echo>
+			<echo>src = ${src.dir}</echo>
+			<echo>NewArgs = ${newargs}</echo>
+			<echo>baseDir = ${basedir}</echo>
+			<echo>ant.file = ${ant.file}</echo>
+			<echo>src.dir = ${src.dir}</echo>
+			<echo>base.src = ${base.src}</echo>
+	        <echo>build.classes.dir = ${build.classes.dir}</echo>
+-->
+	  </target>
+
+	<target name="clojure-compile_clojure" depends="clojure-prepare_clojure_compile"
+	          description="Compile clojure sources.">
+	    <java failonerror="true"
+              classname="clojure.lang.Compile"
+	          classpath="build${file.separator}classes:${src.dir}:${javac.classpath}">
+	      <sysproperty key="clojure.compile.path" value="${build.classes.dir}"/>
+		  &argfile;
+	    </java>
+	  </target>
+
+	  <target name="clojure-jar" depends="clojure-compile_clojure"
+	          description="Create jar file.">
+	    <jar jarfile="${org_enclojure_repl_jar}" basedir="${build.classes.dir}">
+	      <fileset dir="${src.dir}" includes="**/*.clj"/>
+	      <manifest>
+	        <attribute name="Class-Path" value="."/>
+	      </manifest>
+	    </jar>
+	  </target>
+
+	<target name="-post-compile" depends="clojure-compile_clojure" />
+
+	  <!-- End Clojure ANT Tasks -->
+
+    <!--
+
+    There exist several targets which are by default empty and which can be
+    used for execution of your tasks. These targets are usually executed
+    before and after some main targets. They are:
+
+      -pre-init:                 called before initialization of project properties
+      -post-init:                called after initialization of project properties
+      -pre-compile:              called before javac compilation
+      -post-compile:             called after javac compilation
+      -pre-compile-single:       called before javac compilation of single file
+      -post-compile-single:      called after javac compilation of single file
+      -pre-compile-test:         called before javac compilation of JUnit tests
+      -post-compile-test:        called after javac compilation of JUnit tests
+      -pre-compile-test-single:  called before javac compilation of single JUnit test
+      -post-compile-test-single: called after javac compilation of single JUunit test
+      -pre-jar:                  called before JAR building
+      -post-jar:                 called after JAR building
+      -post-clean:               called after cleaning build products
+
+    (Targets beginning with '-' are not intended to be called on their own.)
+
+    Example of inserting an obfuscator after compilation could look like this:
+
+        <target name="-post-compile">
+            <obfuscate>
+                <fileset dir="${build.classes.dir}"/>
+            </obfuscate>
+        </target>
+
+    For list of available properties check the imported
+    nbproject/build-impl.xml file.
+
+
+    Another way to customize the build is by overriding existing main targets.
+    The targets of interest are:
+
+      -init-macrodef-javac:     defines macro for javac compilation
+      -init-macrodef-junit:     defines macro for junit execution
+      -init-macrodef-debug:     defines macro for class debugging
+      -init-macrodef-java:      defines macro for class execution
+      -do-jar-with-manifest:    JAR building (if you are using a manifest)
+      -do-jar-without-manifest: JAR building (if you are not using a manifest)
+      run:                      execution of project
+      -javadoc-build:           Javadoc generation
+      test-report:              JUnit report generation
+
+    An example of overriding the target for project execution could look like this:
+
+        <target name="run" depends="org.enclojure.ide-impl.jar">
+            <exec dir="bin" executable="launcher.exe">
+                <arg file="${dist.jar}"/>
+            </exec>
+        </target>
+
+    Notice that the overridden target depends on the jar target and not only on
+    the compile target as the regular run target does. Again, for a list of available
+    properties which you can use, check the target you are overriding in the
+    nbproject/build-impl.xml file.
+
+    -->
+</project>
+
