@@ -92,12 +92,13 @@
     emptiness (m-result nil)))
 
 (defn anything
-  "A rule that matches anything--that is, it matches the first token of the tokens it is
-  given.
-  This rule's product is the first token it receives."
+  "A rule that matches anything--that is, it matches the first token of the
+  tokens it is given.
+  This rule's product is the first token it receives. It fails if there are no
+  tokens left."
 ;  [{tokens *remainder-accessor*, :as state}]
   [state]
-  (let [tokens (*remainder-accessor* state)]
+  (if-let [tokens (*remainder-accessor* state)]
     [(first tokens) (*remainder-setter* state (next tokens))]))
 
 (defn validate
