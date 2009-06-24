@@ -259,7 +259,16 @@
   of b were found, or nil if there was no match. (Note that this means that, in the latter
   case, the result would be [nil given-state].) The new rule can never simply return nil."
   [subrule]
-  (opt (rep+ subrule)))
+  (fn [state]
+    (loop [cur-product [], cur-state state]
+      (if-let [[subproduct substate] (subrule cur-state)]
+        (if (seq (*remainder-accessor* substate))
+          (recur (conj cur-product subproduct) substate)
+          [(conj cur-product subproduct) substate])
+        [(if (not= cur-product []) cur-product) cur-state]))))
+  ; The following code was used until I found that the mutually recursive calls to rep+
+  ; resulted in an easily inflated function call stack.
+;  (opt (rep+ subrule)))
 
 (defn rep+
   "Creates a rule that is the zero-or-more greedy repetition of the given subrule. It
@@ -267,14 +276,17 @@
   its subrule fails. Its result is the sequence of results from the subrule's repetitions.
   (def a (rep* b)) is equivalent to the EBNF:
     a = {b}-;
-  The new rule's products would be either the vector [b-product ...] for how many matches
-  of b were found. If there was no match, then nil is simply returned."
+  The new rule's products would be the vector [b-product ...] for how many matches
+  of b were found. If there was no match, then the rule fails."
   [subrule]
-  (complex [cur-remainder get-remainder
-            :when (seq cur-remainder)
-            first-subproduct subrule
-            rest-subproducts (rep* subrule)]
-    (cons first-subproduct rest-subproducts)))
+  (complex [first-product subrule, rest-products (rep* subrule)]
+    (vec (cons first-product rest-products))))
+  ; See note at rep*.
+;  (complex [cur-remainder get-remainder
+;            :when (seq cur-remainder)
+;            first-subproduct subrule
+;            rest-subproducts (rep* subrule)]
+;    (cons first-subproduct rest-subproducts)))
 
 (defn except
   "Creates a rule that is the exception from the first given subrules with the second given
