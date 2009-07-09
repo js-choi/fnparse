@@ -8,7 +8,7 @@
 ;   consumed symbols' products and (2) a state data object, usually a map. The
 ;   state contains the (3) sequence of remaining tokens, usually with the key
 ;   *remainder-accessor*.
-; - If the given token sequence is invalid, then the rule Fails, meaning that it either
+; - If the given token sequence is invalid, then the rule Fails, meaning that it
 ;   simply returns nil.
 
 ; - (0) is called the rule's Result.
@@ -56,39 +56,40 @@
      [Equivalent to the result of fetch-state from clojure.contrib.monads.]"}
   get-state (fetch-state))
 (defn get-info
-  "Creates a rule that consumes no tokens. The new rule's product is the value of the given
-  key in the current state.
+  "Creates a rule that consumes no tokens. The new rule's product is the value
+  of the given key in the current state.
   [Equivalent to fetch-val from clojure.contrib.monads.]"
   [key]
   (fetch-val key))
 (def
-  #^{:doc "A rule that consumes no tokens. Its product is the sequence of the remaining
-     tokens.
-     (Equivalent to the result of (fetch-val *remainder-accessor*) from
-     clojure.contrib.monads.)"}
+  #^{:doc "A rule that consumes no tokens. Its product is the sequence of the
+     remaining tokens.
+     [Equivalent to the result of (fetch-val *remainder-accessor*) from
+     clojure.contrib.monads.]"}
   get-remainder (fetch-val *remainder-accessor*))
 (defn set-info
-  "Creates a rule that consumes no tokens. The new rule directly changes the current state
-  by associating the given key with the given value. The product is the old value of the
-  changed key.
-
+  "Creates a rule that consumes no tokens. The new rule directly changes the
+  current state by associating the given key with the given value. The product
+  is the old value of the changed key.
   [Equivalent to set-val from clojure.contrib.monads.]"
   [key value]
   (set-val key value))
 (defn update-info
-  "Creates a rule that consumes no tokens. The new rule changes the current state by
-  associating the given key with the evaluated result of applying the given updating
-  function to the key's current value. The product is the old value of the changed key.
+  "Creates a rule that consumes no tokens. The new rule changes the current
+  state by associating the given key with the evaluated result of applying the
+  given updating function to the key's current value. The product is the old
+  value of the changed key.
   [Equivalent to update-val from clojure.contrib.monads.]"
   [key val-update-fn]
   (update-val key val-update-fn))
 
 (with-monad parser-m
   (def
-    #^{:doc "A rule that matches emptiness--that is, it always matches with every given
-       token sequence, and it always returns [nil tokens].
+    #^{:doc "A rule that matches emptiness--that is, it always matches with
+       every given token sequence, and it always returns [nil tokens].
        (def a emptiness) would be equivalent to the EBNF a = ;
-       This rule's product is always nil, and it therefore always returns [nil tokens]."}
+       This rule's product is always nil, and it therefore always returns
+       [nil tokens]."}
     emptiness (m-result nil)))
 
 (defn anything
@@ -102,73 +103,80 @@
     [(first tokens) (*remainder-setter* state (next tokens))]))
 
 (defn validate
-  "Creates a rule from attaching a product-validating function to the given subrule--that
-  is, any products of the subrule must fulfill the validator function.
-  (def a (validate b validator)) says that the rule a succeeds only when b succeeds and
-  also when the evaluated value of (validator b-product) is true. The new rule's product
-  would be b-product."
+  "Creates a rule from attaching a product-validating function to the given
+  subrule--that is, any products of the subrule must fulfill the validator
+  function.
+  (def a (validate b validator)) says that the rule a succeeds only when b
+  succeeds and also when the evaluated value of (validator b-product) is true.
+  The new rule's product would be b-product."
   [subrule validator]
   (complex [subproduct subrule, :when (validator subproduct)]
     subproduct))
 
 (defn term
-  "Creates a rule that is a terminal rule of the given validator--that is, it accepts only
-  tokens for whom (validator token) is true.
+  "Creates a rule that is a terminal rule of the given validator--that is, it
+  accepts only tokens for whom (validator token) is true.
   (def a (term validator)) would be equivalent to the EBNF
     a = ? (validator %) evaluates to true ?;
-  The new rule's product would be the first token, if it fulfills the validator."
+  The new rule's product would be the first token, if it fulfills the
+  validator."
   [validator]
   (validate anything validator))
 
 (defn lit
-  "Creates a rule that is the terminal rule of the given literal token--that is, it accepts
-  only tokens that are equal to the given literal token.
+  "Creates a rule that is the terminal rule of the given literal token--that is,
+  it accepts only tokens that are equal to the given literal token.
   (def a (lit \"...\")) would be equivalent to the EBNF
     a = \"...\";
-  The new rule's product would be the first token, if it equals the given literal token."
+  The new rule's product would be the first token, if it equals the given
+  literal token."
   [literal-token]
   (term (partial = literal-token)))
 
 (defn re-term
-  "Creates a rule that is the terminal rule of the given regex--that is, it accepts only
-  tokens that match the given regex.
+  "Creates a rule that is the terminal rule of the given regex--that is, it
+  accepts only tokens that match the given regex.
   (def a (re-term #\"...\")) would be equivalent to the EBNF
     a = ? (re-matches #\"...\" %) evaluates to true ?;
-  The new rule's product would be the first token, if it matches the given regex."
+  The new rule's product would be the first token, if it matches the given
+  regex."
   [token-re]
   (term (partial re-matches token-re)))
 
 (defn followed-by
-  "Creates a rule that does not consume any tokens, but fails when the given subrule fails.
+  "Creates a rule that does not consume any tokens, but fails when the given
+  subrule fails.
   The new rule's product would be the subrule's product."
   [subrule]
   (complex [state get-state, subproduct subrule, _ (set-state state)]
     subproduct))
 
 (defn not-followed-by
-  "Creates a rule that does not consume any tokens, but fails when the given subrule
-  succeeds. On success, the new rule's product is always true."
+  "Creates a rule that does not consume any tokens, but fails when the given
+  subrule succeeds. On success, the new rule's product is always true."
   [subrule]
   (fn [state]
     (if (nil? (subrule state))
       [true state])))
 
 (defn semantics
-  "Creates a rule with a semantic hook: basically a simple version of a complex rule. The
-  semantic hook is a function that takes one argument: the product of the subrule."
+  "Creates a rule with a semantic hook: basically a simple version of a complex
+  rule. The semantic hook is a function that takes one argument: the product of
+  the subrule."
   [subrule semantic-hook]
   (complex [subproduct subrule]
     (semantic-hook subproduct)))
 
 (defn constant-semantics
-  "Creates a rule with a constant semantic hook. Its product is always the given constant."
+  "Creates a rule with a constant semantic hook. Its product is always the given
+  constant."
   [subrule semantic-value]
   (complex [subproduct subrule]
     semantic-value))
 
 (def
-  #^{:doc "A rule that does not consume any tokens. Its product is the very next token in
-     the remainder."}
+  #^{:doc "A rule that does not consume any tokens. Its product is the very next
+     token in the remainder."}
   remainder-peek
   (complex [remainder get-remainder]
     (first remainder)))
