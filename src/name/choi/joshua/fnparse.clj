@@ -47,6 +47,29 @@
   *remainder-setter*
   #(assoc %1 :remainder %2))
 
+(def
+  #^{:doc "The function, symbol, or other callable object that is used to access
+     the index inside a state object. In other words,
+     (*index-accessor* a-state) has to return the remainder inside a-state.
+     By default, the index-accessor is :remainder (for more information on
+     FnParse's default states, see make-state's docs). But the accessor is
+     rebindable, so that you can use different kinds of state objects in your
+     parsing application. For more information, see with-bundle's docs."}
+  *index-accessor*
+  :index)
+
+(def
+  #^{:doc "The function, symbol, or other callable object that is used to change
+     the index inside a state object. In other words,
+     (*index-setter* a-state new-index) has to return the index
+     inside a-state. By default, the index-setter is
+     #(assoc %1 :remainder %2) (for more information on FnParse's default
+     states, see make-state's docs). But it is rebindable, so that you can use
+     different kinds of state objects in your parsing application. For more
+     information on custom states, see with-bundle's docs."}
+  *index-setter*
+  #(assoc %1 :index %2))
+
 (defn *merge-info*
   "The function, symbol, or other callable object that is used to to customize
   the behavior of the merge-states function, intelligently merging one state
