@@ -28,11 +28,10 @@
   #^{:doc "The function, symbol, or other callable object that is used to access
      the remainder inside a state object. In other words,
      (*remainder-accessor* a-state) has to return the remainder inside a-state.
-     By default, the remainder-accessor is :remainder (meaning that FnParse's
-     default states are maps containing :remainder). But the accessor is
+     By default, the remainder-accessor is :remainder (for more information on
+     FnParse's default states, see make-state's docs). But the accessor is
      rebindable, so that you can use different kinds of state objects in your
-     parsing application. Myself, I usually put a struct-map accessor for
-     :remainder in here."}
+     parsing application. For more information, see with-bundle's docs."}
   *remainder-accessor*
   :remainder)
 
@@ -40,11 +39,11 @@
   #^{:doc "The function, symbol, or other callable object that is used to change
      the remainder inside a state object. In other words,
      (*remainder-setter* a-state new-remainder) has to return the remainder
-     inside a-state. By default, the remainder-accessor is
-     #(assoc %1 :remainder %2), which means that FnParse's default states are
-     maps containing :remainder. But the accessor is rebindable, so that you can
-     use different kinds of state objects in your parsing application. Myself, I
-     usually leave this variable alone."}
+     inside a-state. By default, the remainder-setter is
+     #(assoc %1 :remainder %2) (for more information on FnParse's default
+     states, see make-state's docs). But it is rebindable, so that you can use
+     different kinds of state objects in your parsing application. For more
+     information, see with-bundle's docs."}
   *remainder-setter*
   #(assoc %1 :remainder %2))
 
@@ -53,9 +52,22 @@
   merge one state with another state. In other words,
   (*merge-states* state-0 state-1) merges state-1 into state-0. By default,
   it's just the clojure.core/merge function (for more information on FnParse's
-  default states, see make-state)."
+  default states, see make-state). But it is rebindable, so that you can use
+  different kinds of state objects in your parsing application. For more
+  information, see with-bundle's docs."
   [state-0 state-1]
   (merge state-0 state-1))
+
+(def
+  #^{:doc "The function, symbol, or other callable object that is used as a
+     blank, empty state, which MUST have an empty remainder and an index of
+     zero. By default, it is {:remainder [], :index 0}. (For more information on
+     FnParse's default states, see make-state's docs).
+     But it is rebindable, so that you can use different kinds of state objects
+     in your parsing application. For more information on customizing states,
+     see with-bundle's docs."}
+  *empty-state*
+  {:remainder [], :index 0})
 
 (defmacro complex
   "Creates a complex rule in monadic form. It's a lot easier than it sounds.
