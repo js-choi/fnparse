@@ -48,6 +48,15 @@
   *remainder-setter*
   #(assoc %1 :remainder %2))
 
+(defn *merge-states*
+  "The function, symbol, or other callable object that is used to intelligently
+  merge one state with another state. In other words,
+  (*merge-states* state-0 state-1) merges state-1 into state-0. By default,
+  it's just the clojure.core/merge function (for more information on FnParse's
+  default states, see make-state)."
+  [state-0 state-1]
+  (merge state-0 state-1))
+
 (defmacro complex
   "Creates a complex rule in monadic form. It's a lot easier than it sounds.
   It's like a very useful combination of conc and semantics.
@@ -453,7 +462,11 @@
   state, with no remainder left.
   - If (rule given-state) fails, then (failure-fn given-state) is called.
   - If the remainder of (rule given-state) is not empty, then
-    (incomplete-fn given-state new-state-after-rule) is called.
+    (incomplete-fn
+      product-from-consumed-tokens
+      new-state-after-rule
+      given-state)
+    ...is called.
   - If the new remainder is empty, then the product of the rule is returned."
   [rule failure-fn incomplete-fn state-0]
   (if-let [[product state-1] (rule state-0)]
