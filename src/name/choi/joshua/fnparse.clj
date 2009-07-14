@@ -43,18 +43,23 @@
      #(assoc %1 :remainder %2) (for more information on FnParse's default
      states, see make-state's docs). But it is rebindable, so that you can use
      different kinds of state objects in your parsing application. For more
-     information, see with-bundle's docs."}
+     information on custom states, see with-bundle's docs."}
   *remainder-setter*
   #(assoc %1 :remainder %2))
 
-(defn *merge-states*
-  "The function, symbol, or other callable object that is used to intelligently
-  merge one state with another state. In other words,
-  (*merge-states* state-0 state-1) merges state-1 into state-0. By default,
-  it's just the clojure.core/merge function (for more information on FnParse's
-  default states, see make-state). But it is rebindable, so that you can use
-  different kinds of state objects in your parsing application. For more
-  information, see with-bundle's docs."
+(defn *merge-info*
+  "The function, symbol, or other callable object that is used to to customize
+  the behavior of the merge-states function, intelligently merging one state
+  with another state. In other words, (*merge-info* state-0 state-1) should
+  merge state-1's info into state-0's.
+  NOTE: You do not need to alter the (first) state's remainder or index. When
+  merge-states is called, *merge-info* is used first to merge any info, but then
+  the function merges the states' remainders and indexes for you.
+  By default, this variable just contains the clojure.core/merge function (for
+  more information on FnParse's default states, see make-state). But it is
+  rebindable, so that you can use different kinds of state objects in your
+  parsing application. (For more information on custom states, see with-bundle's
+  docs.)"
   [state-0 state-1]
   (merge state-0 state-1))
 
