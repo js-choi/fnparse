@@ -47,6 +47,19 @@
   #(assoc %1 :remainder %2))
 
 (defmacro complex
+  "Creates a complex rule in monadic form. It's a lot easier than it sounds.
+  It's like a very useful combination of conc and semantics.
+  The first argument is a vector containing binding forms à la the let and for
+  forms. The keys are new, lexically scoped variables. Their corresponding vals
+  are subrules. Each of these subrules are sequentially called as if they were
+  concatinated together with conc. If any of them fails, the whole rule
+  immediately fails.
+  Meanwhile, each sequential subrule's product is bound to its corresponding
+  variable. After all subrules match, all of the variables can be used in the
+  body.
+  The second argument of complex is a body that calculates the whole new rule's
+  product, with access to any of the variables defined in the binding vector.
+  It's basically like let, for, or any other monad. Very useful!"
   [steps & product-expr]
   `(domonad parser-m ~steps ~@product-expr))
 
