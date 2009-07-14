@@ -74,6 +74,15 @@
   *empty-state*
   {:remainder [], :index 0})
 
+(defn make-state
+  "The general function that creates a state from the given sequence of tokens.
+  It uses the overridable variables *empty-state* and *remainder-setter* to
+  create the state. (It's recommended, though, that you use a state bundle
+  instead to make things easier, along with the with-bundle form. For more
+  information, please see with-bundle's documentation.)"
+  [tokens]
+  (*remainder-setter* *empty-state* tokens))
+
 (defmacro complex
   "Creates a complex rule in monadic form. It's a lot easier than it sounds.
   It's like a very useful combination of conc and semantics.
