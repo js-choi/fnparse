@@ -21,7 +21,8 @@
     (try (parser state)
       (catch Exception e nil))))
 
-(def parser-m (state-t maybe-m))
+(def parser-m
+  (state-t maybe-m))
 
 (def
   #^{:doc "The function, symbol, or other callable object that is used to access
@@ -34,6 +35,7 @@
      :remainder in here."}
   *remainder-accessor*
   :remainder)
+
 (def
   #^{:doc "The function, symbol, or other callable object that is used to change
      the remainder inside a state object. In other words,
@@ -67,19 +69,24 @@
   #^{:doc "A rule that consumes no tokens. Its product is the entire current
      state.
      [Equivalent to the result of fetch-state from clojure.contrib.monads.]"}
-  get-state (fetch-state))
+  get-state
+  (fetch-state))
+
 (defn get-info
   "Creates a rule that consumes no tokens. The new rule's product is the value
   of the given key in the current state.
   [Equivalent to fetch-val from clojure.contrib.monads.]"
   [key]
   (fetch-val key))
+
 (def
   #^{:doc "A rule that consumes no tokens. Its product is the sequence of the
      remaining tokens.
      [Equivalent to the result of (fetch-val *remainder-accessor*) from
      clojure.contrib.monads.]"}
-  get-remainder (fetch-val *remainder-accessor*))
+  get-remainder
+  (fetch-val *remainder-accessor*))
+
 (defn set-info
   "Creates a rule that consumes no tokens. The new rule directly changes the
   current state by associating the given key with the given value. The product
@@ -87,6 +94,7 @@
   [Equivalent to set-val from clojure.contrib.monads.]"
   [key value]
   (set-val key value))
+
 (defn update-info
   "Creates a rule that consumes no tokens. The new rule changes the current
   state by associating the given key with the evaluated result of applying the
@@ -103,7 +111,8 @@
        (def a emptiness) would be equivalent to the EBNF a = ;
        This rule's product is always nil, and it therefore always returns
        [nil tokens]."}
-    emptiness (m-result nil)))
+    emptiness
+    (m-result nil)))
 
 (defn anything
   "A rule that matches anything--that is, it matches the first token of the
@@ -439,8 +448,23 @@
   (complex [subproduct subrule, subremainder get-remainder, :when (validator subremainder)]
     subproduct))
 
+(defn match-rule
+  "Creates a function that tries to completely match the given rule to the given
+  state, with no remainder left.
+  - If (rule given-state) fails, then (failure-fn given-state) is called.
+  - If the remainder of (rule given-state) is not empty, then
+    (incomplete-fn given-state new-state-after-rule) is called.
+  - If the new remainder is empty, then the product of the rule is returned."
+  [rule failure-fn incomplete-fn state-0]
+  (if-let [[product state-1] (rule state-0)]
+    (if (empty? (*remainder-accessor* state-1))
+      product
+      (incomplete-fn product state-1 state-0))
+    (failure-fn state-0)))
+
 (defn rule-match
-  "Creates a function that tries to completely match the given rule to the given state, with
+  "DEPRECATED. Use match-rule instead.
+  Creates a function that tries to completely match the given rule to the given state, with
   no remainder left.
   - If (rule given-state) fails, then (failure-fn given-state) is called.
   - If the remainder of (rule given-state) is not empty, then
@@ -452,14 +476,3 @@
       product
       (incomplete-fn state new-state))
     (failure-fn state)))
-
-(defn rule-matcher
-  "DEPRECATED: Use rule-match instead.
-  Creates a function that tries to completely match the given rule to the given state, with
-  no remainder left.
-  - If (rule given-state) fails, then (failure-fn given-state) is called.
-  - If the remainder of (rule given-state) is not empty, then
-    (incomplete-fn given-state new-state-after-rule) is called.
-  - If the new remainder is empty, then the product of the rule is returned."
-  [rule failure-fn incomplete-fn]
-  (partial rule-match rule failure-fn incomplete-fn))

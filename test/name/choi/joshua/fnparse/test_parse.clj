@@ -302,11 +302,12 @@
             p/*remainder-setter* #(identity %2)]
     (is (= ((p/lit \a) "abc") [\a (seq "bc")]))))
 
-(deftest rule-match
+(deftest match-rule
   (let [rule (p/lit "A")
-        matcher (partial p/rule-match rule identity vector)]
+        matcher (partial p/match-rule rule identity vector)]
     (is (= (matcher (make-state ["A"])) "A"))
     (is (= (matcher (make-state ["B"])) (make-state ["B"])))
-    (is (= (matcher (make-state ["A" "B"])) [(make-state ["A" "B"]) (make-state ["B"])]))))
+    (is (= (matcher (make-state ["A" "B"]))
+           ["A" (make-state ["B"]) (make-state ["A" "B"])]))))
 
 (time (run-tests))
