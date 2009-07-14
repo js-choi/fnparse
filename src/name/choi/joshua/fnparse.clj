@@ -104,7 +104,7 @@
   instead to make things easier, along with the with-bundle form. For more
   information, please see with-bundle's documentation.)"
   [tokens]
-  (*remainder-setter* *empty-state* tokens))
+  (-> *empty-state* (*remainder-setter* tokens) (*index-setter* 0)))
 
 (defmacro complex
   "Creates a complex rule in monadic form. It's a lot easier than it sounds.
