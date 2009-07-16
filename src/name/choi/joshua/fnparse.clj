@@ -80,8 +80,8 @@
   associating the given key with the evaluated result of applying the given updating
   function to the key's current value. The product is the old value of the changed key.
   [Equivalent to update-val from clojure.contrib.monads.]"
-  [key val-update-fn]
-  (update-val key val-update-fn))
+  [key val-update-fn & args]
+  (update-val key #(apply val-update-fn % args)))
 
 (with-monad parser-m
   (def
