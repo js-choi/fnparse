@@ -538,3 +538,23 @@
       product
       (incomplete-fn state new-state))
     (failure-fn state)))
+
+(defn mem
+  [subrule]
+  (let [memory (atom {})]
+    (fn [& state-0]
+      (let [remainder-0 (*remainder-accessor* state-0)]
+        (if-let [found-result (find-mem-result remainder-0)]
+          (let [found-product (found-result 0)
+                found-state (found-result 1)]
+            [found-product (merge-states state-0 found-state)])
+          (if-let [subresult (subrule
+                               (*remainder-setter* *empty-state* remainder-0))]
+            (let [index-0 (*index-accessor* state-0)
+                  subproduct (subresult 0)
+                  substate (subresult 1)
+                  subremainder (*remainder-accessor* substate)
+                  subindex (*index-accessor* substate)
+                  consumed-tokens (drop-last (- subindex index-0) remainder-0)]
+              (swap! memory assoc consumed-tokens subresult)
+              [subproduct substate])))))))
