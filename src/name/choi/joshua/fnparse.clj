@@ -106,6 +106,14 @@
   [tokens]
   (-> *empty-state* (*remainder-setter* tokens) (*index-setter* 0)))
 
+(defn merge-states
+  [state-a state-b]
+  (-> state-a
+    (*merge-info* state-b)
+    (*remainder-setter*
+      (concat (*remainder-accessor* state-a) (*remainder-accessor* state-b)))
+    (*index-setter* (*index-accessor* state-b))))
+
 (defmacro complex
   "Creates a complex rule in monadic form. It's a lot easier than it sounds.
   It's like a very useful combination of conc and semantics.
