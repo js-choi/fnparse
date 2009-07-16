@@ -70,14 +70,14 @@
   *index-setter*
   #(assoc %1 :index %2))
 
-(defn *merge-info*
+(defn *add-info*
   "The function, symbol, or other callable object that is used to to customize
-  the behavior of the merge-states function, intelligently merging one state
-  with another state. In other words, (*merge-info* state-0 state-1) should
-  merge state-1's info into state-0's.
-  NOTE: You do not need to alter the (first) state's remainder or index. When
-  merge-states is called, *merge-info* is used first to merge any info, but then
-  the function merges the states' remainders and indexes for you.
+  the behavior of the add-states function, intelligently adding one state
+  with another state. In other words, (*add-info* state-0 state-1) should
+  add state-1's info into state-0's.
+  NOTE: You do not need to alter the state's remainder or index. When
+  add-states is called, *add-info* is used first to add any info, but then
+  the function adds the states' remainders and indexes for you.
   By default, this variable just contains the clojure.core/merge function (for
   more information on FnParse's default states, see make-state). But it is
   rebindable, so that you can use different kinds of state objects in your
@@ -104,15 +104,30 @@
   instead to make things easier, along with the with-bundle form. For more
   information, please see with-bundle's documentation.)"
   [tokens]
-  (-> *empty-state* (*remainder-setter* tokens) (*index-setter* 0)))
+  (*remainder-setter* *empty-state* tokens))
 
-(defn merge-states
+(defn add-states
+  "This function is not expected to be useful for users--only the mem rule maker
+  uses it. It adds state-b into state-a. First:
+  - The two states' info are added using the overridable *add-info* function,
+    forming a new state.
+  - The remainder of the new state is changed to state-a's remainder with the
+    first few tokens dropped off. The number of tokens dropped is the 
+  - The index of the new state is changed to the sum of the indexes of state-a
+    and state-b."
   [state-a state-b]
-  (-> state-a
-    (*merge-info* state-b)
-    (*remainder-setter*
-      (concat (*remainder-accessor* state-a) (*remainder-accessor* state-b)))
-    (*index-setter* (*index-accessor* state-b))))
+;                found-state-index (*index-accessor* found-state)
+;                new-remainder (drop found-state-index remainder)
+;                new-state (-> state-0
+;                            (add-states found-state)
+;                            (*remainder-setter* new-remainder)
+;                            (*index-setter* (+ index-0 found-state-index)))]
+  (let [state-index-0 (*index-accessor* found)]
+    (-> state-a
+      (*add-info* state-b)
+      (*remainder-setter*
+        (concat (*remainder-accessor* state-a) (*remainder-accessor* state-b)))
+      (*index-setter* (*index-accessor* state-b)))))
 
 (defmacro complex
   "Creates a complex rule in monadic form. It's a lot easier than it sounds.
@@ -551,18 +566,26 @@
   [subrule]
   (let [memory (atom {})]
     (fn [& state-0]
-      (let [remainder-0 (*remainder-accessor* state-0)]
+      (let [remainder-0 (*remainder-accessor* state-0)
+            index-0 (*index-accessor* state-0)]
         (if-let [found-result (find-mem-result remainder-0)]
           (let [found-product (found-result 0)
-                found-state (found-result 1)]
-            [found-product (merge-states state-0 found-state)])
-          (if-let [subresult (subrule
-                               (*remainder-setter* *empty-state* remainder-0))]
-            (let [index-0 (*index-accessor* state-0)
-                  subproduct (subresult 0)
+                found-state (found-result 1)
+                found-state-index (*index-accessor* found-state)
+                new-remainder (drop found-state-index remainder)
+                new-state (-> state-0
+                            (add-states found-state)
+                            (*remainder-setter* new-remainder)
+                            (*index-setter* (+ index-0 found-state-index)))]
+            [found-product new-state])
+          (if-let [subresult (subrule (*remainder-setter* *empty-state*
+                                        remainder-0))]
+            (let [subproduct (subresult 0)
                   substate (subresult 1)
                   subremainder (*remainder-accessor* substate)
                   subindex (*index-accessor* substate)
-                  consumed-tokens (drop-last (- subindex index-0) remainder-0)]
-              (swap! memory assoc consumed-tokens subresult)
-              [subproduct substate])))))))
+                  consumed-tokens (drop-last (- subindex index-0) remainder-0)
+                  mem-state (*remainder-setter* substate nil)]
+              (swap! memory assoc consumed-tokens [subproduct mem-state])
+              (println "!!!" memory)
+              [subproduct new-state])))))))
