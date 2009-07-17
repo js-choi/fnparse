@@ -557,11 +557,12 @@
 (defn- starts-with? [subject-seq query-seq]
   (every? identity (map = subject-seq query-seq)))
 
-(defn find-mem-result
-  [memory query-key]
+(defn find-mem-result [memory query-key]
   (if-let [candidates (seq (filter #(starts-with? (key %) query-key) memory))]
     (if (> (count candidates) 1)
-      (raise fnparse-error ; Just in case more than one entry is found
+      ; Just in case more than one entry is found, which isn't supposed to
+      ; happen
+      (raise fnparse-error
         "found more than one entry that matches the token remainder %s: %s"
         query-key candidates)
       (val (first candidates)))))
