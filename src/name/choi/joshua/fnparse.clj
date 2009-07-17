@@ -125,8 +125,7 @@
   (let [index-b (*index-accessor* state-b)]
     (-> state-a
       (*add-info* state-b)
-      (*remainder-setter*
-        (concat (*remainder-accessor* state-a) (*remainder-accessor* state-b)))
+      (*remainder-setter* (drop index-b (*remainder-accessor* state-a)))
       (*index-setter* (+ (*index-accessor* state-a) index-b)))))
 
 (defmacro complex
