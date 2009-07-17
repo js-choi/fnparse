@@ -16,6 +16,10 @@
 ; - (2) is called the rule's State.
 ; - (3) is called the rule's Remainder.
 
+(deferror fnparse-error [] [message-template & template-args]
+  {:msg (apply format message-template template-args)
+   :unhandled (throw-msg Exception)})
+
 (defn call-parser-maybe-fn [state]
   (fn [parser]
     (try (parser state)
@@ -555,9 +559,14 @@
       (incomplete-fn state new-state))
     (failure-fn state)))
 
+(defn- starts-with? [subject-seq query-seq]
+  (every? identity (map = subject-seq query-seq)))
+
 (defn find-mem-result
   [memory query-key]
-  (some #(= (drop (count query-key) (key %)) query-key) memory))
+  (if-let [candidates (filter #(starts-with? (key %) query-key) memory)]
+    (if (> (count candidates) 0)
+      (throw (Exception. "found more than one memories with
 
 ;(defn mem
 ;  [subrule]
