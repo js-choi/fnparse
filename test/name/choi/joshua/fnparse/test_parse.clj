@@ -315,4 +315,14 @@
         state-b {:remainder nil, :index 2}]
     (is (= (p/add-states state-a state-b) {:remainder '[c d], :index 6}))))
 
+(deftest find-mem-result
+  (let [remainder-1 '[a b c d]
+        remainder-2 '[d e f]
+        remainder-3 '[a c b d]
+        memory {'[a b] 'dummy-1
+                '[d e f] 'dummy-2}]
+    (is (= (p/find-mem-result memory remainder-1) 'dummy-1))
+    (is (= (p/find-mem-result memory remainder-2) 'dummy-2))
+    (is (= (p/find-mem-result memory remainder-3) nil))))
+
 (time (run-tests))
