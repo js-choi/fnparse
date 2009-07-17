@@ -116,7 +116,13 @@
   - The index of the new state is changed to the sum of the indexes of state-a
     and state-b."
   [state-a state-b]
-  (let [state-index-0 (*index-accessor* found)]
+;                found-state-index (*index-accessor* found-state)
+;                new-remainder (drop found-state-index remainder)
+;                new-state (-> state-0
+;                            (add-states found-state)
+;                            (*remainder-setter* new-remainder)
+;                            (*index-setter* (+ index-0 found-state-index)))]
+  (let [index-a (*index-accessor* state-a)]
     (-> state-a
       (*add-info* state-b)
       (*remainder-setter*
@@ -556,30 +562,34 @@
       (incomplete-fn state new-state))
     (failure-fn state)))
 
-(defn mem
-  [subrule]
-  (let [memory (atom {})]
-    (fn [& state-0]
-      (let [remainder-0 (*remainder-accessor* state-0)
-            index-0 (*index-accessor* state-0)]
-        (if-let [found-result (find-mem-result remainder-0)]
-          (let [found-product (found-result 0)
-                found-state (found-result 1)
-                found-state-index (*index-accessor* found-state)
-                new-remainder (drop found-state-index remainder)
-                new-state (-> state-0
-                            (add-states found-state)
-                            (*remainder-setter* new-remainder)
-                            (*index-setter* (+ index-0 found-state-index)))]
-            [found-product new-state])
-          (if-let [subresult (subrule (*remainder-setter* *empty-state*
-                                        remainder-0))]
-            (let [subproduct (subresult 0)
-                  substate (subresult 1)
-                  subremainder (*remainder-accessor* substate)
-                  subindex (*index-accessor* substate)
-                  consumed-tokens (drop-last (- subindex index-0) remainder-0)
-                  mem-state (*remainder-setter* substate nil)]
-              (swap! memory assoc consumed-tokens [subproduct mem-state])
-              (println "!!!" memory)
-              [subproduct new-state])))))))
+(defn find-mem-result
+  [memory query-key]
+  (some #(%) memory)) ; TODO
+
+;(defn mem
+;  [subrule]
+;  (let [memory (atom {})]
+;    (fn [& state-0]
+;      (let [remainder-0 (*remainder-accessor* state-0)
+;            index-0 (*index-accessor* state-0)]
+;        (if-let [found-result (find-mem-result memory remainder-0)]
+;          (let [found-product (found-result 0)
+;                found-state (found-result 1)
+;                found-state-index (*index-accessor* found-state)
+;                new-remainder (drop found-state-index remainder-0)
+;                new-state (-> state-0
+;                            (add-states found-state)
+;                            (*remainder-setter* new-remainder)
+;                            (*index-setter* (+ index-0 found-state-index)))]
+;            [found-product new-state])
+;          (if-let [subresult (subrule (*remainder-setter* *empty-state*
+;                                        remainder-0))]
+;            (let [subproduct (subresult 0)
+;                  substate (subresult 1)
+;                  subremainder (*remainder-accessor* substate)
+;                  subindex (*index-accessor* substate)
+;                  consumed-tokens (drop-last (- subindex index-0) remainder-0)
+;                  mem-state (*remainder-setter* substate nil)]
+;              (swap! memory assoc consumed-tokens [subproduct mem-state])
+;              (println "!!!" memory)
+;              [subproduct new-state])))))))
