@@ -557,7 +557,7 @@
 
 (defn find-mem-result
   [memory query-key]
-  (some #(%) memory)) ; TODO
+  (some #(= (drop (count query-key) (key %)) query-key) memory))
 
 ;(defn mem
 ;  [subrule]
