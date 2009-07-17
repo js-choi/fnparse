@@ -310,4 +310,9 @@
     (is (= (matcher (make-state ["A" "B"]))
            ["A" (make-state ["B"]) (make-state ["A" "B"])]))))
 
+(deftest add-states
+  (let [state-a {:remainder '[a b c d], :index 4}
+        state-b {:remainder nil, :index 2}]
+    (is (= (add-states state-a state-b) {:remainder '[c d], :index 6}))))
+
 (time (run-tests))

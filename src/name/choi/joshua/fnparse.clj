@@ -116,12 +116,6 @@
   - The index of the new state is changed to the sum of the indexes of state-a
     and state-b."
   [state-a state-b]
-;                found-state-index (*index-accessor* found-state)
-;                new-remainder (drop found-state-index remainder)
-;                new-state (-> state-0
-;                            (add-states found-state)
-;                            (*remainder-setter* new-remainder)
-;                            (*index-setter* (+ index-0 found-state-index)))]
   (let [state-index-0 (*index-accessor* found)]
     (-> state-a
       (*add-info* state-b)
