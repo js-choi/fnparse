@@ -17,13 +17,8 @@
 ; - (3) is called the rule's Remainder.
 
 (deferror fnparse-error [] [message-template & template-args]
-  {:msg (apply format message-template template-args)
+  {:msg (str "FnParse error: " (apply format message-template template-args))
    :unhandled (throw-msg Exception)})
-
-(defn call-parser-maybe-fn [state]
-  (fn [parser]
-    (try (parser state)
-      (catch Exception e nil))))
 
 (def parser-m
   (state-t maybe-m))
@@ -564,9 +559,12 @@
 
 (defn find-mem-result
   [memory query-key]
-  (if-let [candidates (filter #(starts-with? (key %) query-key) memory)]
-    (if (> (count candidates) 0)
-      (throw (Exception. "found more than one memories with
+  (if-let [candidates (seq (filter #(starts-with? (key %) query-key) memory))]
+    (if (> (count candidates) 1)
+      (raise fnparse-error ; Just in case more than one entry is found
+        "found more than one entry that matches the token remainder %s: %s"
+        query-key candidates)
+      (val (first candidates)))))
 
 ;(defn mem
 ;  [subrule]
