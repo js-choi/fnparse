@@ -122,12 +122,12 @@
 ;                            (add-states found-state)
 ;                            (*remainder-setter* new-remainder)
 ;                            (*index-setter* (+ index-0 found-state-index)))]
-  (let [index-a (*index-accessor* state-a)]
+  (let [index-b (*index-accessor* state-b)]
     (-> state-a
       (*add-info* state-b)
       (*remainder-setter*
         (concat (*remainder-accessor* state-a) (*remainder-accessor* state-b)))
-      (*index-setter* (*index-accessor* state-b)))))
+      (*index-setter* (+ (*index-accessor* state-a) index-b)))))
 
 (defmacro complex
   "Creates a complex rule in monadic form. It's a lot easier than it sounds.
