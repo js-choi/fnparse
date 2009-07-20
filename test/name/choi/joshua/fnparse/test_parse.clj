@@ -25,15 +25,14 @@
          ['(A B C) (make-state nil 3)])
     "repeated anything rule does not create infinite loop"))
 
-;(deftest term
-;  (is (= ((p/term (partial = "true")) {:remainder ["true" "THEN"]})
-;         ["true" {:remainder (list "THEN")}])
-;      "created terminal rule works when first token fulfills validator")
-;  (is (nil? ((p/term (partial = "true")) {:remainder ["false" "THEN"]}))
-;      "created terminal rule fails when first token fails validator")
-;  (is (= ((p/term (partial = "true")) {:remainder ["true"]})
-;         ["true" {:remainder nil}])
-;      "created terminal rule works when no remainder"))
+(deftest term
+  (let [rule (p/term (partial = 'A))]
+    (is (= (rule (make-state '[A B] 0)) ['A (make-state '[B] 1)])
+      "created terminal rule works when first token fulfills validator")
+    (is (nil? (rule (make-state '[B B] 0)))
+      "created terminal rule fails when first token fails validator")
+    (is (= (rule (make-state '[A])) ["true" {:remainder nil}])
+      "created terminal rule works when no remainder")))
 ;
 ;(deftest lit
 ;  (is (= ((p/lit "true") {:remainder ["true" "THEN"]})
