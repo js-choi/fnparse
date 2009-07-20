@@ -31,7 +31,7 @@
       "created terminal rule works when first token fulfills validator")
     (is (nil? (rule (make-state '[B B] 0)))
       "created terminal rule fails when first token fails validator")
-    (is (= (rule (make-state '[A])) ["true" {:remainder nil}])
+    (is (= (rule (make-state '[A] 0)) ['A (make-state nil 1)])
       "created terminal rule works when no remainder")))
 ;
 ;(deftest lit
