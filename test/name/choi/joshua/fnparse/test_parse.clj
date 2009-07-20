@@ -12,19 +12,19 @@
 
 (deftest emptiness
   (is (= (p/emptiness (make-state '(A B C) 3))
-         [nil (make-state '(A B C) 3))
+         [nil (make-state '(A B C) 3)])
       "emptiness rule matches emptiness"))
 
-;(deftest anything
-;  (is (= (p/anything {:remainder "ABC"})
-;         [\A {:remainder (seq "BC")}])
-;    "anything rule matches first token")
-;  (is (nil? (p/anything (make-state nil)))
-;    "anything rule fails with no tokens left")
-;  (is (= ((p/rep* p/anything) (make-state "ABCD"))
-;         [(seq "ABCD") (make-state nil)])
-;    "repeated anything rule does not create infinite loop"))
-;
+(deftest anything
+  (is (= (p/anything (make-state '(A B C) 3))
+         ['A (make-state '(B C) 4)])
+    "anything rule matches first token")
+  (is (nil? (p/anything (make-state nil 0)))
+    "anything rule fails with no tokens left")
+  (is (= ((p/rep* p/anything) (make-state '(A B C) 0))
+         ['(A B C) (make-state nil 3)])
+    "repeated anything rule does not create infinite loop"))
+
 ;(deftest term
 ;  (is (= ((p/term (partial = "true")) {:remainder ["true" "THEN"]})
 ;         ["true" {:remainder (list "THEN")}])

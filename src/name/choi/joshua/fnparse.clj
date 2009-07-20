@@ -192,10 +192,12 @@
   tokens it is given.
   This rule's product is the first token it receives. It fails if there are no
   tokens left."
-;  [{tokens *remainder-accessor*, :as state}]
   [state]
   (if-let [tokens (*remainder-accessor* state)]
-    [(first tokens) (*remainder-setter* state (next tokens))]))
+    [(first tokens)
+     (-> state
+       (*remainder-setter* (next tokens))
+       (*index-setter* (inc (*index-accessor* state))))]))
 
 (defn validate
   "Creates a rule from attaching a product-validating function to the given
