@@ -55,10 +55,11 @@
          ['A (make-state '[A B C] 0)]))
   (is (nil? ((p/followed-by (p/lit 'A)) (make-state '[B C] 0)))))
 
-;(deftest not-followed-by
-;  (is (= ((p/not-followed-by (p/lit \a)) {:remainder "bcd"}) [true {:remainder "bcd"}]))
-;  (is (nil? ((p/not-followed-by (p/lit \a)) {:remainder "abc"}))))
-;
+(deftest not-followed-by
+  (is (= ((p/not-followed-by (p/lit 'A)) (make-state '[B C] 0))
+         [true (make-state '[A B C] 0)]))
+  (is (nil? ((p/not-followed-by (p/lit 'A)) (make-state '[A B C] 0)))))
+
 ;(deftest complex
 ;  (is (= ((p/complex [a (p/lit "hi")] (str a "!")) {:remainder ["hi" "THEN"]})
 ;         ["hi!" {:remainder (list "THEN")}])
