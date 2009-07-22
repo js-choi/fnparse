@@ -41,15 +41,15 @@
   (is (nil? ((p/lit 'A) (make-state '[B] 1)))
       "created literal rule fails when literal token not present"))
 
-;(deftest re-term
-;  (is (= ((p/re-term #"\s*true\s*") {:remainder ["  true" "THEN"]})
-;         ["  true" {:remainder (list "THEN")}])
-;      "created re-term rule works when first token matches regex")
-;  (is (nil? ((p/re-term #"\s*true\s*") {:remainder ["false" "THEN"]}))
-;      "created re-term rule fails when first token does not match regex")
-;  (is (nil? ((p/re-term #"\s*true\s*") {:remainder nil}))
-;      "created re-term rule fails when no tokens are left"))
-;
+(deftest re-term
+  (is (= ((p/re-term #"\s*true\s*") (make-state ["  true" "THEN"] 1))
+         ["  true" (make-state ["THEN"] 2)])
+      "created re-term rule works when first token matches regex")
+  (is (nil? ((p/re-term #"\s*true\s*") (make-state ["false" "THEN"] 1)))
+      "created re-term rule fails when first token does not match regex")
+  (is (nil? ((p/re-term #"\s*true\s*") (make-state nil 1)))
+      "created re-term rule fails when no tokens are left"))
+
 ;(deftest followed-by
 ;  (is (= ((p/followed-by (p/lit \a)) {:remainder "abc"}) [\a {:remainder "abc"}]))
 ;  (is (nil? ((p/followed-by (p/lit \a)) {:remainder "bcd"}))))
