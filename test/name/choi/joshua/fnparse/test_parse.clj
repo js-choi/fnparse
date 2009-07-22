@@ -50,10 +50,11 @@
   (is (nil? ((p/re-term #"\s*true\s*") (make-state nil 1)))
       "created re-term rule fails when no tokens are left"))
 
-;(deftest followed-by
-;  (is (= ((p/followed-by (p/lit \a)) {:remainder "abc"}) [\a {:remainder "abc"}]))
-;  (is (nil? ((p/followed-by (p/lit \a)) {:remainder "bcd"}))))
-;
+(deftest followed-by
+  (is (= ((p/followed-by (p/lit 'A)) (make-state '[A B C] 0))
+         ['A (make-state '[A B C] 0)]))
+  (is (nil? ((p/followed-by (p/lit 'A)) (make-state '[B C] 0)))))
+
 ;(deftest not-followed-by
 ;  (is (= ((p/not-followed-by (p/lit \a)) {:remainder "bcd"}) [true {:remainder "bcd"}]))
 ;  (is (nil? ((p/not-followed-by (p/lit \a)) {:remainder "abc"}))))
