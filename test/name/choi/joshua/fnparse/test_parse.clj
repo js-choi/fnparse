@@ -33,14 +33,14 @@
       "created terminal rule fails when first token fails validator")
     (is (= (rule (make-state '[A] 0)) ['A (make-state nil 1)])
       "created terminal rule works when no remainder")))
-;
-;(deftest lit
-;  (is (= ((p/lit "true") {:remainder ["true" "THEN"]})
-;         ["true" {:remainder (list "THEN")}])
-;      "created literal rule works when literal token present")
-;  (is (nil? ((p/lit "true") {:remainder ["false" "THEN"]}))
-;      "created literal rule fails when literal token not present"))
-;
+
+(deftest lit
+  (is (= ((p/lit 'A) (make-state '[A B] 1))
+         ['A (make-state '[B] 2)])
+      "created literal rule works when literal token present")
+  (is (nil? ((p/lit 'A) (make-state '[B] 1)))
+      "created literal rule fails when literal token not present"))
+
 ;(deftest re-term
 ;  (is (= ((p/re-term #"\s*true\s*") {:remainder ["  true" "THEN"]})
 ;         ["  true" {:remainder (list "THEN")}])
