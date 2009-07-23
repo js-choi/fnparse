@@ -57,26 +57,21 @@
 
 (deftest not-followed-by
   (is (= ((p/not-followed-by (p/lit 'A)) (make-state '[B C] 0))
-         [true (make-state '[A B C] 0)]))
+         [true (make-state '[B C] 0)]))
   (is (nil? ((p/not-followed-by (p/lit 'A)) (make-state '[A B C] 0)))))
 
-;(deftest complex
-;  (is (= ((p/complex [a (p/lit "hi")] (str a "!")) {:remainder ["hi" "THEN"]})
-;         ["hi!" {:remainder (list "THEN")}])
-;      "created complex rule applies semantic hook to valid result of given rule")
-;  (is (nil? ((p/complex [a (p/lit "hi")] (str a \!)) {:remainder ["RST"]}))
-;      "created complex rule fails when a given subrule fails")
-;  (is (= ((p/complex [a (p/lit "hi")] (str a \!)) {:remainder ["hi" "THEN"], :a "hi"})
-;         ["hi!" {:remainder (list "THEN"), :a "hi"}])
-;      "created complex rule passes rest of state to subrule")
-;  (is (= ((p/complex [a (p/lit "hi") b (p/lit "THEN")] [(str a "!") b])
-;          {:remainder ["hi" "THEN" "bye"]})
-;         [["hi!" "THEN"] {:remainder (list "bye")}])
-;      "created complex rule succeeds when all subrules fulfilled in order")
-;  (is (nil? ((p/complex [a (p/lit "hi") b (p/lit "THEN")] [(str a "!") b])
-;          {:remainder ["hi" "bye" "boom"]}))
-;      "created complex rule fails when one subrule fails"))
-;
+(deftest complex
+  (let [rule1 (p/complex [a (p/lit 'A)] (str a "!"))
+        rule2 (p/complex [a (p/lit 'A), b (p/lit 'B)] (str a "!" b))]
+    (is (= (rule1 (make-state '[A B] 1)) ["A!" (make-state '[B] 2)])
+      "created complex rule applies semantic hook to valid subresult")
+    (is (nil? (rule1 (make-state '[B A] 1)))
+      "created complex rule fails when a given subrule fails")
+    (is (= (rule2 (make-state '[A B C] 1)) ["A!B" (make-state '[C] 3)])
+      "created complex rule succeeds when all subrules fulfilled in order")
+    (is (nil? (rule2 (make-state '[A C] 1)))
+      "created complex rule fails when one subrule fails")))
+
 ;(deftest semantics
 ;  (is (= ((p/semantics (p/lit "hi") #(str % "!")) {:remainder ["hi" "THEN"]})
 ;         ["hi!" {:remainder (list "THEN")}])
