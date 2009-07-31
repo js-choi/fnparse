@@ -591,7 +591,7 @@
                             (add-states found-state)
                             (*remainder-setter* new-remainder)
                             (*index-setter* (+ index-0 found-state-index)))]
-            (println "> memory found" [found-product found-state])
+            ; (println "> memory found" [found-product found-state])
             [found-product new-state])
           (if-let [subresult (subrule (*remainder-setter* *empty-state*
                                         remainder-0))]
@@ -602,7 +602,7 @@
                   consumed-tokens (take subindex remainder-0)
                   mem-state (*remainder-setter* substate nil)
                   returned-state (add-states state-0 mem-state)]
-               (println "> memory registered" consumed-tokens [consumed-tokens mem-state])
+              ; (println "> memory registered" consumed-tokens [consumed-tokens mem-state])
               (swap! memory assoc consumed-tokens [subproduct mem-state])
-              (println "> memory " memory)
+              ; (println "> memory " memory)
               [subproduct returned-state])))))))
