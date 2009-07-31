@@ -328,6 +328,11 @@
 
 (deftest mem
   (let [rule (p/mem (p/alt (p/conc (p/lit 'a) (p/lit 'b)) (p/lit 'c)))]
-    (is (= (rule (make-state '[a b c] 2)) ['[a b] (make-state '[c] 4)]))))
+    (is (= (rule (make-state '[a b c] 2)) ['[a b] (make-state '[c] 4)]))
+    (is (= (rule (make-state '[a b c] 7)) ['[a b] (make-state '[c] 9)]))
+    (is (= (rule (make-state '[c s a] 1)) ['c (make-state '[s a] 2)]))
+    (is (= (rule (make-state '[c] 7)) ['c (make-state [] 8)]))
+    (is (nil? (rule (make-state '[s a] 7))))
+    (is (nil? (rule (make-state '[s a] 2))))))
 
 (time (run-tests))
