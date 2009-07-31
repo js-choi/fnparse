@@ -579,7 +579,7 @@
 (defn mem
   [subrule]
   (let [memory (atom {})]
-    (fn [& state-0]
+    (fn [state-0]
       (let [remainder-0 (*remainder-accessor* state-0)
             index-0 (*index-accessor* state-0)]
         (if-let [found-result (find-mem-result @memory remainder-0)]
