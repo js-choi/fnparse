@@ -46,28 +46,34 @@
   *remainder-setter*
   #(assoc %1 :remainder %2))
 
-(def
-  #^{:doc "The function, symbol, or other callable object that is used to access
-     the index inside a state object. In other words,
-     (*index-accessor* a-state) has to return the remainder inside a-state.
-     By default, the index-accessor is :remainder (for more information on
-     FnParse's default states, see make-state's docs). But the accessor is
-     rebindable, so that you can use different kinds of state objects in your
-     parsing application. For more information, see with-bundle's docs."}
-  *index-accessor*
-  :index)
+(defn *index-accessor*
+  "The function, symbol, or other callable object that is used to access
+   the index inside a state object. In other words,
+   (*index-accessor* a-state) has to return the remainder inside a-state.
+   By default, the index-accessor returns (:index a-state) unless
+   (:index a-state) is nil--for backwards compatibility, it then returns zero.
+   (For more information on FnParse's default states, see make-state's docs.)
+   But the accessor is rebindable, so that you can use different kinds of
+   state objects in your parsing application. For more information, see
+   with-bundle's docs."
+  [a-state]
+  (or (:index a-state) 0))
 
-(def
-  #^{:doc "The function, symbol, or other callable object that is used to change
-     the index inside a state object. In other words,
-     (*index-setter* a-state new-index) has to return the index
-     inside a-state. By default, the index-setter is
-     #(assoc %1 :remainder %2) (for more information on FnParse's default
-     states, see make-state's docs). But it is rebindable, so that you can use
-     different kinds of state objects in your parsing application. For more
-     information on custom states, see with-bundle's docs."}
-  *index-setter*
-  #(assoc %1 :index %2))
+(defn *index-setter*
+  "The function, symbol, or other callable object that is used to change
+   the index inside a state object. In other words,
+   (*index-setter* a-state new-index) has to return the index
+   inside a-state. By default, the index-setter is a function that calls
+   (assoc a-state :index new-index) if (:index a-state) is a true value, and
+   a-state otherwise. (This is for backwards compatibility for before FnParse
+   FnParse 2.5.) is (for more information on FnParse's default
+   states, see make-state's docs). But it is rebindable, so that you can use
+   different kinds of state objects in your parsing application. For more
+   information on custom states, see with-bundle's docs."
+  [a-state new-index]
+  (if (:index a-state)
+    (assoc a-state :index new-index)
+    a-state))
 
 (defn *add-info*
   "The function, symbol, or other callable object that is used to to customize
