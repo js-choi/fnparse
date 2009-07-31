@@ -120,8 +120,8 @@
         "created alternatives rule fails when no valid rule product present")))
 
 (deftest update-info
-  (is (= ((p/update-info :column inc) (make-state [\a] 3))
-         [3 (make-state [\a] 4)])))
+  (is (= ((p/update-info :column inc) (make-state [\a] nil 3))
+         [3 (make-state [\a] nil 4)])))
 
 (deftest invisi-conc
   (is (= ((p/invisi-conc (p/lit \a) (p/update-info :column inc))
