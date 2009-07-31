@@ -598,9 +598,10 @@
                   substate (subresult 1)
                   subremainder (*remainder-accessor* substate)
                   subindex (*index-accessor* substate)
-                  consumed-tokens (drop-last (- subindex index-0) remainder-0)
+                  consumed-tokens (take subindex remainder-0)
                   mem-state (*remainder-setter* substate nil)
                   returned-state (add-states state-0 mem-state)]
+              (println "!!" subindex index-0 consumed-tokens)
               (swap! memory assoc consumed-tokens [subproduct mem-state])
               (println "!!!" memory)
               [subproduct returned-state])))))))
