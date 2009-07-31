@@ -565,8 +565,9 @@
 (defn- starts-with? [subject-seq query-seq]
   (every? identity (map = subject-seq query-seq)))
 
-(defn find-mem-result [memory query-key]
-  (if-let [candidates (seq (filter #(starts-with? (key %) query-key) memory))]
+(defn find-mem-result [memory-map query-key]
+  (if-let [candidates (seq (filter #(starts-with? (key %) query-key)
+                             memory-map))]
     (if (> (count candidates) 1)
       ; Just in case more than one entry is found, which isn't supposed to
       ; happen
@@ -575,30 +576,31 @@
         query-key candidates)
       (val (first candidates)))))
 
-;(defn mem
-;  [subrule]
-;  (let [memory (atom {})]
-;    (fn [& state-0]
-;      (let [remainder-0 (*remainder-accessor* state-0)
-;            index-0 (*index-accessor* state-0)]
-;        (if-let [found-result (find-mem-result memory remainder-0)]
-;          (let [found-product (found-result 0)
-;                found-state (found-result 1)
-;                found-state-index (*index-accessor* found-state)
-;                new-remainder (drop found-state-index remainder-0)
-;                new-state (-> state-0
-;                            (add-states found-state)
-;                            (*remainder-setter* new-remainder)
-;                            (*index-setter* (+ index-0 found-state-index)))]
-;            [found-product new-state])
-;          (if-let [subresult (subrule (*remainder-setter* *empty-state*
-;                                        remainder-0))]
-;            (let [subproduct (subresult 0)
-;                  substate (subresult 1)
-;                  subremainder (*remainder-accessor* substate)
-;                  subindex (*index-accessor* substate)
-;                  consumed-tokens (drop-last (- subindex index-0) remainder-0)
-;                  mem-state (*remainder-setter* substate nil)]
-;              (swap! memory assoc consumed-tokens [subproduct mem-state])
-;              (println "!!!" memory)
-;              [subproduct new-state])))))))
+(defn mem
+  [subrule]
+  (let [memory (atom {})]
+    (fn [& state-0]
+      (let [remainder-0 (*remainder-accessor* state-0)
+            index-0 (*index-accessor* state-0)]
+        (if-let [found-result (find-mem-result @memory remainder-0)]
+          (let [found-product (found-result 0)
+                found-state (found-result 1)
+                found-state-index (*index-accessor* found-state)
+                new-remainder (drop found-state-index remainder-0)
+                new-state (-> state-0
+                            (add-states found-state)
+                            (*remainder-setter* new-remainder)
+                            (*index-setter* (+ index-0 found-state-index)))]
+            [found-product new-state])
+          (if-let [subresult (subrule (*remainder-setter* *empty-state*
+                                        remainder-0))]
+            (let [subproduct (subresult 0)
+                  substate (subresult 1)
+                  subremainder (*remainder-accessor* substate)
+                  subindex (*index-accessor* substate)
+                  consumed-tokens (drop-last (- subindex index-0) remainder-0)
+                  mem-state (*remainder-setter* substate nil)
+                  returned-state (add-states state-0 mem-state)]
+              (swap! memory assoc consumed-tokens [subproduct mem-state])
+              (println "!!!" memory)
+              [subproduct returned-state])))))))

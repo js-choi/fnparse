@@ -327,7 +327,7 @@
     (is (= (p/find-mem-result memory remainder-3) nil))))
 
 (deftest mem
-  (let [rule (mem (alt (conc (lit 'a) (lit 'b)) (lit 'c)))]
-    (is (= (rule (make-state '[a b c] 2)) ['a (make-state '[b c] 3)]))))
+  (let [rule (p/mem (p/alt (p/conc (p/lit 'a) (p/lit 'b)) (p/lit 'c)))]
+    (is (= (rule (make-state '[a b c] 2)) ['[a b] (make-state '[c] 4)]))))
 
 (time (run-tests))
