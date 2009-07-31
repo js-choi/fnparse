@@ -124,16 +124,18 @@
          [3 (make-state [\a] 4)])))
 
 (deftest invisi-conc
-  (is (= ((p/invisi-conc (p/lit \a) (p/update-info :column inc)) (make-state "abc" 3))
-         [\a (make-state (seq "bc") 4)])))
+  (is (= ((p/invisi-conc (p/lit \a) (p/update-info :column inc))
+          (make-state "abc" nil 3))
+         [\a (make-state (seq "bc") nil 4)])))
 
 (deftest lit-conc-seq
   (is (= ((p/lit-conc-seq "THEN") {:remainder "THEN print 42;"})
          [(vec "THEN") {:remainder (seq " print 42;")}])
       "created literal-sequence rule is based on sequence of given token sequencible")
-  (is (= ((p/lit-conc-seq "THEN" (fn [lit-token]
-                                     (p/invisi-conc (p/lit lit-token)
-                                                    (p/update-info :column inc))))
+  (is (= ((p/lit-conc-seq "THEN"
+            (fn [lit-token]
+              (p/invisi-conc (p/lit lit-token)
+                (p/update-info :column inc))))
           {:remainder "THEN print 42;", :column 1})
          [(vec "THEN") {:remainder (seq " print 42;"), :column 5}])
       "created literal-sequence rule uses given rule-maker"))
