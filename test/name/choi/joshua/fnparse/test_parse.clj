@@ -335,4 +335,15 @@
     (is (nil? (rule (make-state '[s a] 7))))
     (is (nil? (rule (make-state '[s a] 2))))))
 
+(deftest with-bundle
+  (let [my-state-s (create-struct :remainder :index)
+        my-bundle {:remainder-accessor (accessor my-state-s :remainder)
+                   :remainder-setter #(assoc %1 :remainder %2)
+                   :index-accessor (accessor my-state-s :index)
+                   :index-setter #(assoc %1 :index %2)
+                   :add-info identity}]
+    (p/with-bundle my-bundle
+      (is (= (p/anything (p/make-state '[a b c]))
+             ['a (struct my-state-s '[b c] 1)])))))
+
 (time (run-tests))
