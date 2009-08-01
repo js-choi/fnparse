@@ -606,3 +606,12 @@
               (swap! memory assoc consumed-tokens [subproduct mem-state])
               ; (println "> memory " memory)
               [subproduct returned-state])))))))
+
+(defmacro with-bundle
+  [bundle & forms]
+  `(binding [*remainder-accessor* (:remainder-accessor bundle)
+             *remainder-setter* (:remainder-setter bundle)
+             *index-accessor* (:index-accessor bundle)
+             *index-setter* (:index-setter bundle)
+             *add-info* (:add-info bundle)]
+     `@forms))

@@ -341,9 +341,10 @@
                    :remainder-setter #(assoc %1 :remainder %2)
                    :index-accessor (accessor my-state-s :index)
                    :index-setter #(assoc %1 :index %2)
-                   :add-info identity}]
+                   :add-info identity}
+        my-rule (p/opt p/anything)]
     (p/with-bundle my-bundle
-      (is (= (p/anything (p/make-state '[a b c]))
+      (is (= (my-rule (p/make-state '[a b c]))
              ['a (struct my-state-s '[b c] 1)])))))
 
 (time (run-tests))
