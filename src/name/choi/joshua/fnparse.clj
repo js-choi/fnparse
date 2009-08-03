@@ -607,6 +607,17 @@
               ; (println "> memory " memory)
               [subproduct returned-state])))))))
 
+(def bundle-keys
+  '{*remainder-accessor* :remainder-accessor
+    *remainder-setter* :remainder-setter
+    *index-accessor* :index-accessor
+    *index-setter* :index-setter
+    *add-info* :add-info})
+
+(defn interpolate-bundle
+  [bundle]
+  (mapcat #(vector (key %) (val %))))
+
 (defmacro with-bundle
   [bundle & forms]
   `(binding [*remainder-accessor* (:remainder-accessor bundle)
