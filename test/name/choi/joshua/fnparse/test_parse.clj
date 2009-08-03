@@ -335,11 +335,11 @@
     (is (nil? (rule (make-state '[s a] 7))))
     (is (nil? (rule (make-state '[s a] 2))))))
 
-(deftest interpolate-bundle
+(deftest convert-bundle
   (let [my-bundle {:remainder-accessor :remainder
                    :index-accessor :index
                    :add-info identity}]
-    (is (= (p/interpolate-bundle my-bundle)
+    (is (= (p/convert-bundle my-bundle)
            ['*remainder-accessor* :remainder
             '*index-accessor* :index
             '*add-info* identity]))))

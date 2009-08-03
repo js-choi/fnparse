@@ -614,9 +614,9 @@
     *index-setter* :index-setter
     *add-info* :add-info})
 
-(defn interpolate-bundle
+(defn convert-bundle
   [bundle]
-  (mapcat #(vector (key %) (val %))))
+  (mapcat #(vector (symbol (str "*" (name (key %)) "*")) (val %)) bundle))
 
 (defmacro with-bundle
   [bundle & forms]
