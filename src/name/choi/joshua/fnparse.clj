@@ -619,11 +619,12 @@
   (into {} (map #(vector (symbol (str "*" (name (key %)) "*")) (val %))
                 bundle)))
 
-(defn- with-bundle-fn [var-map & procedure]
-  (clojure.lang.Var/pushThreadBindings var-map)
+(defn with-bundle-fn [bundle & procedure]
+  (println ">>>>" (convert-bundle bundle))
+  (clojure.lang.Var/pushThreadBindings (convert-bundle bundle))
   (try (procedure)
     (clojure.lang.Var/popThreadBindings)))
 
 (defmacro with-bundle
   [bundle & body]
-  `(with-bundle-fn ~(convert-bundle bundle) (fn [] ~@body)))
+  `(with-bundle-fn ~bundle (fn [] ~@body)))
