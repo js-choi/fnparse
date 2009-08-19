@@ -344,14 +344,13 @@
             '*index-accessor* :index
             '*add-info* identity]))))
 
-;(deftest with-bundle
-;  (let [my-state-s (create-struct :remainder :index)
-;        my-bundle {:remainder-accessor (accessor my-state-s :remainder)
-;                   :remainder-setter #(assoc %1 :remainder %2)
-;                   :index-accessor (accessor my-state-s :index)
-;                   :index-setter #(assoc %1 :index %2)
-;                   :add-info identity}
-;        my-rule (p/opt p/anything)]
+(deftest with-bundle
+  (let [my-state-s (create-struct :remainder :index)
+        my-bundle {:remainder-accessor (accessor my-state-s :remainder)
+                   :index-accessor (accessor my-state-s :index)
+                   :add-info identity}
+        my-rule (p/opt p/anything)]
+    (println ">>" (macroexpand-1 '(p/with-bundle {:a :a} 55)))))
 ;    (p/with-bundle my-bundle
 ;      (is (= (my-rule (p/make-state '[a b c]))
 ;             ['a (struct my-state-s '[b c] 1)])))))

@@ -618,11 +618,11 @@
   [bundle]
   (mapcat #(vector (symbol (str "*" (name (key %)) "*")) (val %)) bundle))
 
+(defn- with-bundle-fn [var-map & procedure]
+  (clojure.lang.Var/pushThreadBindings var-map)
+  (try (procedure)
+    (clojure.lang.Var/popThreadBindings)))
+
 (defmacro with-bundle
-  [bundle & forms]
-  `(binding [*remainder-accessor* (:remainder-accessor bundle)
-             *remainder-setter* (:remainder-setter bundle)
-             *index-accessor* (:index-accessor bundle)
-             *index-setter* (:index-setter bundle)
-             *add-info* (:add-info bundle)]
-     `@forms))
+  [bundle & body]
+  `(with-bundle-fn ~(convert-bundle bundle) (fn [] ~@body)))
