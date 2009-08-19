@@ -616,7 +616,8 @@
 
 (defn convert-bundle
   [bundle]
-  (mapcat #(vector (symbol (str "*" (name (key %)) "*")) (val %)) bundle))
+  (into {} (map #(vector (symbol (str "*" (name (key %)) "*")) (val %))
+                bundle)))
 
 (defn- with-bundle-fn [var-map & procedure]
   (clojure.lang.Var/pushThreadBindings var-map)
