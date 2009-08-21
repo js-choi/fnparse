@@ -681,8 +681,20 @@
                      :line (+ line0 line1)
                      :column column1))))})
 
-(defn inc-column [subrule]
+(defn inc-column
+  "Meant to be used only with standard-bundle states, or other states with an
+  integer :column val.
+
+  Creates a new rule that calls the subrule, and then increments the column.
+  Meant to be called on literal rules of one non-break character."
+  [subrule]
   (invisi-conc subrule (update-info :column inc)))
 
-(defn inc-line [subrule]
+(defn inc-line
+  "Meant to be used only with standard-bundle states, or other states with an
+  integer :column val and an integer :line val.
+
+  Creates a new rule that calls the subrule, and then increments the line and
+  sets the column to zero."
+  [subrule]
   (invisi-conc subrule (update-info :line inc) (set-info :column 0)))
