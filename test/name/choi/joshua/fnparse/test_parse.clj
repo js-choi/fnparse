@@ -346,13 +346,15 @@
 
 (deftest with-bundle
   (let [my-state-s (create-struct :remainder :index)
-        my-bundle {:remainder-accessor (accessor my-state-s :remainder)
+        my-bundle {:empty-state (struct my-state-s [] 0)
+                   :remainder-accessor (accessor my-state-s :remainder)
                    :index-accessor (accessor my-state-s :index)
                    :add-info identity}
         my-rule (p/opt p/anything)]
-    (println ">>" (macroexpand-1 '(p/with-bundle my-bundle 55)))))
-;    (p/with-bundle my-bundle
-;      (is (= (my-rule (p/make-state '[a b c]))
-;             ['a (struct my-state-s '[b c] 1)])))))
+;    (println ">>" (macroexpand-1 '(p/with-bundle my-bundle 55)))))
+    (p/with-bundle my-bundle
+      (println "$$$$$$>" (identity (p/make-state [])))
+      (is (= (my-rule (p/make-state '[a b c]))
+             ['a (struct my-state-s '[b c] 1)])))))
 
 (time (run-tests))

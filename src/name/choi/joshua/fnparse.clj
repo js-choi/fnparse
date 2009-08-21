@@ -608,7 +608,8 @@
               [subproduct returned-state])))))))
 
 (def bundle-keys
-  {:remainder-accessor #'*remainder-accessor*
+  {:empty-state #'*empty-state*
+   :remainder-accessor #'*remainder-accessor*
    :remainder-setter #'*remainder-setter*
    :index-accessor #'*index-accessor*
    :index-setter #'*index-setter*
@@ -619,7 +620,7 @@
   (into {} (map #(vector (-> % key bundle-keys) (val %))
                 bundle)))
 
-(defn with-bundle-fn [bundle & procedure]
+(defn with-bundle-fn [bundle procedure]
   (println ">>>>" (convert-bundle bundle))
   (clojure.lang.Var/pushThreadBindings (convert-bundle bundle))
   (try (procedure)
