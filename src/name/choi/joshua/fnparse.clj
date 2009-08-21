@@ -577,6 +577,18 @@
       (val (first candidates)))))
 
 (defn mem
+  "Creates a memoizing rule that caches its subrule's results in an atom.
+  Whenever the new mem rule is called, it checks the cache to see if there is an
+  existing match; otherwise, the subrule is called.
+
+  mem REQUIRES that the given state contain an index, accessible with
+  *index-accessor* and setable with *index-setter*. mem also requires that ALL
+  rules within the subrule increment the index as each token is consumed. This
+  is normally not a problem, as all of FnParse's rule makers create rules that
+  do this.
+
+  For more information on indexes, check out
+  http://wiki.github.com/joshua-choi/fnparse/on-states."
   [subrule]
   (let [memory (atom {})]
     (fn [state-0]
