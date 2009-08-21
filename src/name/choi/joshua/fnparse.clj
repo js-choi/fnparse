@@ -79,7 +79,8 @@
   "The function, symbol, or other callable object that is used to to customize
   the behavior of the add-states function, intelligently adding one state
   with another state. In other words, (*add-info* state-0 state-1) should
-  add state-1's info into state-0's.
+  add state-1's info into state-0's. For more info, see
+  http://github.com/joshua-choi/fnparse/wikis/on-states.
   NOTE: You do not need to alter the state's remainder or index. When
   add-states is called, *add-info* is used first to add any info, but then
   the function adds the states' remainders and indexes for you.
@@ -654,3 +655,34 @@
   http://wiki.github.com/joshua-choi/fnparse/on-bundles."
   [bundle & body]
   `(with-bundle-fn ~bundle (fn [] ~@body)))
+
+(defstruct minimal-s :remainder :index)
+(defstruct standard-s :remainder :index :line :column)
+(def standard-line-a (accessor standard-s :line))
+(def standard-column-a (accessor standard-s :column))
+
+(def minimal-bundle
+  {:empty-state (struct minimal-s [] 0)
+   :remainder-accessor (accessor minimal-s :remainder)
+   :index-accessor (accessor minimal-s :index)
+   :add-info #'*add-info*})
+
+(def standard-bundle
+  {:empty-state (struct standard-s [] 0 0 0)
+   :remainder-accessor (accessor standard-s :remainder)
+   :index-accessor (accessor standard-s :index)
+   :add-info (fn [s0 s1]
+               (let [line0 (standard-line-a s0)
+                     line1 (standard-line-a s1)
+                     column1 (standard-column-a s1)]
+                 (if (zero? line1)
+                   (assoc s0 :column (+ (standard-column-a s0) column1))
+                   (assoc s0
+                     :line (+ line0 line1)
+                     :column column1))))})
+
+(def inc-column
+  (update-info :column inc))
+
+(def inc-line
+  (conc (update-info :line inc) (set-info :column 0)))

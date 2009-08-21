@@ -357,4 +357,12 @@
       (is (= (my-rule (p/make-state '[a b c]))
              ['a (struct my-state-s '[b c] 1)])))))
 
+(deftest standard-inc-line-and-column-and-mem
+  (p/with-bundle p/standard-bundle
+  (let [a-rule (p/inc-column (p/lit 'a))
+        b-rule (p/inc-line (p/lit 'n))
+        mem-rule (p/mem (p/alt a-rule b-rule a-rule) a-rule)]
+    (is (= (rule (make-state '[a n a b] 3 2 5))
+           ['[a n a] (make-state '[b] 6 3 4)])))))
+
 (time (run-tests))
