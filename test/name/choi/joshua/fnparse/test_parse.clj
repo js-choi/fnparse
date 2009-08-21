@@ -361,8 +361,10 @@
   (p/with-bundle p/standard-bundle
   (let [a-rule (p/inc-column (p/lit 'a))
         b-rule (p/inc-line (p/lit 'n))
-        mem-rule (p/mem (p/alt a-rule b-rule a-rule) a-rule)]
-    (is (= (rule (make-state '[a n a b] 3 2 5))
-           ['[a n a] (make-state '[b] 6 3 4)])))))
+        mem-rule (p/mem (p/alt (p/conc a-rule b-rule a-rule) a-rule))]
+    (is (= (mem-rule (struct p/standard-s '[a n a b] 3 2 5))
+           ['[a n a] (struct p/standard-s '[b] 6 3 1)]))
+    (is (= (mem-rule (struct p/standard-s '[a n a b] 3 2 5))
+           ['[a n a] (struct p/standard-s '[b] 6 3 1)])))))
 
 (time (run-tests))

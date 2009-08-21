@@ -681,8 +681,8 @@
                      :line (+ line0 line1)
                      :column column1))))})
 
-(def inc-column
-  (update-info :column inc))
+(defn inc-column [subrule]
+  (invisi-conc subrule (update-info :column inc)))
 
-(def inc-line
-  (conc (update-info :line inc) (set-info :column 0)))
+(defn inc-line [subrule]
+  (invisi-conc subrule (update-info :line inc) (set-info :column 0)))
