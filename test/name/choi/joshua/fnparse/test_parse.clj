@@ -338,11 +338,13 @@
 (deftest convert-bundle
   (let [my-bundle {:remainder-accessor :remainder
                    :index-accessor :index
-                   :add-info identity}]
+                   :add-info identity}
+        invalid-bundle {:a :arst}]
     (is (= (p/convert-bundle my-bundle)
            {#'p/*remainder-accessor* :remainder
             #'p/*index-accessor* :index
-            #'p/*add-info* identity}))))
+            #'p/*add-info* identity}))
+    (is (thrown? Exception (p/convert-bundle invalid-bundle)))))
 
 (deftest with-bundle
   (let [my-state-s (create-struct :remainder :index)
@@ -351,9 +353,7 @@
                    :index-accessor (accessor my-state-s :index)
                    :add-info identity}
         my-rule (p/opt p/anything)]
-;    (println ">>" (macroexpand-1 '(p/with-bundle my-bundle 55)))))
     (p/with-bundle my-bundle
-      (println "$$$$$$>" (identity (p/make-state [])))
       (is (= (my-rule (p/make-state '[a b c]))
              ['a (struct my-state-s '[b c] 1)])))))
 

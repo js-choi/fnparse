@@ -615,17 +615,30 @@
    :index-setter #'*index-setter*
    :add-info #'*add-info*})
 
+(defn- get-bundle-val [bundle-key]
+  (or (bundle-keys bundle-key)
+      (throw-arg "invalid bundle key %s given" bundle-key)))
+
 (defn convert-bundle
   [bundle]
-  (into {} (map #(vector (-> % key bundle-keys) (val %))
+  (into {} (map #(vector (-> % key get-bundle-val) (val %))
                 bundle)))
 
 (defn with-bundle-fn [bundle procedure]
-  (println ">>>>" (convert-bundle bundle))
   (clojure.lang.Var/pushThreadBindings (convert-bundle bundle))
   (try (procedure)
     (clojure.lang.Var/popThreadBindings)))
 
 (defmacro with-bundle
+  "Creates a binding context where the vals of the given bundle is bound to
+  FnParse's various overridable variables to customize state.
+
+  A bundle is a map with any but only the keywords with the names of FnParse's
+  overridable variables: :empty-state, :remainder-accessor, :remainder-setter,
+  :index-accessor, :index-setter, :add-info.
+
+  FnParse comes with a default bundle (no bundle at all), a standard bundle
+  for regular use with text, and a minimal bundle. For more information, see
+  http://wiki.github.com/joshua-choi/fnparse/on-bundles."
   [bundle & body]
   `(with-bundle-fn ~bundle (fn [] ~@body)))
