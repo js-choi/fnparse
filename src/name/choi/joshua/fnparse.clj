@@ -608,15 +608,15 @@
               [subproduct returned-state])))))))
 
 (def bundle-keys
-  '{*remainder-accessor* :remainder-accessor
-    *remainder-setter* :remainder-setter
-    *index-accessor* :index-accessor
-    *index-setter* :index-setter
-    *add-info* :add-info})
+  {:remainder-accessor #'*remainder-accessor*
+   :remainder-setter #'*remainder-setter*
+   :index-accessor #'*index-accessor*
+   :index-setter #'*index-setter*
+   :add-info #'*add-info*})
 
 (defn convert-bundle
   [bundle]
-  (into {} (map #(vector (symbol (str "*" (name (key %)) "*")) (val %))
+  (into {} (map #(vector (-> % key bundle-keys) (val %))
                 bundle)))
 
 (defn with-bundle-fn [bundle & procedure]

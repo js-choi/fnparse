@@ -340,9 +340,9 @@
                    :index-accessor :index
                    :add-info identity}]
     (is (= (p/convert-bundle my-bundle)
-           {#'*remainder-accessor* :remainder
-            #'*index-accessor* :index
-            #'*add-info* identity}))))
+           {#'p/*remainder-accessor* :remainder
+            #'p/*index-accessor* :index
+            #'p/*add-info* identity}))))
 
 (deftest with-bundle
   (let [my-state-s (create-struct :remainder :index)
