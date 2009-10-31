@@ -298,10 +298,14 @@
            "! A\nYES 3\n")
         "effect rule should call their effect and return the same state")))
 
-(deftest remainder-bindings
-  (binding [p/*remainder-accessor* identity
-            p/*remainder-setter* #(identity %2)]
-    (is (= ((p/lit \a) "abc") [\a (seq "bc")]))))
+(deftest state-bundle-bindings
+  (binding [p/*state-bundle*
+              (p/make-state-bundle
+                :make-state nil
+                :remainder-accessor identity
+                :remainder-setter #(identity %2))]
+    (is (= ((p/lit \a) (p/make-state "abc"))
+           [\a (seq "bc")]))))
 
 (deftest match-rule
   (let [rule (p/lit "A")
@@ -326,45 +330,45 @@
     (is (= (p/find-mem-result memory remainder-2) 'dummy-2))
     (is (= (p/find-mem-result memory remainder-3) nil))))
 
-(deftest mem
-  (let [rule (p/mem (p/alt (p/conc (p/lit 'a) (p/lit 'b)) (p/lit 'c)))]
-    (is (= (rule (make-state '[a b c] 2)) ['[a b] (make-state '[c] 4)]))
-    (is (= (rule (make-state '[a b c] 7)) ['[a b] (make-state '[c] 9)]))
-    (is (= (rule (make-state '[c s a] 1)) ['c (make-state '[s a] 2)]))
-    (is (= (rule (make-state '[c] 7)) ['c (make-state [] 8)]))
-    (is (nil? (rule (make-state '[s a] 7))))
-    (is (nil? (rule (make-state '[s a] 2))))))
-
-(deftest convert-bundle
-  (let [my-bundle {:remainder-accessor :remainder
-                   :index-accessor :index
-                   :add-info identity}
-        invalid-bundle {:a :arst}]
-    (is (= (p/convert-bundle my-bundle)
-           {#'p/*remainder-accessor* :remainder
-            #'p/*index-accessor* :index
-            #'p/*add-info* identity}))
-    (is (thrown? Exception (p/convert-bundle invalid-bundle)))))
-
-(deftest with-bundle
-  (let [my-state-s (create-struct :remainder :index)
-        my-bundle {:empty-state (struct my-state-s [] 0)
-                   :remainder-accessor (accessor my-state-s :remainder)
-                   :index-accessor (accessor my-state-s :index)
-                   :add-info identity}
-        my-rule (p/opt p/anything)]
-    (p/with-bundle my-bundle
-      (is (= (my-rule (p/make-state '[a b c]))
-             ['a (struct my-state-s '[b c] 1)])))))
-
-(deftest standard-inc-line-and-column-and-mem
-  (p/with-bundle p/standard-bundle
-  (let [a-rule (p/inc-column (p/lit 'a))
-        b-rule (p/inc-line (p/lit 'n))
-        mem-rule (p/mem (p/alt (p/conc a-rule b-rule a-rule) a-rule))]
-    (is (= (mem-rule (struct p/standard-s '[a n a b] 3 2 5))
-           ['[a n a] (struct p/standard-s '[b] 6 3 1)]))
-    (is (= (mem-rule (struct p/standard-s '[a n a b] 3 2 5))
-           ['[a n a] (struct p/standard-s '[b] 6 3 1)])))))
+; (deftest mem
+;   (let [rule (p/mem (p/alt (p/conc (p/lit 'a) (p/lit 'b)) (p/lit 'c)))]
+;     (is (= (rule (make-state '[a b c] 2)) ['[a b] (make-state '[c] 4)]))
+;     (is (= (rule (make-state '[a b c] 7)) ['[a b] (make-state '[c] 9)]))
+;     (is (= (rule (make-state '[c s a] 1)) ['c (make-state '[s a] 2)]))
+;     (is (= (rule (make-state '[c] 7)) ['c (make-state [] 8)]))
+;     (is (nil? (rule (make-state '[s a] 7))))
+;     (is (nil? (rule (make-state '[s a] 2))))))
+; 
+; (deftest convert-bundle
+;   (let [my-bundle {:remainder-accessor :remainder
+;                    :index-accessor :index
+;                    :add-info identity}
+;         invalid-bundle {:a :arst}]
+;     (is (= (p/convert-bundle my-bundle)
+;            {#'p/*remainder-accessor* :remainder
+;             #'p/*index-accessor* :index
+;             #'p/*add-info* identity}))
+;     (is (thrown? Exception (p/convert-bundle invalid-bundle)))))
+; 
+; (deftest with-bundle
+;   (let [my-state-s (create-struct :remainder :index)
+;         my-bundle {:empty-state (struct my-state-s [] 0)
+;                    :remainder-accessor (accessor my-state-s :remainder)
+;                    :index-accessor (accessor my-state-s :index)
+;                    :add-info identity}
+;         my-rule (p/opt p/anything)]
+;     (p/with-bundle my-bundle
+;       (is (= (my-rule (p/make-state '[a b c]))
+;              ['a (struct my-state-s '[b c] 1)])))))
+; 
+; (deftest standard-inc-line-and-column-and-mem
+;   (p/with-bundle p/standard-bundle
+;   (let [a-rule (p/inc-column (p/lit 'a))
+;         b-rule (p/inc-line (p/lit 'n))
+;         mem-rule (p/mem (p/alt (p/conc a-rule b-rule a-rule) a-rule))]
+;     (is (= (mem-rule (struct p/standard-s '[a n a b] 3 2 5))
+;            ['[a n a] (struct p/standard-s '[b] 6 3 1)]))
+;     (is (= (mem-rule (struct p/standard-s '[a n a b] 3 2 5))
+;            ['[a n a] (struct p/standard-s '[b] 6 3 1)])))))
 
 (time (run-tests))

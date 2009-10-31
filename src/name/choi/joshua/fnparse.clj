@@ -1,6 +1,7 @@
 (ns name.choi.joshua.fnparse
   [:use clojure.contrib.monads clojure.contrib.except
-        clojure.contrib.error-kit])
+        clojure.contrib.error-kit clojure.contrib.def
+        clojure.test])
 
 ; A rule is a delay object that contains a function that:
 ; - Takes a collection of tokens.
@@ -22,6 +23,47 @@
 
 (def parser-m
   (state-t maybe-m))
+
+(defstruct- state-bundle-struct
+  :empty-state :remainder-accessor :remainder-setter)
+
+(defn- accessor-def-form-
+  [state-bundle-struct state-bundle key]
+  (let [key-sym (-> key name symbol)]
+    `(let [accessor# (accessor ~state-bundle-struct ~key)]
+       (defvar- ~key-sym
+         (accessor# ~state-bundle)))))
+
+(defmacro- def-bundle-accessors-
+  [state-bundle-struct state-bundle & keys]
+  (let [def-forms
+          (map (partial accessor-def-form-
+                 state-bundle-struct state-bundle)
+            keys)]
+    `(let []
+       ~@def-forms)))
+
+(defvar *state-bundle*
+  (struct-map state-bundle-struct
+    :empty-state {:remainder nil}
+    :remainder-accessor :remainder
+    :remainder-setter #(assoc %1 :remainder %2)))
+
+(defvar make-state-bundle
+  (partial struct-map state-bundle-struct))
+
+; (def-bundle-accessors- state-bundle-struct *state-bundle*
+;   :empty-state
+;   :remainder-accessor)
+
+(defn- remainder-accessor []
+  (:remainder-accessor *state-bundle*))
+
+(defn- remainder-setter []
+  (:remainder-setter *state-bundle*))
+
+(defn- empty-state []
+  (:empty-state *state-bundle*))
 
 (def
   #^{:doc "The function, symbol, or other callable object that is used to access
@@ -110,7 +152,7 @@
   instead to make things easier, along with the with-bundle form. For more
   information, please see with-bundle's documentation.)"
   [tokens]
-  (*remainder-setter* *empty-state* tokens))
+  ((remainder-setter) (empty-state) tokens))
 
 (defn add-states
   "This function is not expected to be useful for users--only the mem rule maker
@@ -125,7 +167,7 @@
   (let [index-b (*index-accessor* state-b)]
     (-> state-a
       (*add-info* state-b)
-      (*remainder-setter* (drop index-b (*remainder-accessor* state-a)))
+      ((remainder-setter) (drop index-b (*remainder-accessor* state-a)))
       (*index-setter* (+ (*index-accessor* state-a) index-b)))))
 
 (defmacro complex
@@ -165,7 +207,7 @@
      [Equivalent to the result of (fetch-val *remainder-accessor*) from
      clojure.contrib.monads.]"}
   get-remainder
-  (fetch-val *remainder-accessor*))
+  (fetch-val (remainder-accessor)))
 
 (defn set-info
   "Creates a rule that consumes no tokens. The new rule directly changes the
@@ -200,10 +242,10 @@
   This rule's product is the first token it receives. It fails if there are no
   tokens left."
   [state]
-  (if-let [tokens (*remainder-accessor* state)]
+  (if-let [tokens ((remainder-accessor) state)]
     [(first tokens)
      (-> state
-       (*remainder-setter* (next tokens))
+       ((remainder-setter) (next tokens))
        (*index-setter* (inc (*index-accessor* state))))]))
 
 (defn validate
@@ -374,7 +416,7 @@
   (fn [state]
     (loop [cur-product [], cur-state state]
       (if-let [[subproduct substate] (subrule cur-state)]
-        (if (seq (*remainder-accessor* substate))
+        (if (seq ((remainder-accessor) substate))
           (recur (conj cur-product subproduct) substate)
           [(conj cur-product subproduct) substate])
         [(if (not= cur-product []) cur-product) cur-state]))))
@@ -487,7 +529,7 @@
   (fn [state]
     (if-let [result (subrule state)]
       result
-      (failure-hook (*remainder-accessor* state) state))))
+      (failure-hook ((remainder-accessor) state) state))))
 
 (defmacro effects
   "Creates a rule that calls the lists given in its body for side effects. It does not
@@ -543,7 +585,7 @@
   - If the new remainder is empty, then the product of the rule is returned."
   [rule failure-fn incomplete-fn state-0]
   (if-let [[product state-1] (rule state-0)]
-    (if (empty? (*remainder-accessor* state-1))
+    (if (empty? ((remainder-accessor) state-1))
       product
       (incomplete-fn product state-1 state-0))
     (failure-fn state-0)))
@@ -558,7 +600,7 @@
   - If the new remainder is empty, then the product of the rule is returned."
   [rule failure-fn incomplete-fn state]
   (if-let [[product new-state] (rule state)]
-    (if (empty? (*remainder-accessor* new-state))
+    (if (empty? ((remainder-accessor) new-state))
       product
       (incomplete-fn state new-state))
     (failure-fn state)))
@@ -593,7 +635,7 @@
   [subrule]
   (let [memory (atom {})]
     (fn [state-0]
-      (let [remainder-0 (*remainder-accessor* state-0)
+      (let [remainder-0 ((remainder-accessor) state-0)
             index-0 (*index-accessor* state-0)]
         (if-let [found-result (find-mem-result @memory remainder-0)]
           (let [found-product (found-result 0)
@@ -602,18 +644,18 @@
                 new-remainder (drop found-state-index remainder-0)
                 new-state (-> state-0
                             (add-states found-state)
-                            (*remainder-setter* new-remainder)
+                            ((remainder-setter) new-remainder)
                             (*index-setter* (+ index-0 found-state-index)))]
             ; (println "> memory found" [found-product found-state])
             [found-product new-state])
-          (if-let [subresult (subrule (*remainder-setter* *empty-state*
+          (if-let [subresult (subrule ((remainder-setter) (empty-state)
                                         remainder-0))]
             (let [subproduct (subresult 0)
                   substate (subresult 1)
-                  subremainder (*remainder-accessor* substate)
+                  subremainder ((remainder-accessor) substate)
                   subindex (*index-accessor* substate)
                   consumed-tokens (take subindex remainder-0)
-                  mem-state (*remainder-setter* substate nil)
+                  mem-state ((remainder-setter) substate nil)
                   returned-state (add-states state-0 mem-state)]
               ; (println "> memory registered" consumed-tokens [consumed-tokens mem-state])
               (swap! memory assoc consumed-tokens [subproduct mem-state])
