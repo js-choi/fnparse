@@ -1,7 +1,7 @@
 (ns name.choi.joshua.fnparse
   [:use clojure.contrib.monads clojure.contrib.except
-        clojure.contrib.error-kit clojure.contrib.def
-        clojure.test])
+        clojure.contrib.error-kit clojure.contrib.except
+        clojure.contrib.def])
 
 ; A rule is a delay object that contains a function that:
 ; - Takes a collection of tokens.
@@ -546,8 +546,29 @@
   (complex [subproduct subrule, subremainder get-remainder, :when (validator subremainder)]
     subproduct))
 
+(defn- context-var-def-forms
+  [{state-struct :struct, defaults-map :defaults}]
+  (let [bare-state
+         (if state-struct
+           `(struct-map ~state-struct)
+           `{:remainder nil})
+        empty-state
+          `(into ~bare-state ~defaults-map)
+        remainder-accessor
+          (if state-struct
+            `(accessor ~state-struct :remainder)
+            `:remainder)]
+    `[*empty-state* ~empty-state
+      *remainder-accessor* ~remainder-accessor]))
+
 (defmacro state-context
-  
+  [context-map & forms]
+  (if-not (map? context-map)
+    (throw-arg "The first argument to state-context must be a map"))
+  (let [var-defs (context-var-def-forms context-map)]
+    (println ">>>A" var-defs)
+    `(binding [~@var-defs]
+       ~@forms)))
 
 (defn match-rule
   "Creates a function that tries to completely match the given rule to the given

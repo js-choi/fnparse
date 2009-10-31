@@ -1,5 +1,6 @@
 (ns name.choi.joshua.fnparse.test-parse
-  (:use clojure.contrib.test-is clojure.contrib.monads clojure.contrib.error-kit
+  (:use clojure.test clojure.contrib.monads
+        clojure.contrib.error-kit
         [clojure.contrib.except :only [throw-arg]])
   (:require [name.choi.joshua.fnparse :as p]))
 
@@ -306,9 +307,15 @@
            "! A\nYES 3\n")
         "effect rule should call their effect and return the same state")))
 
+(println ">>>B"
+  (macroexpand-1
+    '(p/state-context {:struct (create-struct :remainder :warnings)
+                       :defaults {:warnings []}}
+       nil)))
+
 (deftest state-context
-  (state-context {:struct (make-struct :remainder :warnings)
-                  :defaults {:warnings []}}
+  (p/state-context {:struct (create-struct :remainder :warnings)
+                    :defaults {:warnings []}}
     (is (= ((p/lit \a) (p/make-state "abc"))
            [\a (-> "bc" p/make-state (assoc :warnings []))]))))
 
