@@ -307,17 +307,10 @@
            "! A\nYES 3\n")
         "effect rule should call their effect and return the same state")))
 
-(println ">>>B"
-  (macroexpand-1
-    '(p/state-context {:struct (create-struct :remainder :warnings)
-                       :defaults {:warnings []}}
-       nil)))
-
 (deftest state-context
-  (p/state-context {:struct (create-struct :remainder :warnings)
-                    :defaults {:warnings []}}
+  (p/state-context {:warnings []}
     (is (= ((p/lit \a) (p/make-state "abc"))
-           [\a (-> "bc" p/make-state (assoc :warnings []))]))))
+           [\a (-> "bc" seq p/make-state (assoc :warnings []))]))))
 
 ; (deftest match-rule
 ;   (let [rule (p/lit "A")
