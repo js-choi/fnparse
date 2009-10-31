@@ -697,4 +697,5 @@
   Creates a new rule that calls the subrule, and then increments the line and
   sets the column to zero."
   [subrule]
-  (invisi-conc subrule (update-info :line inc) (set-info :column 0)))
+  (invisi-conc subrule
+    (update-info :line inc) (set-info :column 0)))
