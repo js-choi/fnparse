@@ -27,67 +27,41 @@
 (defstruct- state-bundle-struct
   :empty-state :remainder-accessor :remainder-setter)
 
-(defn- accessor-def-form-
-  [state-bundle-struct state-bundle key]
-  (let [key-sym (-> key name symbol)]
-    `(let [accessor# (accessor ~state-bundle-struct ~key)]
-       (defvar- ~key-sym
-         (accessor# ~state-bundle)))))
+(defvar- *empty-state*
+  {:remainder nil})
 
-(defmacro- def-bundle-accessors-
-  [state-bundle-struct state-bundle & keys]
-  (let [def-forms
-          (map (partial accessor-def-form-
-                 state-bundle-struct state-bundle)
-            keys)]
-    `(let []
-       ~@def-forms)))
-
-(defvar *state-bundle*
-  (struct-map state-bundle-struct
-    :empty-state {:remainder nil}
-    :remainder-accessor :remainder
-    :remainder-setter #(assoc %1 :remainder %2)))
+(defvar- *remainder-accessor*
+  :remainder)
 
 (defvar make-state-bundle
   (partial struct-map state-bundle-struct))
 
-; (def-bundle-accessors- state-bundle-struct *state-bundle*
-;   :empty-state
-;   :remainder-accessor)
+(defn- assoc-remainder [state remainder]
+  (assoc state :remainder remainder))
 
-(defn- remainder-accessor []
-  (:remainder-accessor *state-bundle*))
-
-(defn- remainder-setter []
-  (:remainder-setter *state-bundle*))
-
-(defn- empty-state []
-  (:empty-state *state-bundle*))
-
-(def
-  #^{:doc "The function, symbol, or other callable object that is used to access
-     the remainder inside a state object. In other words,
-     (*remainder-accessor* a-state) has to return the remainder inside a-state.
-     By default, the remainder-accessor is :remainder (for more information on
-     FnParse's default states, see make-state's docs). But the accessor is
-     rebindable, so that you can use different kinds of state objects in your
-     parsing application. For more information, see with-bundle's docs."}
-  *remainder-accessor*
-  :remainder)
-
-(def
-  #^{:doc "The function, symbol, or other callable object that is used to change
-     the remainder inside a state object. In other words,
-     (*remainder-setter* a-state new-remainder) has to return the remainder
-     inside a-state. By default, the remainder-setter is
-     #(assoc %1 :remainder %2) (for more information on FnParse's default
-     states, see make-state's docs). But it is rebindable, so that you can use
-     different kinds of state objects in your parsing application. For more
-     information on custom states, see with-bundle's docs."}
-  *remainder-setter*
-  #(assoc %1 :remainder %2))
-
+; (def
+;   #^{:doc "The function, symbol, or other callable object that is used to access
+;      the remainder inside a state object. In other words,
+;      (*remainder-accessor* a-state) has to return the remainder inside a-state.
+;      By default, the remainder-accessor is :remainder (for more information on
+;      FnParse's default states, see make-state's docs). But the accessor is
+;      rebindable, so that you can use different kinds of state objects in your
+;      parsing application. For more information, see with-bundle's docs."}
+;   *remainder-accessor*
+;   :remainder)
+; 
+; (def
+;   #^{:doc "The function, symbol, or other callable object that is used to change
+;      the remainder inside a state object. In other words,
+;      (*remainder-setter* a-state new-remainder) has to return the remainder
+;      inside a-state. By default, the remainder-setter is
+;      #(assoc %1 :remainder %2) (for more information on FnParse's default
+;      states, see make-state's docs). But it is rebindable, so that you can use
+;      different kinds of state objects in your parsing application. For more
+;      information on custom states, see with-bundle's docs."}
+;   *remainder-setter*
+;   #(assoc %1 :remainder %2))
+; 
 (defn *index-accessor*
   "The function, symbol, or other callable object that is used to access
    the index inside a state object. In other words,
@@ -116,34 +90,34 @@
   (if (:index a-state)
     (assoc a-state :index new-index)
     a-state))
-
-(defn *add-info*
-  "The function, symbol, or other callable object that is used to to customize
-  the behavior of the add-states function, intelligently adding one state
-  with another state. In other words, (*add-info* state-0 state-1) should
-  add state-1's info into state-0's. For more info, see
-  http://github.com/joshua-choi/fnparse/wikis/on-states.
-  NOTE: You do not need to alter the state's remainder or index. When
-  add-states is called, *add-info* is used first to add any info, but then
-  the function adds the states' remainders and indexes for you.
-  By default, this variable just contains the clojure.core/merge function (for
-  more information on FnParse's default states, see make-state). But it is
-  rebindable, so that you can use different kinds of state objects in your
-  parsing application. (For more information on custom states, see with-bundle's
-  docs.)"
-  [state-0 state-1]
-  (merge state-0 state-1))
-
-(def
-  #^{:doc "The function, symbol, or other callable object that is used as a
-     blank, empty state, which MUST have an empty remainder and an index of
-     zero. By default, it is {:remainder [], :index 0}. (For more information on
-     FnParse's default states, see make-state's docs).
-     But it is rebindable, so that you can use different kinds of state objects
-     in your parsing application. For more information on customizing states,
-     see with-bundle's docs."}
-  *empty-state*
-  {:remainder [], :index 0})
+; 
+; (defn *add-info*
+;   "The function, symbol, or other callable object that is used to to customize
+;   the behavior of the add-states function, intelligently adding one state
+;   with another state. In other words, (*add-info* state-0 state-1) should
+;   add state-1's info into state-0's. For more info, see
+;   http://github.com/joshua-choi/fnparse/wikis/on-states.
+;   NOTE: You do not need to alter the state's remainder or index. When
+;   add-states is called, *add-info* is used first to add any info, but then
+;   the function adds the states' remainders and indexes for you.
+;   By default, this variable just contains the clojure.core/merge function (for
+;   more information on FnParse's default states, see make-state). But it is
+;   rebindable, so that you can use different kinds of state objects in your
+;   parsing application. (For more information on custom states, see with-bundle's
+;   docs.)"
+;   [state-0 state-1]
+;   (merge state-0 state-1))
+; 
+; (def
+;   #^{:doc "The function, symbol, or other callable object that is used as a
+;      blank, empty state, which MUST have an empty remainder and an index of
+;      zero. By default, it is {:remainder [], :index 0}. (For more information on
+;      FnParse's default states, see make-state's docs).
+;      But it is rebindable, so that you can use different kinds of state objects
+;      in your parsing application. For more information on customizing states,
+;      see with-bundle's docs."}
+;   *empty-state*
+;   {:remainder [], :index 0})
 
 (defn make-state
   "The general function that creates a state from the given sequence of tokens.
@@ -152,23 +126,23 @@
   instead to make things easier, along with the with-bundle form. For more
   information, please see with-bundle's documentation.)"
   [tokens]
-  ((remainder-setter) (empty-state) tokens))
+  (assoc-remainder *empty-state* tokens))
 
-(defn add-states
-  "This function is not expected to be useful for users--only the mem rule maker
-  uses it. It adds state-b into state-a. First:
-  - The two states' info are added using the overridable *add-info* function,
-    forming a new state.
-  - The remainder of the new state is changed to state-a's remainder with the
-    first few tokens dropped off. The number of tokens dropped is the 
-  - The index of the new state is changed to the sum of the indexes of state-a
-    and state-b."
-  [state-a state-b]
-  (let [index-b (*index-accessor* state-b)]
-    (-> state-a
-      (*add-info* state-b)
-      ((remainder-setter) (drop index-b (*remainder-accessor* state-a)))
-      (*index-setter* (+ (*index-accessor* state-a) index-b)))))
+; (defn add-states
+;   "This function is not expected to be useful for users--only the mem rule maker
+;   uses it. It adds state-b into state-a. First:
+;   - The two states' info are added using the overridable *add-info* function,
+;     forming a new state.
+;   - The remainder of the new state is changed to state-a's remainder with the
+;     first few tokens dropped off. The number of tokens dropped is the 
+;   - The index of the new state is changed to the sum of the indexes of state-a
+;     and state-b."
+;   [state-a state-b]
+;   (let [index-b (*index-accessor* state-b)]
+;     (-> state-a
+;       (*add-info* state-b)
+;       (assoc-remainder (drop index-b (*remainder-accessor* state-a)))
+;       (*index-setter* (+ (*index-accessor* state-a) index-b)))))
 
 (defmacro complex
   "Creates a complex rule in monadic form. It's a lot easier than it sounds.
@@ -207,7 +181,7 @@
      [Equivalent to the result of (fetch-val *remainder-accessor*) from
      clojure.contrib.monads.]"}
   get-remainder
-  (fetch-val (remainder-accessor)))
+  (fetch-val *remainder-accessor*))
 
 (defn set-info
   "Creates a rule that consumes no tokens. The new rule directly changes the
@@ -242,10 +216,10 @@
   This rule's product is the first token it receives. It fails if there are no
   tokens left."
   [state]
-  (if-let [tokens ((remainder-accessor) state)]
+  (if-let [tokens (*remainder-accessor* state)]
     [(first tokens)
      (-> state
-       ((remainder-setter) (next tokens))
+       (assoc-remainder (next tokens))
        (*index-setter* (inc (*index-accessor* state))))]))
 
 (defn validate
@@ -416,7 +390,7 @@
   (fn [state]
     (loop [cur-product [], cur-state state]
       (if-let [[subproduct substate] (subrule cur-state)]
-        (if (seq ((remainder-accessor) substate))
+        (if (seq (*remainder-accessor* substate))
           (recur (conj cur-product subproduct) substate)
           [(conj cur-product subproduct) substate])
         [(if (not= cur-product []) cur-product) cur-state]))))
@@ -529,7 +503,7 @@
   (fn [state]
     (if-let [result (subrule state)]
       result
-      (failure-hook ((remainder-accessor) state) state))))
+      (failure-hook (*remainder-accessor* state) state))))
 
 (defmacro effects
   "Creates a rule that calls the lists given in its body for side effects. It does not
@@ -572,6 +546,9 @@
   (complex [subproduct subrule, subremainder get-remainder, :when (validator subremainder)]
     subproduct))
 
+(defmacro state-context
+  
+
 (defn match-rule
   "Creates a function that tries to completely match the given rule to the given
   state, with no remainder left.
@@ -585,25 +562,10 @@
   - If the new remainder is empty, then the product of the rule is returned."
   [rule failure-fn incomplete-fn state-0]
   (if-let [[product state-1] (rule state-0)]
-    (if (empty? ((remainder-accessor) state-1))
+    (if (empty? (*remainder-accessor* state-1))
       product
       (incomplete-fn product state-1 state-0))
     (failure-fn state-0)))
-
-(defn rule-match
-  "DEPRECATED. Use match-rule instead.
-  Creates a function that tries to completely match the given rule to the given state, with
-  no remainder left.
-  - If (rule given-state) fails, then (failure-fn given-state) is called.
-  - If the remainder of (rule given-state) is not empty, then
-    (incomplete-fn given-state new-state-after-rule) is called.
-  - If the new remainder is empty, then the product of the rule is returned."
-  [rule failure-fn incomplete-fn state]
-  (if-let [[product new-state] (rule state)]
-    (if (empty? ((remainder-accessor) new-state))
-      product
-      (incomplete-fn state new-state))
-    (failure-fn state)))
 
 (defn- starts-with? [subject-seq query-seq]
   (every? identity (map = subject-seq query-seq)))
@@ -619,84 +581,49 @@
         query-key candidates)
       (val (first candidates)))))
 
-(defn mem
-  "Creates a memoizing rule that caches its subrule's results in an atom.
-  Whenever the new mem rule is called, it checks the cache to see if there is an
-  existing match; otherwise, the subrule is called.
+; (defn mem
+;   "Creates a memoizing rule that caches its subrule's results in an atom.
+;   Whenever the new mem rule is called, it checks the cache to see if there is an
+;   existing match; otherwise, the subrule is called.
+; 
+;   mem REQUIRES that the given state contain an index, accessible with
+;   *index-accessor* and setable with *index-setter*. mem also requires that ALL
+;   rules within the subrule increment the index as each token is consumed. This
+;   is normally not a problem, as all of FnParse's rule makers create rules that
+;   do this.
+; 
+;   For more information on indexes, check out
+;   http://wiki.github.com/joshua-choi/fnparse/on-states."
+;   [subrule]
+;   (let [memory (atom {})]
+;     (fn [state-0]
+;       (let [remainder-0 (*remainder-accessor* state-0)
+;             index-0 (*index-accessor* state-0)]
+;         (if-let [found-result (find-mem-result @memory remainder-0)]
+;           (let [found-product (found-result 0)
+;                 found-state (found-result 1)
+;                 found-state-index (*index-accessor* found-state)
+;                 new-remainder (drop found-state-index remainder-0)
+;                 new-state (-> state-0
+;                             (add-states found-state)
+;                             (assoc-remainder new-remainder)
+;                             (*index-setter* (+ index-0 found-state-index)))]
+;             ; (println "> memory found" [found-product found-state])
+;             [found-product new-state])
+;           (if-let [subresult (subrule (assoc-remainder *empty-state*
+;                                         remainder-0))]
+;             (let [subproduct (subresult 0)
+;                   substate (subresult 1)
+;                   subremainder (*remainder-accessor* substate)
+;                   subindex (*index-accessor* substate)
+;                   consumed-tokens (take subindex remainder-0)
+;                   mem-state (assoc-remainder substate nil)
+;                   returned-state (add-states state-0 mem-state)]
+;               ; (println "> memory registered" consumed-tokens [consumed-tokens mem-state])
+;               (swap! memory assoc consumed-tokens [subproduct mem-state])
+;               ; (println "> memory " memory)
+;               [subproduct returned-state])))))))
 
-  mem REQUIRES that the given state contain an index, accessible with
-  *index-accessor* and setable with *index-setter*. mem also requires that ALL
-  rules within the subrule increment the index as each token is consumed. This
-  is normally not a problem, as all of FnParse's rule makers create rules that
-  do this.
-
-  For more information on indexes, check out
-  http://wiki.github.com/joshua-choi/fnparse/on-states."
-  [subrule]
-  (let [memory (atom {})]
-    (fn [state-0]
-      (let [remainder-0 ((remainder-accessor) state-0)
-            index-0 (*index-accessor* state-0)]
-        (if-let [found-result (find-mem-result @memory remainder-0)]
-          (let [found-product (found-result 0)
-                found-state (found-result 1)
-                found-state-index (*index-accessor* found-state)
-                new-remainder (drop found-state-index remainder-0)
-                new-state (-> state-0
-                            (add-states found-state)
-                            ((remainder-setter) new-remainder)
-                            (*index-setter* (+ index-0 found-state-index)))]
-            ; (println "> memory found" [found-product found-state])
-            [found-product new-state])
-          (if-let [subresult (subrule ((remainder-setter) (empty-state)
-                                        remainder-0))]
-            (let [subproduct (subresult 0)
-                  substate (subresult 1)
-                  subremainder ((remainder-accessor) substate)
-                  subindex (*index-accessor* substate)
-                  consumed-tokens (take subindex remainder-0)
-                  mem-state ((remainder-setter) substate nil)
-                  returned-state (add-states state-0 mem-state)]
-              ; (println "> memory registered" consumed-tokens [consumed-tokens mem-state])
-              (swap! memory assoc consumed-tokens [subproduct mem-state])
-              ; (println "> memory " memory)
-              [subproduct returned-state])))))))
-
-(def bundle-keys
-  {:empty-state #'*empty-state*
-   :remainder-accessor #'*remainder-accessor*
-   :remainder-setter #'*remainder-setter*
-   :index-accessor #'*index-accessor*
-   :index-setter #'*index-setter*
-   :add-info #'*add-info*})
-
-(defn- get-bundle-val [bundle-key]
-  (or (bundle-keys bundle-key)
-      (throw-arg "invalid bundle key %s given" bundle-key)))
-
-(defn convert-bundle
-  [bundle]
-  (into {} (map #(vector (-> % key get-bundle-val) (val %))
-                bundle)))
-
-(defn with-bundle-fn [bundle procedure]
-  (clojure.lang.Var/pushThreadBindings (convert-bundle bundle))
-  (try (procedure)
-    (clojure.lang.Var/popThreadBindings)))
-
-(defmacro with-bundle
-  "Creates a binding context where the vals of the given bundle is bound to
-  FnParse's various overridable variables to customize state.
-
-  A bundle is a map with any but only the keywords with the names of FnParse's
-  overridable variables: :empty-state, :remainder-accessor, :remainder-setter,
-  :index-accessor, :index-setter, :add-info.
-
-  FnParse comes with a default bundle (no bundle at all), a standard bundle
-  for regular use with text, and a minimal bundle. For more information, see
-  http://wiki.github.com/joshua-choi/fnparse/on-bundles."
-  [bundle & body]
-  `(with-bundle-fn ~bundle (fn [] ~@body)))
 
 (defstruct minimal-s :remainder :index)
 (defstruct standard-s :remainder :index :line :column)
@@ -706,8 +633,7 @@
 (def minimal-bundle
   {:empty-state (struct minimal-s [] 0)
    :remainder-accessor (accessor minimal-s :remainder)
-   :index-accessor (accessor minimal-s :index)
-   :add-info #'*add-info*})
+   :index-accessor (accessor minimal-s :index)})
 
 (def standard-bundle
   {:empty-state (struct standard-s [] 0 0 0)
