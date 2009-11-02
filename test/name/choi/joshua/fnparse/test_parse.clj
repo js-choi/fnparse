@@ -9,6 +9,11 @@
 (deferror weird-error [] []
   {:msg "BOOM", :unhandled (throw-msg Exception)})
 
+(deftest index-fns
+  (-> nil p/make-state p/get-index (= 0) is)
+  (-> nil p/make-state (p/vary-index inc) p/get-index (= 1) is)
+  (-> nil p/make-state (p/set-index 4) p/get-index (= 4) is))
+
 (deftest emptiness
   (is (= (p/emptiness (p/make-state '(A B C)))
          [nil (p/make-state '(A B C))])
@@ -21,6 +26,9 @@
   (is (= (p/anything (p/make-state '(A B C)))
          ['A (p/make-state '(B C))])
     "anything rule matches first token without index")
+  (is (-> '(A B C) p/make-state p/anything second meta ::p/index (= 1)))
+  (is (-> '(A B C) p/make-state (vary-meta assoc ::p/index 5)
+        p/anything second meta ::p/index (= 6)))
   (is (nil? (p/anything (p/make-state nil)))
     "anything rule fails with no tokens left")
   (is (= ((p/rep* p/anything) (p/make-state '(A B C)))

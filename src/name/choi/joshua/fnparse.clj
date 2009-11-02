@@ -62,10 +62,10 @@
 ;   *remainder-setter*
 ;   #(assoc %1 :remainder %2))
 ; 
-(defn *index-accessor*
+(defn get-index
   "The function, symbol, or other callable object that is used to access
    the index inside a state object. In other words,
-   (*index-accessor* a-state) has to return the remainder inside a-state.
+   (get-index a-state) has to return the remainder inside a-state.
    By default, the index-accessor returns (:index a-state) unless
    (:index a-state) is nil--for backwards compatibility, it then returns zero.
    (For more information on FnParse's default states, see make-state's docs.)
@@ -73,12 +73,12 @@
    state objects in your parsing application. For more information, see
    with-bundle's docs."
   [a-state]
-  (or (:index a-state) 0))
+  (::index ^a-state))
 
-(defn *index-setter*
+(defn set-index
   "The function, symbol, or other callable object that is used to change
    the index inside a state object. In other words,
-   (*index-setter* a-state new-index) has to return the index
+   (vary-index a-state new-index) has to return the index
    inside a-state. By default, the index-setter is a function that calls
    (assoc a-state :index new-index) if (:index a-state) is a true value, and
    a-state otherwise. (This is for backwards compatibility for before FnParse
@@ -87,9 +87,12 @@
    different kinds of state objects in your parsing application. For more
    information on custom states, see with-bundle's docs."
   [a-state new-index]
-  (if (:index a-state)
-    (assoc a-state :index new-index)
-    a-state))
+  (vary-meta a-state assoc ::index new-index))
+
+(defn vary-index
+  [a-state f]
+  (set-index a-state (f (get-index a-state))))
+
 ; 
 ; (defn *add-info*
 ;   "The function, symbol, or other callable object that is used to to customize
@@ -126,7 +129,8 @@
   instead to make things easier, along with the with-bundle form. For more
   information, please see with-bundle's documentation.)"
   [tokens]
-  (assoc-remainder *empty-state* tokens))
+  (with-meta (assoc-remainder *empty-state* tokens)
+    {::index 0}))
 
 ; (defn add-states
 ;   "This function is not expected to be useful for users--only the mem rule maker
@@ -138,11 +142,11 @@
 ;   - The index of the new state is changed to the sum of the indexes of state-a
 ;     and state-b."
 ;   [state-a state-b]
-;   (let [index-b (*index-accessor* state-b)]
+;   (let [index-b (get-index state-b)]
 ;     (-> state-a
 ;       (*add-info* state-b)
 ;       (assoc-remainder (drop index-b (*remainder-accessor* state-a)))
-;       (*index-setter* (+ (*index-accessor* state-a) index-b)))))
+;       (vary-index (+ (get-index state-a) index-b)))))
 
 (defmacro complex
   "Creates a complex rule in monadic form. It's a lot easier than it sounds.
@@ -220,7 +224,7 @@
     [(first tokens)
      (-> state
        (assoc-remainder (next tokens))
-       (*index-setter* (inc (*index-accessor* state))))]))
+       (vary-index inc))]))
 
 (defn validate
   "Creates a rule from attaching a product-validating function to the given
@@ -596,7 +600,7 @@
 ;   existing match; otherwise, the subrule is called.
 ; 
 ;   mem REQUIRES that the given state contain an index, accessible with
-;   *index-accessor* and setable with *index-setter*. mem also requires that ALL
+;   get-index and setable with vary-index. mem also requires that ALL
 ;   rules within the subrule increment the index as each token is consumed. This
 ;   is normally not a problem, as all of FnParse's rule makers create rules that
 ;   do this.
@@ -607,16 +611,16 @@
 ;   (let [memory (atom {})]
 ;     (fn [state-0]
 ;       (let [remainder-0 (*remainder-accessor* state-0)
-;             index-0 (*index-accessor* state-0)]
+;             index-0 (get-index state-0)]
 ;         (if-let [found-result (find-mem-result @memory remainder-0)]
 ;           (let [found-product (found-result 0)
 ;                 found-state (found-result 1)
-;                 found-state-index (*index-accessor* found-state)
+;                 found-state-index (get-index found-state)
 ;                 new-remainder (drop found-state-index remainder-0)
 ;                 new-state (-> state-0
 ;                             (add-states found-state)
 ;                             (assoc-remainder new-remainder)
-;                             (*index-setter* (+ index-0 found-state-index)))]
+;                             (vary-index (+ index-0 found-state-index)))]
 ;             ; (println "> memory found" [found-product found-state])
 ;             [found-product new-state])
 ;           (if-let [subresult (subrule (assoc-remainder *empty-state*
@@ -624,7 +628,7 @@
 ;             (let [subproduct (subresult 0)
 ;                   substate (subresult 1)
 ;                   subremainder (*remainder-accessor* substate)
-;                   subindex (*index-accessor* substate)
+;                   subindex (get-index substate)
 ;                   consumed-tokens (take subindex remainder-0)
 ;                   mem-state (assoc-remainder substate nil)
 ;                   returned-state (add-states state-0 mem-state)]
