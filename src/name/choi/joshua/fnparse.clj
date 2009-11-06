@@ -28,17 +28,14 @@
   "The parser monad of FnParse. What new
   forms can you form from this?")
 
-(defstruct- state-bundle-struct
-  :empty-state :remainder-accessor :remainder-setter)
-
 (defvar- *empty-state*
-  {:remainder nil})
+  {::remainder nil})
 
 (defvar- *remainder-accessor*
-  :remainder)
+  ::remainder)
 
 (defn- assoc-remainder [state remainder]
-  (assoc state :remainder remainder))
+  (assoc state ::remainder remainder))
 
 (defn make-state
   "The general function that creates a state
@@ -856,9 +853,10 @@
 (with-test
   (defmacro state-context
     "Puts all Clojure forms inside into a state context.
-    This is for customization of states.
-    You do this by providing a state template of keys
-    and their default values.
+    This is for customization of states, which affect
+    make-state and all rules within the context.
+    You customize by providing as a template a map of
+    your states' desired keys and their default values.
     In addition, you get a speed boost from the automatic
     generation and use of a struct map and accessors, which
     are invisibly used by make-state and all rules.
@@ -867,10 +865,10 @@
     [state-template & forms]
     (if-not (map? state-template)
       (throw-arg "The first argument to state-context must be a map"))
-    (let [struct-keys (cons :remainder (keys state-template))]
+    (let [struct-keys (cons ::remainder (keys state-template))]
       `(let [state-struct# (create-struct ~@struct-keys)
              empty-state# (into (struct state-struct#) ~state-template)
-             remainder-accessor# (accessor state-struct# :remainder)]
+             remainder-accessor# (accessor state-struct# ::remainder)]
         (binding [*empty-state* empty-state#
                   *remainder-accessor* remainder-accessor#]
           ~@forms)))))
@@ -880,10 +878,10 @@
     (is (= ((lit \a) (make-state "abc"))
            [\a (-> "bc" seq make-state (assoc :warnings []))]))
     (is (thrown? ClassCastException
-          ((lit \a) {:remainder []})))))
+          ((lit \a) {::remainder []})))))
 
 (with-test
-  (defn match-rule
+  (defn- match-rule
     "Creates a function that tries to completely match the given rule to the given
     state, with no remainder left.
     - If (rule given-state) fails, then (failure-fn given-state) is called.
@@ -965,19 +963,19 @@
 ;               [subproduct returned-state])))))))
 
 
-(defstruct minimal-s :remainder :index)
-(defstruct standard-s :remainder :index :line :column)
+(defstruct minimal-s ::remainder :index)
+(defstruct standard-s ::remainder :index :line :column)
 (def standard-line-a (accessor standard-s :line))
 (def standard-column-a (accessor standard-s :column))
 
 (def minimal-bundle
   {:empty-state (struct minimal-s [] 0)
-   :remainder-accessor (accessor minimal-s :remainder)
+   :remainder-accessor (accessor minimal-s ::remainder)
    :index-accessor (accessor minimal-s :index)})
 
 (def standard-bundle
   {:empty-state (struct standard-s [] 0 0 0)
-   :remainder-accessor (accessor standard-s :remainder)
+   :remainder-accessor (accessor standard-s ::remainder)
    :index-accessor (accessor standard-s :index)
    :add-info (fn [s0 s1]
                (let [line0 (standard-line-a s0)
