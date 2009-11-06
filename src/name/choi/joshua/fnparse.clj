@@ -63,7 +63,7 @@
   [state f]
   (set-index state (f (get-index state))))
 
-(defvar- *add-info*
+(defvar- *merge-info*
   merge
   "Overridable by using with-state-context.
   Merges two states' info together. The first
@@ -77,7 +77,7 @@
     useful for users--only the mem rule maker
     uses it. It adds state-b into state-a. First:
     - The two states' info are added using the
-      overridable *add-info* function,
+      overridable *merge-info* function,
       forming a new state.
     - The remainder of the new state is changed
       to state-a's remainder with the
@@ -89,7 +89,7 @@
     [state-a state-b]
     (let [index-b (get-index state-b)]
       (-> state-a
-        (*add-info* state-b)
+        (*merge-info* state-b)
         (assoc-remainder (drop index-b (*remainder-accessor* state-a)))
         (set-index (+ (get-index state-a) index-b)))))
   (let [state-a (-> '[a b c d] make-state (set-index 4))
@@ -855,13 +855,65 @@
     "Puts all Clojure forms inside into a state context.
     This is for customization of states, which affect
     make-state and all rules within the context.
+    
     You customize by providing as a template a map of
     your states' desired keys and their default values.
+    
     In addition, you get a speed boost from the automatic
     generation and use of a struct map and accessors, which
     are invisibly used by make-state and all rules.
+    
     This form uses the binding form, so the context formed
-    is thread-specific."
+    is thread-specific.
+    
+    You can (and must, if you use things like memoizing
+    rules) provide a special info addition recipe in the
+    template with the key :name.choi.joshua.fnparse/merge-info.
+    Corresponding to it would be a two-argument function that
+    merges its second argument (a state) into the first
+    argument (another state). This is important. It is
+    essential if you use the memo rule-maker. Read the example
+    below to learn how to implement a proper merge-info.
+    
+    Here is an example to make it clearer how you
+    customize states. Let's say that I want my states to
+    store: (1) any warnings that a rule might want to raise
+    for the user during parsing, (2) the current line number,
+    and (3) the current column number. Also, whenever two
+    states are merged, I want to do it in a particular way.
+    I want the warnings to simply be merged together. Also, I
+    want the new state's line and column to similarly be
+    the sum of the lines and column of the two states.
+    
+    But! if the line of the second state's column is above zero,
+    then that means that merging the second state into the
+    first state should RESET the new column number, since the
+    new state is at a new line, a different line from the first
+    state! Here's the code...
+    
+    (with-state-context
+      {:warnings []
+       :line 0
+       :column 0
+       :name.choi.joshua.fnparse/merge-info
+         (fn [s0 s1]
+           ; find-info is like Clojure's get, only it
+           ; takes advantage of the context's speedy
+           ; struct accessors.
+           ; reduce-info-pair takes the info with the
+           ; given key of two states and plugs them into
+           ; the given function.
+           (let [new-warnings (reduce-info-pair + :warnings s0 s1)
+                 s1-line (find-info s1 :line)
+                 s1-column (find-info s1 :column)
+                 new-line (+ (find-info s0 :line) s1-line)
+                 new-column (if (pos? s1-line)
+                              s1-column
+                              (+ (find-info s0 :column) s1-column))]
+             (new-info
+               :warnings new-warnings
+               :line new-line
+               :column new-column)))})"
     [state-template & forms]
     (if-not (map? state-template)
       (throw-arg "The first argument to state-context must be a map"))
@@ -977,7 +1029,7 @@
   {:empty-state (struct standard-s [] 0 0 0)
    :remainder-accessor (accessor standard-s ::remainder)
    :index-accessor (accessor standard-s :index)
-   :add-info (fn [s0 s1]
+   :merge-info (fn [s0 s1]
                (let [line0 (standard-line-a s0)
                      line1 (standard-line-a s1)
                      column1 (standard-column-a s1)]
