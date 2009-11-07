@@ -1,20 +1,11 @@
 (ns name.choi.joshua.fnparse.json
   (:use name.choi.joshua.fnparse clojure.contrib.error-kit
-        [clojure.contrib.seq-utils :only [flatten]]))
+        clojure.contrib.test-is
+        [clojure.contrib.seq-utils :only [flatten]])
+  (:require [name.choi.joshua.fnparse :as fnparse]))
 
-;; These are some functions that the rules will use. A lot of these are
-;; optional.
-
-; A JSON node, which what the parsing will return in the end.
 (defstruct node-s :kind :content) 
-
-; The parsing state data structure. The remaining tokens are stored
-; in :remainder, and the current column and line are stored in their
-; respective fields.
-(defstruct state-s :remainder :column :line)
-
-(def remainder-a
-  (accessor state-s :remainder))
+  ; A JSON node, which what the parsing will return in the end.
 
 (def make-node
   (partial struct node-s))
@@ -31,6 +22,27 @@
 (def apply-str
   (partial apply str))
 
+;; The functions below just convert JSON nodes into Clojure strings,
+;; vectors, and maps.
+
+(defmulti represent :kind)
+
+(defmethod represent :object [node]
+  (into {}
+    (map #(vector (represent (key %)) (represent (val %)))
+      (:content node))))
+
+(defmethod represent :array [node]
+  (vec (map #(represent %) (:content node))))
+
+(defmethod represent :scalar [node]
+  (:content node))
+
+(defn- make-mock-state [tokens warnings column line]
+  (state-context standard-template
+    (make-state-with-info (seq tokens)
+      :warnings warnings, :line line, :column column)))
+
 ;; These two functions are given a rule and make it so that it
 ;; increments the current column (or the current line).
 
@@ -38,8 +50,7 @@
   (invisi-conc subrule (update-info :column inc)))
 
 (def nb-char-lit
-  (comp nb-char lit)) ; lit is a FnParse function that creates a literal
-                      ; rule.
+  (comp nb-char lit))
 
 (defn- b-char [subrule]
   (invisi-conc subrule (update-info :line inc)))
@@ -135,15 +146,27 @@
             (str "in number literal, after an exponent sign, decimal"
                  "digit")))))
 
-(def number-lit
-  (complex [minus (opt minus-sign)
-            above-one (alt zero-digit (rep+ nonzero-decimal-digit))
-            below-one (opt fractional-part)
-            power (opt exponential-part)]
-    (-> [minus above-one below-one power] flatten apply-str
-      Double/parseDouble
-      ((if (or below-one power) identity int))
-      make-scalar-node)))
+(with-test
+  (def number-lit
+    (complex [minus (opt minus-sign)
+              above-one (alt zero-digit (rep+ nonzero-decimal-digit))
+              below-one (opt fractional-part)
+              power (opt exponential-part)]
+      (-> [minus above-one below-one power] flatten apply-str
+        Double/parseDouble
+        ((if (or below-one power) identity int))
+        make-scalar-node)))
+  (is (= (number-lit (make-mock-state "123]" [] 3 4))
+         [(make-node :scalar 123) (make-mock-state "]" [] 6 4)]))
+  (is (= (number-lit (make-mock-state "-123]" [] 3 4))
+         [(make-node :scalar -123) (make-mock-state "]" [] 7 4)]))
+  (is (= (number-lit (make-mock-state "-123e3]" [] 3 4))
+         [(make-node :scalar -123e3) (make-mock-state "]" [] 9 4)]))
+  (is (= (number-lit (make-mock-state "-123.9e3]" [] 3 4))
+         [(make-node :scalar -123.9e3) (make-mock-state "]" [] 11 4)])))
+;  (is (thrown-with-msg? Exception
+;        #"JSON error at line 4, column 10: in number literal, after an exponent sign, decimal digit expected where \"e\" is"
+;        (number-lit (make-mock-state "-123.9ee3]" [] 3 4)))))
 
 (def hexadecimal-digit
   (alt decimal-digit (lit-alt-seq "ABCDEF" nb-char-lit)))
@@ -151,12 +174,17 @@
 (def unescaped-char
   (except json-char (alt escape-indicator string-delimiter)))
 
-(def unicode-char-sequence
-  (complex [_ (nb-char-lit \u)
-              digits (factor= 4
-                       (failpoint hexadecimal-digit
-                         (expectation-error-fn "hexadecimal digit")))]
-    (-> digits apply-str (Integer/parseInt 16) char)))
+(with-test
+  (def unicode-char-sequence
+    (complex [_ (nb-char-lit \u)
+                digits (factor= 4
+                         (failpoint hexadecimal-digit
+                           (expectation-error-fn "hexadecimal digit")))]
+      (-> digits apply-str (Integer/parseInt 16) char)))
+  (is (= (unicode-char-sequence (make-mock-state "u11A3a\"]" [] 3 4))
+         [\u11A3 (make-mock-state (seq "a\"]") [] 8 4)]))
+  (is (thrown? Exception
+        (unicode-char-sequence (make-mock-state "u11ATa\"]" [] 3 4)))))
 
 (def escaped-characters
   {\\ \\, \/ \/, \b \backspace, \f \formfeed, \n \newline, \r \return,
@@ -181,9 +209,7 @@
             _ string-delimiter]
     (-> contents apply-str make-scalar-node)))
 
-(declare array)
-
-(declare object)
+(declare array object)
 
 (def value (alt string-lit number-lit keyword-lit array object))
 
@@ -201,9 +227,13 @@
                 (expectation-error-fn "an array is unclosed; \"]\""))]
     (-> contents vec make-array-node)))
 
-(def entry
-  (complex [entry-key string-lit, _ name-separator, entry-val value]
-    [entry-key entry-val]))
+(with-test
+  (def entry
+    (complex [entry-key string-lit, _ name-separator, entry-val value]
+      [entry-key entry-val]))
+  (is (= (entry (make-mock-state "\"hello\": 55}" [] 3 4))
+         [[(make-node :scalar "hello") (make-node :scalar 55)]
+          (make-mock-state "}" [] 14 4)])))
 
 (def additional-entry
   (complex [_ value-separator, content entry]
@@ -213,53 +243,52 @@
   (complex [first-entry entry, rest-entries (rep* additional-entry)]
     (cons first-entry rest-entries)))
 
-(def object
-  (complex [_ begin-object
-            contents object-contents
-            _ (failpoint end-object
-                (expectation-error-fn
-                  (str "either \"}\" or another object entry (which "
-                       "always starts with a string)")))]
-    (struct node-s :object (into {} contents))))
+(with-test
+  (def object
+    (complex [_ begin-object
+              contents object-contents
+              _ (failpoint end-object
+                  (expectation-error-fn
+                    (str "either \"}\" or another object entry (which "
+                         "always starts with a string)")))]
+      (struct node-s :object (into {} contents))))
+  (is (= (object (make-mock-state "{\"hello\": 55}]" [] 3 4))
+         [(make-node :object
+          {(make-node :scalar "hello")
+             (make-node :scalar 55)})
+          (make-mock-state "]" [] 16 4)]))
+  (is (= (object (make-mock-state
+                   "{\"hello\": 55, \"B\": \"goodbye\"}]"
+                   [] 3 4))
+         [(make-node :object
+          {(make-node :scalar "hello") (make-node :scalar 55)
+           (make-node :scalar "B") (make-node :scalar "goodbye")})
+          (make-mock-state "]" [] 32 4)])))
 
 (def text (alt object array)) ; The root rule
 
 ;; The functions below uses the rules to parse strings.
 
 (defn parse [tokens]
-  (binding [*remainder-accessor* remainder-a] ; this is completely
-                                              ; optional
-    (rule-match text
-      #(raise parse-error "invalid document \"%s\""
-         (apply-str (remainder-a %)))
-      #(raise parse-error "leftover data after a valid node \"%s\""
-         (apply-str (remainder-a %2)))
-      (struct state-s tokens 0 0))))
-; The call to rule-match above is equivalent to the stuff below:
-;    (let [[product state :as result]
-;          (text (struct state-s tokens 0 0))]
-;      (if (nil? result)
-;        (raise parse-error "invalid document \"%s\""
-;          (apply-str tokens))
-;        (if-let [remainder (seq (remainder-a state))]
-;          product
-;          (raise parse-error "leftover data after a valid node \"%s\""
-;            (apply-str remainder)))))
+  (state-context standard-template
+    (match-rule text
+      #(raise parse-error %
+         "invalid document \"%s\""
+         (apply-str (fetch-remainder %)))
+      (fn [product new-state old-state]
+        (raise parse-error "leftover data '%s' after a valid node '%s'"
+          (apply-str (fetch-remainder new-state))
+          product))
+      tokens)))
 
-;; The functions below just convert JSON nodes into Clojure strings,
-;; vectors, and maps.
-
-(defmulti represent :kind)
-
-(defmethod represent :object [node]
-  (into {}
-    (map #(vector (represent (key %)) (represent (val %)))
-      (:content node))))
-
-(defmethod represent :array [node]
-  (vec (map #(represent %) (:content node))))
-
-(defmethod represent :scalar [node]
-  (:content node))
-
-(def load-stream (comp represent parse))
+(with-test
+  (def load-stream (comp represent parse))
+  (is (= (load-stream "[11]") [11]))
+  (is (= (load-stream "[1, 2, 3]") [1 2 3])
+      "loading a flat array containing integers")
+  (is (= (load-stream "[\"a\", \"b\\n\", \"\\u1234\"]")
+         ["a" "b\n" "\u1234"])
+      "loading a flat array containing strings")
+  (is (= (load-stream "{\"a\": 1, \"b\\n\": 2, \"\\u1234\": 3}")
+         {"a" 1, "b\n" 2, "\u1234" 3})
+      "loading a flat object containing strings and integers"))

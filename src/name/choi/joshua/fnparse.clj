@@ -51,6 +51,11 @@
   supposed to use state-context, which
   does all the work for you.")
 
+(defn fetch-remainder
+  "Gets the state's remainder."
+  [state]
+  (*remainder-accessor* state))
+
 (defn- assoc-remainder [state remainder]
   (assoc state ::remainder remainder))
 
@@ -63,11 +68,19 @@
   (with-meta (assoc-remainder *empty-state* tokens)
     {::index 0}))
 
+(defn make-state-with-info
+  "For mocking a state with already
+  provided info. Basically calls make-state
+  on the tokens and then applies info-args
+  to assoc."
+  [tokens & info-args]
+  (apply assoc (make-state tokens) info-args))
+
 (with-test
-  (defvar- get-index
+  (defvar- fetch-index
     (comp ::index meta)
     "Gets the given state's index.")
-  (-> nil make-state get-index (= 0) is))
+  (-> nil make-state fetch-index (= 0) is))
 
 (defn- set-index
   "Sets the given state's index to the given new-index."
@@ -78,7 +91,7 @@
   "Sets the given state's index to the result of
   applying the given function to the old index."
   [state f]
-  (set-index state (f (get-index state))))
+  (set-index state (f (fetch-index state))))
 
 (defn new-info
   "Creates a new state with the given info."
@@ -109,16 +122,16 @@
       the sum of the indexes of state-a and
       state-b."
     [state-a state-b]
-    (let [index-b (get-index state-b)]
+    (let [index-b (fetch-index state-b)]
       (-> state-a
         (*add-info* state-b)
         (assoc-remainder (drop index-b (*remainder-accessor* state-a)))
-        (set-index (+ (get-index state-a) index-b)))))
+        (set-index (+ (fetch-index state-a) index-b)))))
   (let [state-a (-> '[a b c d] make-state (set-index 4))
         state-b (-> nil make-state (set-index 2))
         summed-state (add-states state-a state-b)]
     (-> '[c d] make-state (= summed-state) is)
-    (-> summed-state get-index (= 6) is)))
+    (-> summed-state fetch-index (= 6) is)))
 
 (with-test
   (defmacro complex
@@ -410,7 +423,7 @@
       "created concatenated rule succeeds when all subrules fulfilled in order")
   (is (= (-> ["hi" "THEN" "bye"] make-state
            ((conc (lit "hi") (lit "THEN")))
-           second get-index)
+           second fetch-index)
          2)
       "created concatenated rule correctly deals with indexes")
   (is (nil? ((conc (lit "hi") (lit "THEN"))
@@ -442,7 +455,7 @@
          ["THEN" (make-state (list "bye"))]))
   (is (= (-> ["THEN" "bye"] make-state
            ((alt (lit "hi") (lit "THEN")))
-           second get-index)
+           second fetch-index)
          1))
   (is (nil? ((alt (lit "hi") (lit "THEN"))
              (make-state ["bye" "boom"])))))
@@ -942,10 +955,10 @@
       (let [new-warnings (into (:warnings s0) (:warnings s1))
             s1-line (s1 :line)
             s1-column (s1 :column)
-            new-line (+ (s0 :line) s1-line -1)
-            new-column (if (> s1-line -1)
+            new-line (+ (s0 :line) s1-line)
+            new-column (if (pos? s1-line)
                          s1-column
-                         (+ (s0 :column) s1-column -1))]
+                         (+ (s0 :column) s1-column))]
        (new-info
          :warnings new-warnings
          :line new-line
@@ -953,8 +966,8 @@
     
     (state-context
       {:warnings []
-       :line 1
-       :column 1
+       :line 0
+       :column 0
        ::p/add-info add-info}
       ; Define your rules and create states inside the context.
       (def line-break
@@ -1013,66 +1026,54 @@
            [\a (-> "bc" seq make-state (assoc :warnings []))]))
     (is (thrown? ClassCastException
           ((lit \a) {::remainder []}))))
-  (let [add-info
-          (fn [s0 s1]
-            (let [new-warnings (into (:warnings s0) (:warnings s1))
-                  s1-line (s1 :line)
-                  s1-column (s1 :column)
-                  new-line (+ (s0 :line) s1-line -1)
-                  new-column (if (> s1-line 1)
-                               s1-column
-                               (+ (s0 :column) s1-column -1))]
-             (new-info
-               :warnings new-warnings
-               :line new-line
-               :column new-column)))]
-    (state-context standard-template
-      (is (= {::remainder "ABZ\nC"
-              :line 1
-              :column 1
-              :warnings []}
-             (make-state "ABZ\nC")))
-      (is (= (assoc (make-state (seq "D"))
-               :line 2
+  (state-context standard-template
+    (is (= {::remainder "ABZ\nC"
+            :line 0
+            :column 0
+            :warnings []}
+           (make-state "ABZ\nC")))
+    (is (= (assoc (make-state (seq "D"))
+             :line 1
+             :column 1
+             :warnings ["I'm a warning!"])
+           (add-states
+             (assoc (make-state "\nCD")
+               :line 0
+               :column 3
+               :warnings [])
+             (assoc (set-index (make-state nil) 2)
+               :line 1
                :column 1
-               :warnings ["I'm a warning!"])
-             (add-states
-               (assoc (make-state "\nCD")
-                 :line 1
-                 :column 1
-                 :warnings [])
-               (assoc (set-index (make-state nil) 2)
-                 :line 2
-                 :column 1
-                 :warnings ["I'm a warning!"])))))))
+               :warnings ["I'm a warning!"]))))))
 
 (with-test
-  (defn- match-rule
+  (defn match-rule
     "Creates a function that tries to completely
-    match the given rule to the given
-    state, with no remainder left.
-    - If (rule given-state) fails, then
+    match the given rule to the given tokens,
+    with no remainder left over after the match.
+    - If (-> tokens make-state rule) fails, then
       (failure-fn given-state) is called.
-    - If the remainder of (rule given-state) is
-      not empty, then...
+    - If the remainder of (-> tokens make-state rule)
+      is not empty, then...
         (incomplete-fn
           product-from-consumed-tokens
           new-state-after-rule
-          given-state)
+          initial-state)
       ...is called.
     - If the new remainder is empty, then the
       product of the rule is returned."
-    [rule failure-fn incomplete-fn state-0]
-    (if-let [[product state-1] (rule state-0)]
-      (if (empty? (*remainder-accessor* state-1))
-        product
-        (incomplete-fn product state-1 state-0))
-      (failure-fn state-0)))
+    [rule failure-fn incomplete-fn tokens]
+    (let [state-0 (make-state tokens)]
+      (if-let [[product state-1] (rule state-0)]
+        (if (empty? (*remainder-accessor* state-1))
+          product
+          (incomplete-fn product state-1 state-0))
+        (failure-fn state-0))))
   (let [rule (lit "A")
         matcher (partial match-rule rule identity vector)]
-    (is (= (matcher (make-state ["A"])) "A"))
-    (is (= (matcher (make-state ["B"])) (make-state ["B"])))
-    (is (= (matcher (make-state ["A" "B"]))
+    (is (= (matcher ["A"]) "A"))
+    (is (= (matcher ["B"]) (make-state ["B"])))
+    (is (= (matcher ["A" "B"])
            ["A" (make-state ["B"]) (make-state ["A" "B"])]))))
 
 (defn- starts-with? [subject-seq query-seq]
@@ -1115,11 +1116,11 @@
     (let [memory (atom {})]
       (fn [state-0]
         (let [remainder-0 (*remainder-accessor* state-0)
-              index-0 (get-index state-0)]
+              index-0 (fetch-index state-0)]
           (if-let [found-result (find-mem-result @memory remainder-0)]
             (let [found-product (found-result 0)
                   found-state (found-result 1)
-                  found-state-index (get-index found-state)
+                  found-state-index (fetch-index found-state)
                   new-remainder (drop found-state-index remainder-0)
                   new-state (-> state-0
                               (add-states found-state)
@@ -1131,7 +1132,7 @@
               (let [subproduct (subresult 0)
                     substate (subresult 1)
                     subremainder (*remainder-accessor* substate)
-                    subindex (get-index substate)
+                    subindex (fetch-index substate)
                     consumed-tokens (take subindex remainder-0)
                     mem-state (assoc-remainder substate nil)
                     returned-state (add-states state-0 mem-state)]
@@ -1160,10 +1161,10 @@
   (let [new-warnings (into (:warnings s0) (:warnings s1))
         s1-line (s1 :line)
         s1-column (s1 :column)
-        new-line (+ (s0 :line) s1-line -1)
-        new-column (if (> s1-line 1)
+        new-line (+ (s0 :line) s1-line)
+        new-column (if (pos? s1-line)
                      s1-column
-                     (+ (s0 :column) s1-column -1))]
+                     (+ (s0 :column) s1-column))]
    (new-info
      :warnings new-warnings
      :line new-line
@@ -1171,8 +1172,8 @@
 
 (defvar standard-template
   {:warnings []
-   :line 1
-   :column 1
+   :line 0
+   :column 0
    ::add-info merge-standard-info})
 
 (defn inc-column
