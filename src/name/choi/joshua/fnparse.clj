@@ -63,9 +63,14 @@
   [state f]
   (set-index state (f (get-index state))))
 
+(defn new-info
+  "Creates a new state with the given info."
+  [& info-keys-and-vals]
+  (apply assoc *empty-state* info-keys-and-vals))
+
 (defvar- *merge-info*
   merge
-  "Overridable by using with-state-context.
+  "Overridable by using state-context.
   Merges two states' info together. The first
   state is the primary one, and the second state
   adds its warnings, line numbers, and whatever
@@ -386,6 +391,11 @@
           (make-state ["hi" "THEN" "bye"]))
          [["hi" "THEN"] (make-state (list "bye"))])
       "created concatenated rule succeeds when all subrules fulfilled in order")
+  (is (= (-> ["hi" "THEN" "bye"] make-state
+           ((conc (lit "hi") (lit "THEN")))
+           second get-index)
+         2)
+      "created concatenated rule correctly deals with indexes")
   (is (nil? ((conc (lit "hi") (lit "THEN"))
              (make-state ["hi" "bye" "boom"])))
       "created concatenated rule fails when one subrule fails"))
@@ -408,6 +418,17 @@
   `(with-monad parser-m
      (fn [state#]
        ((~'m-plus ~@subrules) state#))))
+
+(deftest test-alt
+  (is (= ((alt (lit "hi") (lit "THEN"))
+          (make-state ["THEN" "bye"]))
+         ["THEN" (make-state (list "bye"))]))
+  (is (= (-> ["THEN" "bye"] make-state
+           ((alt (lit "hi") (lit "THEN")))
+           second get-index)
+         1))
+  (is (nil? ((alt (lit "hi") (lit "THEN"))
+             (make-state ["bye" "boom"])))))
 
 (with-test
   (defn opt
@@ -783,7 +804,7 @@
          (complex [subproduct (lit "A")
                      line-number (get-info :line)
                      effects (effects (println "!" subproduct)
-                                        (println "YES" line-number))]
+                                      (println "YES" line-number))]
            subproduct)]
     (is (= (with-out-str
              (is (= (rule (-> ["A" "B"] make-state (assoc :line 3)))
@@ -891,38 +912,80 @@
     new state is at a new line, a different line from the first
     state! Here's the code...
     
-    (with-state-context
+    (use 'name.choi.joshua.fnparse)
+    (require '[name.choi.joshua.fnparse :as p])
+      ; Did you know that you can shorten double-colon-ed
+      ; namespace-qualified keywords using the namespaces'
+      ; abbreviations from require? It's true! Thanks to
+      ; the above require form, the ::p/remainder keyword
+      ; is equivalent to :name.choi.joshua.fnparse/remainder!
+    
+    (defn merge-info [s0 s1]
+      (let [new-warnings (into (:warnings s0) (:warnings s1))
+            s1-line (s1 :line)
+            s1-column (s1 :column)
+            new-line (+ (s0 :line) s1-line)
+            new-column (if (pos? s1-line)
+                         s1-column
+                         (+ (s0 :column) s1-column))]
+       (new-info
+         :warnings new-warnings
+         :line new-line
+         :column new-column)))
+    
+    (state-context
       {:warnings []
-       :line 0
-       :column 0
-       :name.choi.joshua.fnparse/merge-info
-         (fn [s0 s1]
-           ; find-info is like Clojure's get, only it
-           ; takes advantage of the context's speedy
-           ; struct accessors.
-           ; reduce-info-pair takes the info with the
-           ; given key of two states and plugs them into
-           ; the given function.
-           (let [new-warnings (reduce-info-pair + :warnings s0 s1)
-                 s1-line (find-info s1 :line)
-                 s1-column (find-info s1 :column)
-                 new-line (+ (find-info s0 :line) s1-line)
-                 new-column (if (pos? s1-line)
-                              s1-column
-                              (+ (find-info s0 :column) s1-column))]
-             (new-info
-               :warnings new-warnings
-               :line new-line
-               :column new-column)))})"
+       :line 1
+       :column 1
+       ::p/merge-info merge-info}
+      ; Define your rules and create states inside the context.
+      (def line-break
+        (invisi-conc (lit \\newline)
+          (update-info :line inc)
+          (set-info :column 0)))
+      (defn add-warning [line column]
+        (update-info :warnings
+          #(conj % (format \"Z FOUND AT line %s, col %s!\"
+                     line column))))
+      (def illegal-z
+        (complex [z (lit \\z)
+                  line (get-info :line)
+                  column (get-info :column)
+                  _ (add-warning line column)]
+          \"WRONG\"))
+      (def non-break
+        (invisi-conc (alt illegal-z (except line-break))
+          (update-info :column inc)))
+      (def text
+        (-> (alt line-break non-break) rep+ mem))
+      (def a-state (make-state \"ABZ\\nC\"))
+        ; Returns
+        ; {::p/remainder \"ABZ\\nC\"
+        ;  :line 1
+        ;  :column 1
+        ;  :warnings []}
+      (text a-state)
+        ; Returns
+        ; [(\\A \\B \"WRONG\" \\newline \\C)
+        ;  {::p/remainder nil
+        ;   :line 2
+        ;   :column 1
+        ;   :warnings [\"Z FOUND AT line 1, column 3\"]}])"
     [state-template & forms]
     (if-not (map? state-template)
       (throw-arg "The first argument to state-context must be a map"))
-    (let [struct-keys (cons ::remainder (keys state-template))]
+    (let [default-state
+            (dissoc state-template ::merge-info)
+          struct-keys
+            (cons ::remainder (keys default-state))
+          merge-info-fn
+            (::merge-info state-template)]
       `(let [state-struct# (create-struct ~@struct-keys)
-             empty-state# (into (struct state-struct#) ~state-template)
+             empty-state# (into (struct state-struct#) ~default-state)
              remainder-accessor# (accessor state-struct# ::remainder)]
         (binding [*empty-state* empty-state#
-                  *remainder-accessor* remainder-accessor#]
+                  *remainder-accessor* remainder-accessor#
+                  *merge-info* ~merge-info-fn]
           ~@forms)))))
 
 (deftest state-context-test
@@ -930,20 +993,60 @@
     (is (= ((lit \a) (make-state "abc"))
            [\a (-> "bc" seq make-state (assoc :warnings []))]))
     (is (thrown? ClassCastException
-          ((lit \a) {::remainder []})))))
+          ((lit \a) {::remainder []}))))
+  (let [merge-info
+          (fn [s0 s1]
+            (let [new-warnings (into (:warnings s0) (:warnings s1))
+                  s1-line (s1 :line)
+                  s1-column (s1 :column)
+                  new-line (+ (s0 :line) s1-line)
+                  new-column (if (pos? s1-line)
+                               s1-column
+                               (+ (s0 :column) s1-column))]
+             (new-info
+               :warnings new-warnings
+               :line new-line
+               :column new-column)))]
+    (state-context
+      {:warnings []
+       :line 1
+       :column 1
+       ::merge-info merge-info}
+      (is (= {::remainder "ABZ\nC"
+              :line 1
+              :column 1
+              :warnings []}
+             (make-state "ABZ\nC")))
+      (is (= (assoc (make-state (seq "D"))
+               :line 2
+               :column 1
+               :warnings ["I'm a warning!"])
+             (add-states
+               (assoc (make-state "\nCD")
+                 :line 1
+                 :column 1
+                 :warnings [])
+               (assoc (set-index (make-state "\nC") 2)
+                 :line 1
+                 :column 1
+                 :warnings ["I'm a warning!"])))))))
 
 (with-test
   (defn- match-rule
-    "Creates a function that tries to completely match the given rule to the given
+    "Creates a function that tries to completely
+    match the given rule to the given
     state, with no remainder left.
-    - If (rule given-state) fails, then (failure-fn given-state) is called.
-    - If the remainder of (rule given-state) is not empty, then
-      (incomplete-fn
-        product-from-consumed-tokens
-        new-state-after-rule
-        given-state)
+    - If (rule given-state) fails, then
+      (failure-fn given-state) is called.
+    - If the remainder of (rule given-state) is
+      not empty, then...
+        (incomplete-fn
+          product-from-consumed-tokens
+          new-state-after-rule
+          given-state)
       ...is called.
-    - If the new remainder is empty, then the product of the rule is returned."
+    - If the new remainder is empty, then the
+      product of the rule is returned."
     [rule failure-fn incomplete-fn state-0]
     (if-let [[product state-1] (rule state-0)]
       (if (empty? (*remainder-accessor* state-1))
@@ -960,60 +1063,76 @@
 (defn- starts-with? [subject-seq query-seq]
   (every? identity (map = subject-seq query-seq)))
 
-(defn find-mem-result [memory-map query-key]
-  (if-let [candidates (seq (filter #(starts-with? (key %) query-key)
-                             memory-map))]
-    (if (> (count candidates) 1)
-      ; Just in case more than one entry is found, which isn't supposed to
-      ; happen
-      (raise fnparse-error
-        "found more than one entry that matches the token remainder %s: %s"
-        query-key candidates)
-      (val (first candidates)))))
+(with-test
+  (defn- find-mem-result [memory-map query-key]
+    (if-let [candidates (seq (filter #(starts-with? (key %) query-key)
+                               memory-map))]
+      (if (> (count candidates) 1)
+        ; Just in case more than one entry is found, which isn't supposed to
+        ; happen
+        (raise fnparse-error
+          "found more than one entry that matches the token remainder %s: %s"
+          query-key candidates)
+        (val (first candidates)))))
+  (let [remainder-1 '[a b c d]
+        remainder-2 '[d e f]
+        remainder-3 '[a c b d]
+        memory {'[a b] 'dummy-1
+                '[d e f] 'dummy-2}]
+    (is (= (find-mem-result memory remainder-1) 'dummy-1))
+    (is (= (find-mem-result memory remainder-2) 'dummy-2))
+    (is (= (find-mem-result memory remainder-3) nil))))
 
-; (defn mem
-;   "Creates a memoizing rule that caches its subrule's results in an atom.
-;   Whenever the new mem rule is called, it checks the cache to see if there is an
-;   existing match; otherwise, the subrule is called.
-; 
-;   mem REQUIRES that the given state contain an index, accessible with
-;   get-index and setable with vary-index. mem also requires that ALL
-;   rules within the subrule increment the index as each token is consumed. This
-;   is normally not a problem, as all of FnParse's rule makers create rules that
-;   do this.
-; 
-;   For more information on indexes, check out
-;   http://wiki.github.com/joshua-choi/fnparse/on-states."
-;   [subrule]
-;   (let [memory (atom {})]
-;     (fn [state-0]
-;       (let [remainder-0 (*remainder-accessor* state-0)
-;             index-0 (get-index state-0)]
-;         (if-let [found-result (find-mem-result @memory remainder-0)]
-;           (let [found-product (found-result 0)
-;                 found-state (found-result 1)
-;                 found-state-index (get-index found-state)
-;                 new-remainder (drop found-state-index remainder-0)
-;                 new-state (-> state-0
-;                             (add-states found-state)
-;                             (assoc-remainder new-remainder)
-;                             (vary-index (+ index-0 found-state-index)))]
-;             ; (println "> memory found" [found-product found-state])
-;             [found-product new-state])
-;           (if-let [subresult (subrule (assoc-remainder *empty-state*
-;                                         remainder-0))]
-;             (let [subproduct (subresult 0)
-;                   substate (subresult 1)
-;                   subremainder (*remainder-accessor* substate)
-;                   subindex (get-index substate)
-;                   consumed-tokens (take subindex remainder-0)
-;                   mem-state (assoc-remainder substate nil)
-;                   returned-state (add-states state-0 mem-state)]
-;               ; (println "> memory registered" consumed-tokens [consumed-tokens mem-state])
-;               (swap! memory assoc consumed-tokens [subproduct mem-state])
-;               ; (println "> memory " memory)
-;               [subproduct returned-state])))))))
-
+(with-test
+  (defn mem
+    "Creates a memoizing rule that caches its subrule's results in an atom.
+    Whenever the new mem rule is called, it checks the cache to see if there is an
+    existing match; otherwise, the subrule is called.
+  
+    mem REQUIRES that the given state contain an index, accessible with
+    get-index and setable with vary-index. mem also requires that ALL
+    rules within the subrule increment the index as each token is consumed. This
+    is normally not a problem, as all of FnParse's rule makers create rules that
+    do this.
+  
+    For more information on indexes, check out
+    http://wiki.github.com/joshua-choi/fnparse/on-states."
+    [subrule]
+    (let [memory (atom {})]
+      (fn [state-0]
+        (let [remainder-0 (*remainder-accessor* state-0)
+              index-0 (get-index state-0)]
+          (if-let [found-result (find-mem-result @memory remainder-0)]
+            (let [found-product (found-result 0)
+                  found-state (found-result 1)
+                  found-state-index (get-index found-state)
+                  new-remainder (drop found-state-index remainder-0)
+                  new-state (-> state-0
+                              (add-states found-state)
+                              (assoc-remainder new-remainder)
+                              (vary-index (+ index-0 found-state-index)))]
+              ; (println "> memory found" [found-product found-state])
+              [found-product new-state])
+            (if-let [subresult (subrule (make-state remainder-0))]
+              (let [subproduct (subresult 0)
+                    substate (subresult 1)
+                    subremainder (*remainder-accessor* substate)
+                    subindex (get-index substate)
+                    consumed-tokens (take subindex remainder-0)
+                    mem-state (assoc-remainder substate nil)
+                    returned-state (add-states state-0 mem-state)]
+                ; (println "> memory registered" consumed-tokens [consumed-tokens mem-state])
+                (swap! memory assoc consumed-tokens [subproduct mem-state])
+                ; (println "> memory " memory)
+                [subproduct returned-state])))))))
+  (let [rule (mem (alt (conc (lit 'a) (lit 'b)) (lit 'c)))]
+    (is (= (rule (make-state '[a b c]))
+           ['[a b] (make-state '[c])]))))
+;     (is (= (rule (make-state '[a b c])) ['[a b] (make-state '[c])]))
+;     (is (= (rule (make-state '[c s a])) ['c (make-state '[s a])]))
+;     (is (= (rule (make-state '[c])) ['c (make-state [])]))
+;     (is (nil? (rule (make-state '[s a]))))
+;     (is (nil? (rule (make-state '[s a]))))))
 
 (defstruct minimal-s ::remainder :index)
 (defstruct standard-s ::remainder :index :line :column)
