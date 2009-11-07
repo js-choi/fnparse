@@ -17,7 +17,7 @@
 ; - (2) is called the rule's State.
 ; - (3) is called the rule's Remainder.
 
-(declare lit rep* rep+ except)
+(declare lit rep* rep+ except standard-template)
 
 (deferror fnparse-error [] [message-template & template-args]
   {:msg (str "FnParse error: " (apply format message-template template-args))
@@ -85,7 +85,7 @@
   [& info-keys-and-vals]
   (apply assoc *empty-state* info-keys-and-vals))
 
-(defvar- *merge-info*
+(defvar- *add-info*
   merge
   "Overridable by using state-context.
   Merges two states' info together. The first
@@ -99,7 +99,7 @@
     useful for users--only the mem rule maker
     uses it. It adds state-b into state-a. First:
     - The two states' info are added using the
-      overridable *merge-info* function,
+      overridable *add-info* function,
       forming a new state.
     - The remainder of the new state is changed
       to state-a's remainder with the
@@ -111,7 +111,7 @@
     [state-a state-b]
     (let [index-b (get-index state-b)]
       (-> state-a
-        (*merge-info* state-b)
+        (*add-info* state-b)
         (assoc-remainder (drop index-b (*remainder-accessor* state-a)))
         (set-index (+ (get-index state-a) index-b)))))
   (let [state-a (-> '[a b c d] make-state (set-index 4))
@@ -666,7 +666,8 @@
     [factor-predicate subrule]
     (validate (rep* subrule) (comp factor-predicate count)))
   (let [tested-rule-fn (rep-predicate (partial > 3) (lit "A"))
-        infinity-rule (rep-predicate (partial > Double/POSITIVE_INFINITY) (lit "A"))]
+        infinity-rule (rep-predicate (partial > Double/POSITIVE_INFINITY)
+                        (lit "A"))]
     (is (= (tested-rule-fn (make-state (list "A" "A" "C")))
            [["A" "A"] (make-state (list "C"))])
         "created rep rule works when predicate returns true")
@@ -906,12 +907,12 @@
     
     You can (and must, if you use things like memoizing
     rules) provide a special info addition recipe in the
-    template with the key :name.choi.joshua.fnparse/merge-info.
+    template with the key :name.choi.joshua.fnparse/add-info.
     Corresponding to it would be a two-argument function that
     merges its second argument (a state) into the first
     argument (another state). This is important. It is
     essential if you use the memo rule-maker. Read the example
-    below to learn how to implement a proper merge-info.
+    below to learn how to implement a proper add-info.
     
     Here is an example to make it clearer how you
     customize states. Let's say that I want my states to
@@ -937,14 +938,14 @@
       ; the above require form, the ::p/remainder keyword
       ; is equivalent to :name.choi.joshua.fnparse/remainder!
     
-    (defn merge-info [s0 s1]
+    (defn add-info [s0 s1]
       (let [new-warnings (into (:warnings s0) (:warnings s1))
             s1-line (s1 :line)
             s1-column (s1 :column)
-            new-line (+ (s0 :line) s1-line)
-            new-column (if (pos? s1-line)
+            new-line (+ (s0 :line) s1-line -1)
+            new-column (if (> s1-line -1)
                          s1-column
-                         (+ (s0 :column) s1-column))]
+                         (+ (s0 :column) s1-column -1))]
        (new-info
          :warnings new-warnings
          :line new-line
@@ -954,7 +955,7 @@
       {:warnings []
        :line 1
        :column 1
-       ::p/merge-info merge-info}
+       ::p/add-info add-info}
       ; Define your rules and create states inside the context.
       (def line-break
         (invisi-conc (lit \\newline)
@@ -989,21 +990,22 @@
         ;   :column 1
         ;   :warnings [\"Z FOUND AT line 1, column 3\"]}])"
     [state-template & forms]
-    (if-not (map? state-template)
-      (throw-arg "The first argument to state-context must be a map"))
-    (let [default-state
-            (dissoc state-template ::merge-info)
-          struct-keys
-            (cons ::remainder (keys default-state))
-          merge-info-fn
-            (::merge-info state-template)]
-      `(let [state-struct# (create-struct ~@struct-keys)
-             empty-state# (into (struct state-struct#) ~default-state)
-             remainder-accessor# (accessor state-struct# ::remainder)]
-        (binding [*empty-state* empty-state#
-                  *remainder-accessor* remainder-accessor#
-                  *merge-info* ~merge-info-fn]
-          ~@forms)))))
+    `(let [default-state#
+            (dissoc ~state-template ::add-info)
+          struct-keys#
+            (cons ::remainder (keys default-state#))
+          add-info-fn#
+            (::add-info ~state-template)
+          state-struct#
+            (apply create-struct struct-keys#)
+          empty-state#
+            (into (struct state-struct#) default-state#)
+          remainder-accessor#
+            (accessor state-struct# ::remainder)]
+      (binding [*empty-state* empty-state#
+                *remainder-accessor* remainder-accessor#
+                *add-info* add-info-fn#]
+        ~@forms))))
 
 (deftest state-context-test
   (state-context {:warnings []}
@@ -1011,24 +1013,20 @@
            [\a (-> "bc" seq make-state (assoc :warnings []))]))
     (is (thrown? ClassCastException
           ((lit \a) {::remainder []}))))
-  (let [merge-info
+  (let [add-info
           (fn [s0 s1]
             (let [new-warnings (into (:warnings s0) (:warnings s1))
                   s1-line (s1 :line)
                   s1-column (s1 :column)
-                  new-line (+ (s0 :line) s1-line)
-                  new-column (if (pos? s1-line)
+                  new-line (+ (s0 :line) s1-line -1)
+                  new-column (if (> s1-line 1)
                                s1-column
-                               (+ (s0 :column) s1-column))]
+                               (+ (s0 :column) s1-column -1))]
              (new-info
                :warnings new-warnings
                :line new-line
                :column new-column)))]
-    (state-context
-      {:warnings []
-       :line 1
-       :column 1
-       ::merge-info merge-info}
+    (state-context standard-template
       (is (= {::remainder "ABZ\nC"
               :line 1
               :column 1
@@ -1043,8 +1041,8 @@
                  :line 1
                  :column 1
                  :warnings [])
-               (assoc (set-index (make-state "\nC") 2)
-                 :line 1
+               (assoc (set-index (make-state nil) 2)
+                 :line 2
                  :column 1
                  :warnings ["I'm a warning!"])))))))
 
@@ -1102,18 +1100,17 @@
 
 (with-test
   (defn mem
-    "Creates a memoizing rule that caches its subrule's results in an atom.
-    Whenever the new mem rule is called, it checks the cache to see if there is an
+    "Creates a memoizing rule that caches
+    its subrule's results in an atom.
+    Whenever the new mem rule is called,
+    it checks the cache to see if there is an
     existing match; otherwise, the subrule is called.
   
-    mem REQUIRES that the given state contain an index, accessible with
-    get-index and setable with vary-index. mem also requires that ALL
-    rules within the subrule increment the index as each token is consumed. This
-    is normally not a problem, as all of FnParse's rule makers create rules that
-    do this.
-  
-    For more information on indexes, check out
-    http://wiki.github.com/joshua-choi/fnparse/on-states."
+    If you use a customized state context,
+    mem requires that you implement a
+    ::fnparse/add-info function in your
+    state template. See state-context's docs
+    for information on how to do that."
     [subrule]
     (let [memory (atom {})]
       (fn [state-0]
@@ -1152,14 +1149,21 @@
 ;     (is (nil? (rule (make-state '[s a]))))))
 
 (defn- merge-standard-info
+  "The standard-template needs special
+  behavior for merging its states. Firstly,
+  warnings are always just merged into each
+  other; it's commutative.
+  However, line and column numbers are
+  different. If you add a state with a line
+  of 0: in other words, "
   [s0 s1]
   (let [new-warnings (into (:warnings s0) (:warnings s1))
         s1-line (s1 :line)
         s1-column (s1 :column)
-        new-line (+ (s0 :line) s1-line)
-        new-column (if (pos? s1-line)
+        new-line (+ (s0 :line) s1-line -1)
+        new-column (if (> s1-line 1)
                      s1-column
-                     (+ (s0 :column) s1-column))]
+                     (+ (s0 :column) s1-column -1))]
    (new-info
      :warnings new-warnings
      :line new-line
@@ -1169,7 +1173,7 @@
   {:warnings []
    :line 1
    :column 1
-   ::merge-info merge-standard-info})
+   ::add-info merge-standard-info})
 
 (defn inc-column
   "Meant to be used only with standard-bundle states, or other states with an
