@@ -1134,29 +1134,25 @@
 ;     (is (nil? (rule (make-state '[s a]))))
 ;     (is (nil? (rule (make-state '[s a]))))))
 
-(defstruct minimal-s ::remainder :index)
-(defstruct standard-s ::remainder :index :line :column)
-(def standard-line-a (accessor standard-s :line))
-(def standard-column-a (accessor standard-s :column))
+(defn- merge-standard-info
+  [s0 s1]
+  (let [new-warnings (into (:warnings s0) (:warnings s1))
+        s1-line (s1 :line)
+        s1-column (s1 :column)
+        new-line (+ (s0 :line) s1-line)
+        new-column (if (pos? s1-line)
+                     s1-column
+                     (+ (s0 :column) s1-column))]
+   (new-info
+     :warnings new-warnings
+     :line new-line
+     :column new-column)))
 
-(def minimal-bundle
-  {:empty-state (struct minimal-s [] 0)
-   :remainder-accessor (accessor minimal-s ::remainder)
-   :index-accessor (accessor minimal-s :index)})
-
-(def standard-bundle
-  {:empty-state (struct standard-s [] 0 0 0)
-   :remainder-accessor (accessor standard-s ::remainder)
-   :index-accessor (accessor standard-s :index)
-   :merge-info (fn [s0 s1]
-               (let [line0 (standard-line-a s0)
-                     line1 (standard-line-a s1)
-                     column1 (standard-column-a s1)]
-                 (if (zero? line1)
-                   (assoc s0 :column (+ (standard-column-a s0) column1))
-                   (assoc s0
-                     :line (+ line0 line1)
-                     :column column1))))})
+(defvar standard-template
+  {:warnings []
+   :line 1
+   :column 1
+   ::merge-info merge-standard-info})
 
 (defn inc-column
   "Meant to be used only with standard-bundle states, or other states with an
