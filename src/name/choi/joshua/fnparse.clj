@@ -29,10 +29,27 @@
   forms can you form from this?")
 
 (defvar- *empty-state*
-  {::remainder nil})
+  {::remainder nil}
+  "The overridable var for the context's
+  empty state. It does not have an index
+  assigned to its metadata; that's
+  make-state's job.
+  It's private. That's because you're
+  supposed to use state-context, which
+  does all the work for you.")
 
 (defvar- *remainder-accessor*
-  ::remainder)
+  ::remainder
+  "The overridable var for the context's
+  remainder accessor. If the current
+  context uses a struct map, then this
+  var contains the speedy accessor for
+  ::remainder. But in any case, it refers
+  to the ::remainder key; I made that
+  standard.
+  The var is private. That's because you're
+  supposed to use state-context, which
+  does all the work for you.")
 
 (defn- assoc-remainder [state remainder]
   (assoc state ::remainder remainder))
@@ -41,7 +58,7 @@
   "The general function that creates a state
   from the given sequence of tokens.
   You really must use this function to create
-  states to plug into rules."
+  any states that you'll plug into rules."
   [tokens]
   (with-meta (assoc-remainder *empty-state* tokens)
     {::index 0}))
@@ -52,7 +69,7 @@
     "Gets the given state's index.")
   (-> nil make-state get-index (= 0) is))
 
-(defn set-index
+(defn- set-index
   "Sets the given state's index to the given new-index."
   [state new-index]
   (vary-meta state assoc ::index new-index))
