@@ -17,7 +17,7 @@
 ; - (2) is called the rule's State.
 ; - (3) is called the rule's Remainder.
 
-(declare lit rep* rep+ except standard-template)
+(declare lit rep* rep+ except std-template)
 
 (deferror fnparse-error [] [message-template & template-args]
   {:msg (str "FnParse error: " (apply format message-template template-args))
@@ -46,7 +46,7 @@
   var contains the speedy accessor for
   ::remainder. But in any case, it refers
   to the ::remainder key; I made that
-  standard.
+  std.
   The var is private. That's because you're
   supposed to use state-context, which
   does all the work for you.")
@@ -1026,7 +1026,7 @@
            [\a (-> "bc" seq make-state (assoc :warnings []))]))
     (is (thrown? ClassCastException
           ((lit \a) {::remainder []}))))
-  (state-context standard-template
+  (state-context std-template
     (is (= {::remainder "ABZ\nC"
             :line 0
             :column 0
@@ -1149,8 +1149,8 @@
 ;     (is (nil? (rule (make-state '[s a]))))
 ;     (is (nil? (rule (make-state '[s a]))))))
 
-(defn- merge-standard-info
-  "The standard-template needs special
+(defn- merge-std-info
+  "The std-template needs special
   behavior for merging its states. Firstly,
   warnings are always just merged into each
   other; it's commutative.
@@ -1170,14 +1170,14 @@
      :line new-line
      :column new-column)))
 
-(defvar standard-template
+(defvar std-template
   {:warnings []
    :line 0
    :column 0
-   ::add-info merge-standard-info})
+   ::add-info merge-std-info})
 
 (defn inc-column
-  "Meant to be used only with standard-bundle states, or other states with an
+  "Meant to be used only with std-bundle states, or other states with an
   integer :column val.
 
   Creates a new rule that calls the subrule, and then increments the column.
@@ -1186,7 +1186,7 @@
   (invisi-conc subrule (update-info :column inc)))
 
 (defn inc-line
-  "Meant to be used only with standard-bundle states, or other states with an
+  "Meant to be used only with std-bundle states, or other states with an
   integer :column val and an integer :line val.
 
   Creates a new rule that calls the subrule, and then increments the line and

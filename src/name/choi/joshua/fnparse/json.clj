@@ -39,9 +39,8 @@
   (:content node))
 
 (defn- make-mock-state [tokens warnings column line]
-  (state-context standard-template
-    (make-state-with-info (seq tokens)
-      :warnings warnings, :line line, :column column)))
+  (make-state-with-info (seq tokens)
+    :warnings warnings, :line line, :column column))
 
 ;; These two functions are given a rule and make it so that it
 ;; increments the current column (or the current line).
@@ -156,17 +155,18 @@
         Double/parseDouble
         ((if (or below-one power) identity int))
         make-scalar-node)))
-  (is (= (number-lit (make-mock-state "123]" [] 3 4))
-         [(make-node :scalar 123) (make-mock-state "]" [] 6 4)]))
-  (is (= (number-lit (make-mock-state "-123]" [] 3 4))
-         [(make-node :scalar -123) (make-mock-state "]" [] 7 4)]))
-  (is (= (number-lit (make-mock-state "-123e3]" [] 3 4))
-         [(make-node :scalar -123e3) (make-mock-state "]" [] 9 4)]))
-  (is (= (number-lit (make-mock-state "-123.9e3]" [] 3 4))
-         [(make-node :scalar -123.9e3) (make-mock-state "]" [] 11 4)])))
-;  (is (thrown-with-msg? Exception
-;        #"JSON error at line 4, column 10: in number literal, after an exponent sign, decimal digit expected where \"e\" is"
-;        (number-lit (make-mock-state "-123.9ee3]" [] 3 4)))))
+  (state-context std-template
+    (is (= (number-lit (make-mock-state "123]" [] 3 4))
+           [(make-node :scalar 123) (make-mock-state "]" [] 6 4)]))
+    (is (= (number-lit (make-mock-state "-123]" [] 3 4))
+           [(make-node :scalar -123) (make-mock-state "]" [] 7 4)]))
+    (is (= (number-lit (make-mock-state "-123e3]" [] 3 4))
+           [(make-node :scalar -123e3) (make-mock-state "]" [] 9 4)]))
+    (is (= (number-lit (make-mock-state "-123.9e3]" [] 3 4))
+           [(make-node :scalar -123.9e3) (make-mock-state "]" [] 11 4)]))))
+  ;  (is (thrown-with-msg? Exception
+  ;        #"JSON error at line 4, column 10: in number literal, after an exponent sign, decimal digit expected where \"e\" is"
+  ;        (number-lit (make-mock-state "-123.9ee3]" [] 3 4))))))
 
 (def hexadecimal-digit
   (alt decimal-digit (lit-alt-seq "ABCDEF" nb-char-lit)))
@@ -181,10 +181,11 @@
                          (failpoint hexadecimal-digit
                            (expectation-error-fn "hexadecimal digit")))]
       (-> digits apply-str (Integer/parseInt 16) char)))
-  (is (= (unicode-char-sequence (make-mock-state "u11A3a\"]" [] 3 4))
-         [\u11A3 (make-mock-state (seq "a\"]") [] 8 4)]))
-  (is (thrown? Exception
-        (unicode-char-sequence (make-mock-state "u11ATa\"]" [] 3 4)))))
+  (state-context std-template
+    (is (= (unicode-char-sequence (make-mock-state "u11A3a\"]" [] 3 4))
+           [\u11A3 (make-mock-state (seq "a\"]") [] 8 4)]))
+    (is (thrown? Exception
+          (unicode-char-sequence (make-mock-state "u11ATa\"]" [] 3 4))))))
 
 (def escaped-characters
   {\\ \\, \/ \/, \b \backspace, \f \formfeed, \n \newline, \r \return,
@@ -231,9 +232,10 @@
   (def entry
     (complex [entry-key string-lit, _ name-separator, entry-val value]
       [entry-key entry-val]))
-  (is (= (entry (make-mock-state "\"hello\": 55}" [] 3 4))
-         [[(make-node :scalar "hello") (make-node :scalar 55)]
-          (make-mock-state "}" [] 14 4)])))
+  (state-context std-template
+    (is (= (entry (make-mock-state "\"hello\": 55}" [] 3 4))
+           [[(make-node :scalar "hello") (make-node :scalar 55)]
+            (make-mock-state "}" [] 14 4)]))))
 
 (def additional-entry
   (complex [_ value-separator, content entry]
@@ -252,25 +254,26 @@
                     (str "either \"}\" or another object entry (which "
                          "always starts with a string)")))]
       (struct node-s :object (into {} contents))))
-  (is (= (object (make-mock-state "{\"hello\": 55}]" [] 3 4))
-         [(make-node :object
-          {(make-node :scalar "hello")
-             (make-node :scalar 55)})
-          (make-mock-state "]" [] 16 4)]))
-  (is (= (object (make-mock-state
-                   "{\"hello\": 55, \"B\": \"goodbye\"}]"
-                   [] 3 4))
-         [(make-node :object
-          {(make-node :scalar "hello") (make-node :scalar 55)
-           (make-node :scalar "B") (make-node :scalar "goodbye")})
-          (make-mock-state "]" [] 32 4)])))
+  (state-context std-template
+    (is (= (object (make-mock-state "{\"hello\": 55}]" [] 3 4))
+           [(make-node :object
+            {(make-node :scalar "hello")
+               (make-node :scalar 55)})
+            (make-mock-state "]" [] 16 4)]))
+    (is (= (object (make-mock-state
+                     "{\"hello\": 55, \"B\": \"goodbye\"}]"
+                     [] 3 4))
+           [(make-node :object
+            {(make-node :scalar "hello") (make-node :scalar 55)
+             (make-node :scalar "B") (make-node :scalar "goodbye")})
+            (make-mock-state "]" [] 32 4)]))))
 
 (def text (alt object array)) ; The root rule
 
 ;; The functions below uses the rules to parse strings.
 
 (defn parse [tokens]
-  (state-context standard-template
+  (state-context std-template
     (match-rule text
       #(raise parse-error %
          "invalid document \"%s\""
