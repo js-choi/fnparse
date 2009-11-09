@@ -101,7 +101,7 @@
 
 (def line-break (b-char (rep+ (alt newline-lit return-lit))))
 
-(def json-char (alt line-break (nb-char anything)))
+(def json-char (alt line-break (nb-char (anything))))
 
 (def ws (constant-semantics (rep* (alt space tab line-break)) :ws))
 

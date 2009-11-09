@@ -17,7 +17,7 @@
 ; - (2) is called the rule's State.
 ; - (3) is called the rule's Remainder.
 
-(declare lit rep* rep+ except std-template)
+(declare lit rep* rep+ except state-context std-template)
 
 (deferror fnparse-error [] [message-template & template-args]
   {:msg (str "FnParse error: " (apply format message-template template-args))
@@ -51,7 +51,7 @@
   supposed to use state-context, which
   does all the work for you.")
 
-(defn fetch-remainder
+(defn get-remainder
   "Gets the state's remainder."
   [state]
   (*remainder-accessor* state))
@@ -176,17 +176,22 @@
   (fetch-val key))
 
 (with-test
-  (defvar get-remainder
-    (fetch-val *remainder-accessor*)
+  (defvar fetch-remainder
+    (fetch-val get-remainder)
     "A rule that consumes no tokens. Its
     product is the sequence of the remaining
     tokens.
     [Equivalent to the result of
     (fetch-val *remainder-accessor*) from
     clojure.contrib.monads.]")
-  (is (= ((complex [remainder get-remainder] remainder)
+  (is (= ((complex [remainder fetch-remainder] remainder)
           (make-state ["hi" "THEN"]))
-         [["hi" "THEN"] (make-state ["hi" "THEN"])])))
+         [["hi" "THEN"] (make-state ["hi" "THEN"])]))
+  (let [rule (complex [remainder fetch-remainder] remainder)
+        remainder '[A B]
+        state (make-state remainder)]
+    (state-context std-template
+      (is (= (rule state) [remainder state])))))
 
 (defn set-info
   "Creates a rule that consumes no tokens.
@@ -237,23 +242,25 @@
     the first token of the tokens it is given.
     This rule's product is the first token it receives.
     It fails if there are no tokens left."
-    [state]
-    (if-let [tokens (*remainder-accessor* state)]
-      [(first tokens)
-       (-> state (assoc-remainder (next tokens))
-         (vary-index inc))]))
-  (is (= (anything (make-state '(A B C)))
+    []
+    (let [remainder-accessor *remainder-accessor*]
+      (fn [state]
+        (if-let [tokens (remainder-accessor state)]
+          [(first tokens)
+           (-> state (assoc-remainder (next tokens))
+             (vary-index inc))]))))
+  (is (= ((anything) (make-state '(A B C)))
          ['A (make-state '(B C))])
     "anything rule matches first token")
-  (is (= (anything (make-state '(A B C)))
+  (is (= ((anything) (make-state '(A B C)))
          ['A (make-state '(B C))])
     "anything rule matches first token without index")
-  (is (-> '(A B C) make-state anything second meta ::index (= 1)))
+  (is (-> '(A B C) make-state ((anything)) second meta ::index (= 1)))
   (is (-> '(A B C) make-state (vary-meta assoc ::index 5)
-        anything second meta ::index (= 6)))
-  (is (nil? (anything (make-state nil)))
+        ((anything)) second meta ::index (= 6)))
+  (is (nil? ((anything) (make-state nil)))
     "anything rule fails with no tokens left")
-  (is (= ((rep* anything) (make-state '(A B C)))
+  (is (= ((rep* (anything)) (make-state '(A B C)))
          ['(A B C) (make-state nil)])
     "repeated anything rule does not create infinite loop"))
 
@@ -277,15 +284,17 @@
       "created validator rule fails when given validator fails"))
 
 (with-test
-  (defvar term
-    (partial validate anything)
-    "Equivalent to (partial validate anything).
+  (defn term
+    "(term validator) is equivalent
+    to (validate (anything) validator).
     Creates a rule that is a terminal rule of the given validator--that is, it
     accepts only tokens for whom (validator token) is true.
     (def a (term validator)) would be equivalent to the EBNF
       a = ? (validator %) evaluates to true ?;
     The new rule's product would be the first token, if it fulfills the
-    validator.")
+    validator."
+    [validator]
+    (validate (anything) validator))
   (let [rule (term (partial = 'A))]
     (is (= (rule (make-state '[A B])) ['A (make-state '[B])])
       "created terminal rule works when first token fulfills validator")
@@ -390,7 +399,7 @@
 
 (with-test
   (defvar remainder-peek
-    (complex [remainder get-remainder]
+    (complex [remainder fetch-remainder]
       (first remainder))
     "A rule that does not consume any tokens. Its product is the very next
      token in the remainder.")
@@ -587,7 +596,7 @@
     ; resulted in an easily inflated function call stack.
   ;  (opt (rep+ subrule)))
   (let [rep*-true (rep* (lit true))
-        rep*-untrue (rep* (except anything (lit true)))]
+        rep*-untrue (rep* (except (anything) (lit true)))]
     (is (= (rep*-true (-> [true "THEN"] make-state (assoc :a 3)))
            [[true] (-> (list "THEN") make-state (assoc :a 3))])
         "created zero-or-more-repetition rule works when symbol present singularly")
@@ -631,7 +640,7 @@
     (complex [first-product subrule, rest-products (rep* subrule)]
       (vec (cons first-product rest-products))))
     ; See note at rep*.
-  ;  (complex [cur-remainder get-remainder
+  ;  (complex [cur-remainder fetch-remainder
   ;            :when (seq cur-remainder)
   ;            first-subproduct subrule
   ;            rest-subproducts (rep* subrule)]
@@ -899,8 +908,51 @@
   (validator b-remainder) is true. The new rule's
   product would be b-product."
   [subrule validator]
-  (complex [subproduct subrule, subremainder get-remainder, :when (validator subremainder)]
+  (complex [subproduct subrule, subremainder fetch-remainder, :when (validator subremainder)]
     subproduct))
+
+(defnk make-template
+  [:default-info {}, :add-info merge]
+  (let [struct-keys
+          (cons ::remainder (keys default-info))
+        state-struct
+          (apply create-struct struct-keys)]
+    {:state-struct state-struct
+     :add-info add-info
+     :default-info default-info}))
+
+(defn- merge-std-info
+  "The std-template needs special
+  behavior for merging its states. Firstly,
+  warnings are always just merged into each
+  other; it's commutative.
+  However, line and column numbers are
+  different. If you add a state with a line
+  of 0: in other words, "
+  [s0 s1]
+  (let [new-warnings (into (:warnings s0) (:warnings s1))
+        s1-line (s1 :line)
+        s1-column (s1 :column)
+        new-line (+ (s0 :line) s1-line)
+        new-column (if (pos? s1-line)
+                     s1-column
+                     (+ (s0 :column) s1-column))]
+   (new-info
+     :warnings new-warnings
+     :line new-line
+     :column new-column)))
+
+(defvar std-template
+  (make-template
+    :default-info
+      {:warnings []
+       :line 0
+       :column 0}
+    :add-info
+      merge-std-info))
+
+(defvar minimal-template
+  (make-template))
 
 (with-test
   (defmacro state-context
@@ -1003,25 +1055,37 @@
         ;   :column 1
         ;   :warnings [\"Z FOUND AT line 1, column 3\"]}])"
     [state-template & forms]
-    `(let [default-state#
-            (dissoc ~state-template ::add-info)
-          struct-keys#
-            (cons ::remainder (keys default-state#))
-          add-info-fn#
-            (::add-info ~state-template)
-          state-struct#
-            (apply create-struct struct-keys#)
-          empty-state#
-            (into (struct state-struct#) default-state#)
-          remainder-accessor#
-            (accessor state-struct# ::remainder)]
+    `(let [state-template#
+             ~state-template
+           add-info-fn#
+             (:add-info state-template#)
+           state-struct#
+             (:state-struct state-template#)
+           default-info#
+             (:default-info state-template#)
+           empty-state#
+             (into (struct state-struct#) default-info#)
+           remainder-accessor#
+             (accessor state-struct# ::remainder)]
       (binding [*empty-state* empty-state#
                 *remainder-accessor* remainder-accessor#
                 *add-info* add-info-fn#]
         ~@forms))))
 
 (deftest state-context-test
-  (state-context {:warnings []}
+  (let [rule-a (state-context std-template (anything))
+        rule-b (state-context std-template (lit \a))
+        state-0 (state-context std-template (make-state "abc"))
+        state-a (state-context std-template
+                  (-> "bc" seq make-state (assoc :warnings [])))]
+    (is (= (rule-a state-0) [\a state-a]))
+    (is (thrown? ClassCastException
+          (rule-a (make-state "abc"))))
+    (is (= (rule-b state-0) [\a state-a]))
+    (is (thrown? ClassCastException
+          (rule-b (make-state "abc")))))
+  (state-context (make-template :default-info {:warnings []})
+    (is (= (emptiness (make-state "abc"))))
     (is (= ((lit \a) (make-state "abc"))
            [\a (-> "bc" seq make-state (assoc :warnings []))]))
     (is (thrown? ClassCastException
@@ -1044,7 +1108,8 @@
              (assoc (set-index (make-state nil) 2)
                :line 1
                :column 1
-               :warnings ["I'm a warning!"]))))))
+               :warnings ["I'm a warning!"])))))
+  (is (= (state-context minimal-template 5) 5)))
 
 (with-test
   (defn match-rule
@@ -1148,33 +1213,6 @@
 ;     (is (= (rule (make-state '[c])) ['c (make-state [])]))
 ;     (is (nil? (rule (make-state '[s a]))))
 ;     (is (nil? (rule (make-state '[s a]))))))
-
-(defn- merge-std-info
-  "The std-template needs special
-  behavior for merging its states. Firstly,
-  warnings are always just merged into each
-  other; it's commutative.
-  However, line and column numbers are
-  different. If you add a state with a line
-  of 0: in other words, "
-  [s0 s1]
-  (let [new-warnings (into (:warnings s0) (:warnings s1))
-        s1-line (s1 :line)
-        s1-column (s1 :column)
-        new-line (+ (s0 :line) s1-line)
-        new-column (if (pos? s1-line)
-                     s1-column
-                     (+ (s0 :column) s1-column))]
-   (new-info
-     :warnings new-warnings
-     :line new-line
-     :column new-column)))
-
-(defvar std-template
-  {:warnings []
-   :line 0
-   :column 0
-   ::add-info merge-std-info})
 
 (defn inc-column
   "Meant to be used only with std-bundle states, or other states with an
