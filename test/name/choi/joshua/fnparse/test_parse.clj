@@ -6,4 +6,4 @@
             name.choi.joshua.fnparse.json))
 
 (time (run-tests 'name.choi.joshua.fnparse))
-(time (run-tests 'name.choi.joshua.fnparse.json))
+; (time (run-tests 'name.choi.joshua.fnparse.json))

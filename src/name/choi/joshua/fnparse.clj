@@ -176,18 +176,19 @@
   (fetch-val key))
 
 (with-test
-  (defvar fetch-remainder
-    (fetch-val get-remainder)
-    "A rule that consumes no tokens. Its
-    product is the sequence of the remaining
-    tokens.
-    [Equivalent to the result of
+  (defn fetch-remainder
+    "Generates a rule whose product is the
+    sequence of the remaining tokens of any states
+    that it is given. It consumes no tokens.
+    [(fetch-remainder) is equivalent to
     (fetch-val *remainder-accessor*) from
-    clojure.contrib.monads.]")
-  (is (= ((complex [remainder fetch-remainder] remainder)
+    clojure.contrib.monads.]"
+    []
+    (fetch-val *remainder-accessor*))
+  (is (= ((complex [remainder (fetch-remainder)] remainder)
           (make-state ["hi" "THEN"]))
          [["hi" "THEN"] (make-state ["hi" "THEN"])]))
-  (let [rule (complex [remainder fetch-remainder] remainder)
+  (let [rule (complex [remainder (fetch-remainder)] remainder)
         remainder '[A B]
         state (make-state remainder)]
     (state-context std-template
@@ -244,6 +245,7 @@
     It fails if there are no tokens left."
     []
     (let [remainder-accessor *remainder-accessor*]
+      (println ">anything" remainder-accessor)
       (fn [state]
         (if-let [tokens (remainder-accessor state)]
           [(first tokens)
@@ -398,12 +400,14 @@
     semantic-value))
 
 (with-test
-  (defvar remainder-peek
-    (complex [remainder fetch-remainder]
-      (first remainder))
-    "A rule that does not consume any tokens. Its product is the very next
-     token in the remainder.")
-  (is (= (remainder-peek (make-state (seq "ABC")))
+  (defn remainder-peek
+    "Generates a rule whose product is the very next
+    token in the remainder of any given state.
+    The new rule does not consume any tokens."
+    []
+    (complex [remainder (fetch-remainder)]
+      (first remainder)))
+  (is (= ((remainder-peek) (make-state (seq "ABC")))
          [\A (make-state (seq "ABC"))])))
 
 (with-test
@@ -584,13 +588,14 @@
     case, the result would be [nil given-state].)
     The new rule can never simply return nil."
     [subrule]
-    (fn [state]
-      (loop [cur-product [], cur-state state]
-        (if-let [[subproduct substate] (subrule cur-state)]
-          (if (seq (*remainder-accessor* substate))
-            (recur (conj cur-product subproduct) substate)
-            [(conj cur-product subproduct) substate])
-          [(if (not= cur-product []) cur-product) cur-state]))))
+    (let [remainder-accessor *remainder-accessor*]
+      (fn [state]
+        (loop [cur-product [], cur-state state]
+          (if-let [[subproduct substate] (subrule cur-state)]
+            (if (seq (remainder-accessor substate))
+              (recur (conj cur-product subproduct) substate)
+              [(conj cur-product subproduct) substate])
+            [(if (not= cur-product []) cur-product) cur-state])))))
     ; The following code was used until I found
     ; that the mutually recursive calls to rep+
     ; resulted in an easily inflated function call stack.
@@ -640,7 +645,7 @@
     (complex [first-product subrule, rest-products (rep* subrule)]
       (vec (cons first-product rest-products))))
     ; See note at rep*.
-  ;  (complex [cur-remainder fetch-remainder
+  ;  (complex [cur-remainder (fetch-remainder)
   ;            :when (seq cur-remainder)
   ;            first-subproduct subrule
   ;            rest-subproducts (rep* subrule)]
@@ -813,10 +818,11 @@
     is called with one argument, the state at time
     of failure."
     [subrule failure-hook]
-    (fn [state]
-      (if-let [result (subrule state)]
-        result
-        (failure-hook (*remainder-accessor* state) state))))
+    (let [remainder-accessor *remainder-accessor*]
+      (fn [state]
+        (if-let [result (subrule state)]
+          result
+          (failure-hook (remainder-accessor state) state)))))
   (let [exception-rule (failpoint (lit "A")
                           (fn [remainder state]
                             (throw-arg "ERROR %s at line %s"
@@ -908,7 +914,9 @@
   (validator b-remainder) is true. The new rule's
   product would be b-product."
   [subrule validator]
-  (complex [subproduct subrule, subremainder fetch-remainder, :when (validator subremainder)]
+  (complex [subproduct subrule
+            subremainder (fetch-remainder)
+            :when (validator subremainder)]
     subproduct))
 
 (defnk make-template
@@ -1072,9 +1080,19 @@
                 *add-info* add-info-fn#]
         ~@forms))))
 
+(state-context std-template
+  (with-test
+    (defvar- state-context-test-rule (anything))
+    (is (thrown? ClassCastException (state-context-test-rule {})))))
+
 (deftest state-context-test
+  (let [state-0 (state-context std-template (make-state "abc"))]
+    (is (= (state-context-test-rule state-0)))
+    (is (thrown? ClassCastException
+          (state-context-test-rule (make-state "abc")))))
   (let [rule-a (state-context std-template (anything))
         rule-b (state-context std-template (lit \a))
+        rule-c (state-context std-template (complex [x (anything)] x))
         state-0 (state-context std-template (make-state "abc"))
         state-a (state-context std-template
                   (-> "bc" seq make-state (assoc :warnings [])))]
@@ -1083,7 +1101,10 @@
           (rule-a (make-state "abc"))))
     (is (= (rule-b state-0) [\a state-a]))
     (is (thrown? ClassCastException
-          (rule-b (make-state "abc")))))
+          (rule-b (make-state "abc"))))
+    (is (= (rule-c state-0) [\a state-a]))
+    (is (thrown? ClassCastException
+          (rule-c (make-state "abc")))))
   (state-context (make-template :default-info {:warnings []})
     (is (= (emptiness (make-state "abc"))))
     (is (= ((lit \a) (make-state "abc"))
@@ -1178,9 +1199,10 @@
     state template. See state-context's docs
     for information on how to do that."
     [subrule]
-    (let [memory (atom {})]
+    (let [memory (atom {})
+          remainder-accessor *remainder-accessor*]
       (fn [state-0]
-        (let [remainder-0 (*remainder-accessor* state-0)
+        (let [remainder-0 (remainder-accessor state-0)
               index-0 (fetch-index state-0)]
           (if-let [found-result (find-mem-result @memory remainder-0)]
             (let [found-product (found-result 0)
@@ -1196,7 +1218,7 @@
             (if-let [subresult (subrule (make-state remainder-0))]
               (let [subproduct (subresult 0)
                     substate (subresult 1)
-                    subremainder (*remainder-accessor* substate)
+                    subremainder (remainder-accessor substate)
                     subindex (fetch-index substate)
                     consumed-tokens (take subindex remainder-0)
                     mem-state (assoc-remainder substate nil)
