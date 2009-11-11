@@ -29,7 +29,7 @@
   forms can you form from this?")
 
 (defvar- *empty-state*
-  {::tokens nil, ::position 0}
+  {::tokens nil, ::index 0}
   "The overridable var for the context's
   empty state. It does not have an index
   assigned to its metadata; that's
@@ -38,19 +38,32 @@
   supposed to use state-context, which
   does all the work for you.")
 
-; (defvar *remainder-accessor*
-;   ::remainder
-;   "The overridable var for the context's
-;   remainder accessor. If the current
-;   context uses a struct map, then this
-;   var contains the speedy accessor for
-;   ::remainder. But in any case, it refers
-;   to the ::remainder key; I made that
-;   std.
-;   The var is private. That's because you're
-;   supposed to use state-context, which
-;   does all the work for you.")
-; 
+(defvar *tokens-accessor*
+  ::tokens
+  "The overridable var for the context's
+  tokens accessor. If the current
+  context uses a struct map, then this
+  var contains the speedy accessor for
+  ::remainder. But in any case, it refers
+  to the ::remainder key; I made that
+  std.
+  The var is private. That's because you're
+  supposed to use state-context, which
+  does all the work for you.")
+
+(defvar *index-accessor*
+  ::index
+  "The overridable var for the context's
+  index accessor. If the current
+  context uses a struct map, then this
+  var contains the speedy accessor for
+  ::remainder. But in any case, it refers
+  to the ::remainder key; I made that
+  std.
+  The var is private. That's because you're
+  supposed to use state-context, which
+  does all the work for you.")
+
 ; (defn- assoc-remainder [state remainder]
 ;   (assoc state ::remainder remainder))
 
@@ -59,21 +72,21 @@
   from the given sequence of tokens.
   You really must use this function to create
   any states that you'll plug into rules."
-  [tokens]
-  (assoc *empty-state* ::tokens tokens))
+  [tokens index]
+  (assoc *empty-state* ::tokens tokens, ::index index))
 
 (defn make-state-with-info
   "For mocking a state with already
   provided info. Basically calls make-state
   on the tokens and then applies info-args
   to assoc."
-  [tokens & info-args]
-  (apply assoc (make-state tokens) info-args))
+  [tokens index & info-args]
+  (apply assoc (make-state tokens index) info-args))
 
 (with-test
   (defvar get-index ::index
     "Gets the given state's index.")
-  (-> nil make-state get-index (= 0) is))
+  (-> nil (make-state 2) get-index (= 2) is))
 
 (defn set-index
   "Sets the given state's index to the given new-index."
@@ -89,10 +102,13 @@
 (defvar get-tokens
   ::tokens)
 
-(defn get-remainder
-  "Gets the state's remaining tokens."
-  [state]
-  (drop (get-tokens state) (get-index state)))
+(with-test
+  (defn get-remainder
+    "Gets the state's remaining tokens."
+    [state]
+    (drop (get-index state) (get-tokens state)))
+  (is (= (get-remainder (make-state '[a b c d] 2))
+         '(c d))))
 
 (defn new-info
   "Creates a new state with the given info."
@@ -134,6 +150,15 @@
 ;     (-> '[c d] make-state (= summed-state) is)
 ;     (-> summed-state get-index (= 6) is)))
 
+(defn- memoizing-rule
+  [subrule]
+  (let [memory (atom {})]
+    (fn [state]
+      (if-let [recalled-result (get memory state)]
+        recalled-result
+        (let [new-result (subrule state)]
+          
+
 (with-test
   (defmacro complex
     "Creates a complex rule in monadic
@@ -161,7 +186,8 @@
     [steps & product-expr]
     `(domonad parser-m ~steps ~@product-expr)))
 
-(defvar- get-state
+(defvar get-state
+  ; TODO change
   (fetch-state)
   "A rule that consumes no tokens. Its product
   is the entire current state.
@@ -182,18 +208,18 @@
     sequence of the remaining tokens of any states
     that it is given. It consumes no tokens.
     [(fetch-remainder) is equivalent to
-    (fetch-val *remainder-accessor*) from
+    (fetch-val get-remainder) from
     clojure.contrib.monads.]"
     []
     (fetch-val get-remainder))
-  (is (= ((complex [remainder (fetch-remainder)] remainder)
-          (make-state ["hi" "THEN"]))
-         [["hi" "THEN"] (make-state ["hi" "THEN"])]))
-  (let [rule (complex [remainder (fetch-remainder)] remainder)
-        remainder '[A B]
-        state (make-state remainder)]
-    (state-context std-template
-      (is (= (rule state) [remainder state])))))
+  (let [state (make-state ["hi" "THEN"] 0)]
+    (is (= ((complex [remainder (fetch-remainder)] remainder) state)
+           [["hi" "THEN"] state]))))
+;   (let [rule (complex [remainder (fetch-remainder)] remainder)
+;         remainder '[A B]
+;         state (make-state remainder 0)]
+;     (state-context std-template
+;       (is (= (rule state) [remainder state])))))
 
 (defn set-info
   "Creates a rule that consumes no tokens.
@@ -218,9 +244,9 @@
     [Equivalent to update-val from clojure.contrib.monads.]"
     [key val-update-fn & args]
     (update-val key #(apply val-update-fn % args)))
-  (is (= (-> [\a] make-state (assoc :column 3)
+  (is (= (-> [\a] (make-state 0) (assoc :column 3)
            ((update-info :column inc)))
-         [3 (-> [\a] make-state (assoc :column 4))])))
+         [3 (-> [\a] (make-state 0) (assoc :column 4))])))
 
 (with-test
   (with-monad parser-m
@@ -234,57 +260,64 @@
       to the EBNF a = ; This rule's product
       is always nil, and it therefore always
       returns [nil given-state]."))
-  (is (= (emptiness (make-state '(A B C)))
-         [nil (make-state '(A B C))])
+  (is (= (emptiness (make-state '(A B C) 0))
+         [nil (make-state '(A B C) 0)])
       "emptiness rule matches emptiness"))
 
-; (with-test
-;   (defn anything
-;     "A rule that matches anything--that is, it matches
-;     the first token of the tokens it is given.
-;     This rule's product is the first token it receives.
-;     It fails if there are no tokens left."
-;     []
-;     (let [remainder-accessor *remainder-accessor*]
-;       (fn [state]
-;         (if-let [tokens (remainder-accessor state)]
-;           [(first tokens)
-;            (-> state (assoc-remainder (next tokens))
-;              (vary-index inc))]))))
-;   (is (= ((anything) (make-state '(A B C)))
-;          ['A (make-state '(B C))])
-;     "anything rule matches first token")
-;   (is (= ((anything) (make-state '(A B C)))
-;          ['A (make-state '(B C))])
-;     "anything rule matches first token without index")
-;   (is (-> '(A B C) make-state ((anything)) second meta ::index (= 1)))
-;   (is (-> '(A B C) make-state (vary-meta assoc ::index 5)
-;         ((anything)) second meta ::index (= 6)))
-;   (is (nil? ((anything) (make-state nil)))
-;     "anything rule fails with no tokens left")
-;   (is (= ((rep* (anything)) (make-state '(A B C)))
-;          ['(A B C) (make-state nil)])
-;     "repeated anything rule does not create infinite loop"))
-; 
-; (with-test
-;   (defn validate
-;     "Creates a rule from attaching a product-validating function to the given
-;     subrule--that is, any products of the subrule must fulfill the validator
-;     function.
-;     (def a (validate b validator)) says that the rule a succeeds only when b
-;     succeeds and also when the evaluated value of (validator b-product) is true.
-;     The new rule's product would be b-product."
-;     [subrule validator]
-;     (complex [subproduct subrule, :when (validator subproduct)]
-;       subproduct))
-;   (is (= ((validate (lit "hi") (partial = "hi")) (make-state ["hi" "THEN"]))
-;          ["hi" (make-state (list "THEN"))])
-;       "created validator rule succeeds when given subrule and validator succeed")
-;   (is (nil? ((validate (lit "hi") (partial = "RST")) (make-state ["RST"])))
-;       "created validator rule fails when given subrule fails")
-;   (is (nil? ((validate (lit "hi") (partial = "hi")) (make-state "hi")))
-;       "created validator rule fails when given validator fails"))
-; 
+(with-test
+  (defn anything
+    "A rule that matches anything--that is, it matches
+    the first token of the tokens it is given.
+    This rule's product is the first token it receives.
+    It fails if there are no tokens left."
+    []
+    (let [tokens-accessor *tokens-accessor*
+          index-accessor *index-accessor*]
+      (fn [state]
+        (let [tokens (tokens-accessor state)
+              tokens-count (count tokens)
+              index (index-accessor state)]
+          (if (< index tokens-count)
+            [(nth tokens index) (vary-index state inc)])))))
+  (let [make-test-state (partial make-state '(A B C))]
+    (is (= ((anything) (make-test-state 0))
+           ['A (make-test-state 1)])
+      "anything rule matches first token")
+    (is (= ((anything) (make-test-state 0))
+           ['A (make-test-state 1)])
+      "anything rule matches first token without index")
+    (is (nil? ((anything) (make-test-state 3)))
+      "anything rule fails with no tokens left")))
+;     (is (= ((rep* (anything)) (make-test-state 0))
+;            ['(A B C) (make-test-state 3)])
+;       "repeated anything rule does not create infinite loop")))
+
+(defn nothing
+  "Generates a rule that never succeeds. It always returns just nil."
+  []
+  (constantly nil))
+
+(with-test
+  (defn validate
+    "Creates a rule from attaching a product-validating function to the given
+    subrule--that is, any products of the subrule must fulfill the validator
+    function.
+    (def a (validate b validator)) says that the rule a succeeds only when b
+    succeeds and also when the evaluated value of (validator b-product) is true.
+    The new rule's product would be b-product."
+    [subrule validator]
+    (complex [subproduct subrule, :when (validator subproduct)]
+      subproduct))
+  (let [rule (validate (anything) (partial = "hi"))
+        make-test-state (partial make-state ["hi" "RST"])]
+    (is (= (rule (make-test-state 0))
+           ["hi" (make-test-state 1)])
+        "created validator rule succeeds when given subrule and validator succeed")
+    (is (nil? ((validate (nothing) (partial = "hi")) (make-test-state 1)))
+        "created validator rule fails when given subrule fails")
+    (is (nil? ((validate (anything) (partial = "RST")) (make-test-state 0)))
+        "created validator rule fails when given validator fails")))
+
 ; (with-test
 ;   (defn term
 ;     "(term validator) is equivalent
@@ -387,7 +420,7 @@
 ;     [subrule semantic-hook]
 ;     (complex [subproduct subrule]
 ;       (semantic-hook subproduct)))
-;   (is (= ((semantics (lit "hi") #(str % "!")) (make-state ["hi" "THEN"]))
+;   (is (= ((semantics (lit "hi") #(str % "!")) (make-test-state))
 ;          ["hi!" (make-state (list "THEN"))])
 ;       "created simple semantic rule applies semantic hook to valid result of given rule"))
 ; 
@@ -1317,3 +1350,4 @@
 ;   [subrule]
 ;   (invisi-conc subrule
 ;     (update-info :line inc) (set-info :column 0)))
+
