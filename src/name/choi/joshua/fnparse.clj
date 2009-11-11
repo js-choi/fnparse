@@ -1184,7 +1184,7 @@
     (is (= (find-mem-result memory remainder-2) 'dummy-2))
     (is (= (find-mem-result memory remainder-3) nil))))
 
-(defn- mem*
+(defn mem*
   [subrule]
   (let [memory (atom {})
         remainder-accessor *remainder-accessor*]
@@ -1200,7 +1200,7 @@
                             (add-states found-state)
                             (assoc-remainder new-remainder)
                             (set-index (+ index-0 found-state-index)))]
-            ; (println "> memory found" [found-product found-state])
+            (println "> memory found" [found-product found-state])
             [found-product new-state])
           (if-let [subresult (subrule (make-state remainder-0))]
             (let [subproduct (subresult 0)
@@ -1210,9 +1210,9 @@
                   consumed-tokens (take subindex remainder-0)
                   mem-state (assoc-remainder substate nil)
                   returned-state (add-states state-0 mem-state)]
-              ; (println "> memory registered" consumed-tokens [consumed-tokens mem-state])
+              (println "> memory registered" consumed-tokens [consumed-tokens mem-state])
               (swap! memory assoc consumed-tokens [subproduct mem-state])
-              ; (println "> memory " memory)
+              (println "> memory " memory)
               [subproduct returned-state])))))))
 
 (defmacro memoize-rules
@@ -1238,25 +1238,50 @@
   your rules. It also makes it easier to
   change which rules are optimized.
   Thanks to Chouser for how to do this
-  with a variable."
+  with a variable.
+  
+  Running (test memoize-rules), which repeats a bunch of
+  calls on a memozing test rule two hundred times, takes about
+  530 ms on my computer, which uses an 2.2 GHz Intel Core
+  Duo and 2 GB of RAM.
+  Omitting the memoization of that test rule causes the same test
+  function to take 620 ms, a significant 17.0% difference."
   [& subrule-names]
   (let [subrule-vars (vec (for [nm subrule-names] `(var ~nm)))]
     `(doseq [subrule-var# ~subrule-vars]
        (alter-var-root subrule-var# mem*))))
 
 (defvar- mem-test-rule
-  (alt (conc (lit 'a) (lit 'b)) (lit 'c)))
+  (alt (conc (lit 'a) (opt (lit 'b))) (lit 'c)))
 
 (memoize-rules mem-test-rule)
+  ; Running (test memoize-rules), which repeats a bunch of
+  ; calls on mem-test-rule two hundred times, takes about
+  ; 530 ms on my computer, which uses an 2.2 GHz Intel Core
+  ; Duo and 2 GB of RAM.
+  ; Omitting the memoize-rules form above causes the same test
+  ; to take 620 ms, a significant 17.0% difference.
 
 (set-test memoize-rules
-  (is (= (mem-test-rule (make-state '[a b c]))
-         ['[a b] (make-state '[c])]))
-  (is (= (mem-test-rule (make-state '[a b c])) ['[a b] (make-state '[c])]))
-  (is (= (mem-test-rule (make-state '[c s a])) ['c (make-state '[s a])]))
-  (is (= (mem-test-rule (make-state '[c])) ['c (make-state [])]))
-  (is (nil? (mem-test-rule (make-state '[s a]))))
-  (is (nil? (mem-test-rule (make-state '[s a])))))
+  (dotimes [_ 200]
+    ; Note: the two assertions below
+    ; tests for bugs when first a certain
+    ; valid state is registered, then another
+    ; valid state whose remainder's beginning
+    ; contains the first state's is also
+    ; registered, and the first state cuts off
+    ; the second during recognition.
+    (is (= (mem-test-rule (make-state '[a c]))
+           [['a nil] (make-state '[c])]))
+    (is (= (mem-test-rule (make-state '[a b c]))
+           ['[a b] (make-state '[c])]))
+    (is (= (mem-test-rule (make-state '[a b c])) ['[a b] (make-state '[c])]))
+    (is (= (mem-test-rule (make-state '[c s a])) ['c (make-state '[s a])]))
+    (let [result (mem-test-rule (make-state '(c)))]
+      (is (= (first result) 'c))
+      (is (empty? (seq (get-remainder (second result))))))
+    (is (nil? (mem-test-rule (make-state '[s a]))))
+    (is (nil? (mem-test-rule (make-state '[s a]))))))
 
 (defn- testing-rule-maker
   [arg1 arg2]

@@ -288,9 +288,11 @@
           product))
       tokens)))
 
+(memoize-rules number-lit)
+
 (with-test
   (def load-stream (comp represent parse))
-  (is (= (load-stream "[11]") [11]))
+  (is (= (load-stream "[1]") [1]))
   (is (= (load-stream "[1, 2, 3]") [1 2 3])
       "loading a flat array containing integers")
   (is (= (load-stream "[\"a\", \"b\\n\", \"\\u1234\"]")
