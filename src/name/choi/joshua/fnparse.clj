@@ -428,7 +428,7 @@
        (fn [state#]
          ((m-seq ~(vec subrules)) state#)))))
 
-(deftest test-conc
+(set-test conc
   (is (= ((conc (lit "hi") (lit "THEN"))
           (make-state ["hi" "THEN" "bye"]))
          [["hi" "THEN"] (make-state (list "bye"))])
@@ -461,7 +461,7 @@
      (fn [state#]
        ((~'m-plus ~@subrules) state#))))
 
-(deftest test-alt
+(set-test alt
   (is (= ((alt (lit "hi") (lit "THEN"))
           (make-state ["THEN" "bye"]))
          ["THEN" (make-state (list "bye"))]))
@@ -506,7 +506,7 @@
     [first-subrule & rest-subrules]
     `(semantics (conc ~first-subrule ~@rest-subrules) first)))
 
-(deftest test-invisi-conc
+(set-test invisi-conc
   (is (= ((invisi-conc (lit \a) (update-info :column inc))
            (-> "abc" make-state (assoc :column 4)))
          [\a (-> "bc" seq make-state (assoc :column 5))])))
@@ -1084,7 +1084,7 @@
     (defvar- state-context-test-rule (anything))
     (is (thrown? ClassCastException (state-context-test-rule {})))))
 
-(deftest state-context-test
+(set-test state-context
   (let [state-0 (state-context std-template (make-state "abc"))]
     (is (= (state-context-test-rule state-0)))
     (is (thrown? ClassCastException
@@ -1184,73 +1184,94 @@
     (is (= (find-mem-result memory remainder-2) 'dummy-2))
     (is (= (find-mem-result memory remainder-3) nil))))
 
-(with-test
-  (defn mem
-    "Creates a memoizing rule that caches
-    its subrule's results in an atom.
-    Whenever the new mem rule is called,
-    it checks the cache to see if there is an
-    existing match; otherwise, the subrule is called.
-  
-    If you use a customized state context,
-    mem requires that you implement a
-    ::fnparse/add-info function in your
-    state template. See state-context's docs
-    for information on how to do that."
-    [subrule]
-    (let [memory (atom {})
-          remainder-accessor *remainder-accessor*]
-      (fn [state-0]
-        (let [remainder-0 (remainder-accessor state-0)
-              index-0 (get-index state-0)]
-          (if-let [found-result (find-mem-result @memory remainder-0)]
-            (let [found-product (found-result 0)
-                  found-state (found-result 1)
-                  found-state-index (get-index found-state)
-                  new-remainder (drop found-state-index remainder-0)
-                  new-state (-> state-0
-                              (add-states found-state)
-                              (assoc-remainder new-remainder)
-                              (set-index (+ index-0 found-state-index)))]
-              ; (println "> memory found" [found-product found-state])
-              [found-product new-state])
-            (if-let [subresult (subrule (make-state remainder-0))]
-              (let [subproduct (subresult 0)
-                    substate (subresult 1)
-                    subremainder (remainder-accessor substate)
-                    subindex (get-index substate)
-                    consumed-tokens (take subindex remainder-0)
-                    mem-state (assoc-remainder substate nil)
-                    returned-state (add-states state-0 mem-state)]
-                ; (println "> memory registered" consumed-tokens [consumed-tokens mem-state])
-                (swap! memory assoc consumed-tokens [subproduct mem-state])
-                ; (println "> memory " memory)
-                [subproduct returned-state])))))))
-  (let [rule (mem (alt (conc (lit 'a) (lit 'b)) (lit 'c)))]
-    (is (= (rule (make-state '[a b c]))
-           ['[a b] (make-state '[c])]))
-    (is (= (rule (make-state '[a b c])) ['[a b] (make-state '[c])]))
-    (is (= (rule (make-state '[c s a])) ['c (make-state '[s a])]))
-    (is (= (rule (make-state '[c])) ['c (make-state [])]))
-    (is (nil? (rule (make-state '[s a]))))
-    (is (nil? (rule (make-state '[s a]))))))
+(defn- mem*
+  [subrule]
+  (let [memory (atom {})
+        remainder-accessor *remainder-accessor*]
+    (fn [state-0]
+      (let [remainder-0 (remainder-accessor state-0)
+            index-0 (get-index state-0)]
+        (if-let [found-result (find-mem-result @memory remainder-0)]
+          (let [found-product (found-result 0)
+                found-state (found-result 1)
+                found-state-index (get-index found-state)
+                new-remainder (drop found-state-index remainder-0)
+                new-state (-> state-0
+                            (add-states found-state)
+                            (assoc-remainder new-remainder)
+                            (set-index (+ index-0 found-state-index)))]
+            ; (println "> memory found" [found-product found-state])
+            [found-product new-state])
+          (if-let [subresult (subrule (make-state remainder-0))]
+            (let [subproduct (subresult 0)
+                  substate (subresult 1)
+                  subremainder (remainder-accessor substate)
+                  subindex (get-index substate)
+                  consumed-tokens (take subindex remainder-0)
+                  mem-state (assoc-remainder substate nil)
+                  returned-state (add-states state-0 mem-state)]
+              ; (println "> memory registered" consumed-tokens [consumed-tokens mem-state])
+              (swap! memory assoc consumed-tokens [subproduct mem-state])
+              ; (println "> memory " memory)
+              [subproduct returned-state])))))))
 
-(defn- testing-defrm-rule-maker
+(defmacro memoize-rules
+  "Turns the subrule contained in the vars
+  referred to by the given symbols
+  into a memoizing rule that caches
+  its's results in an atom.
+  Whenever the new mem rule is called,
+  it checks the cache to see if there is an
+  existing match; otherwise, the subrule is called.
+
+  If you use a customized state context,
+  mem requires that you implement a
+  ::fnparse/add-info function in your
+  state template. See state-context's docs
+  for information on how to do that.
+  
+  Why didn't I just implement it as a
+  regular rule-making function? Because this
+  is truly only useful for optimization.
+  It is better to separate this non-essential
+  complexity from the actual definition of
+  your rules. It also makes it easier to
+  change which rules are optimized.
+  Thanks to Chouser for how to do this
+  with a variable."
+  [& subrule-names]
+  (let [subrule-vars (vec (for [nm subrule-names] `(var ~nm)))]
+    `(doseq [subrule-var# ~subrule-vars]
+       (alter-var-root subrule-var# mem*))))
+
+(defvar- mem-test-rule
+  (alt (conc (lit 'a) (lit 'b)) (lit 'c)))
+
+(memoize-rules mem-test-rule)
+
+(set-test memoize-rules
+  (is (= (mem-test-rule (make-state '[a b c]))
+         ['[a b] (make-state '[c])]))
+  (is (= (mem-test-rule (make-state '[a b c])) ['[a b] (make-state '[c])]))
+  (is (= (mem-test-rule (make-state '[c s a])) ['c (make-state '[s a])]))
+  (is (= (mem-test-rule (make-state '[c])) ['c (make-state [])]))
+  (is (nil? (mem-test-rule (make-state '[s a]))))
+  (is (nil? (mem-test-rule (make-state '[s a])))))
+
+(defn- testing-rule-maker
   [arg1 arg2]
-  (println *remainder-accessor*)
   (conc (opt arg1) (opt arg2)))
 
 (state-context std-template
-  (defvar- testing-defrm-rule
-    (testing-defrm-rule-maker (lit \a) (lit \b))))
+  (defvar- testing-rm-rule
+    (testing-rule-maker (lit \a) (lit \b))))
 
-(deftest test-defrm
+(deftest test-rule-makers
   (let [state-0 (state-context std-template (make-state "ab"))
         state-1 (state-context std-template (make-state nil))]
     (is (thrown? RuntimeException
-          (testing-defrm-rule (make-state "abc"))))
-    (println "outside" *remainder-accessor*)
-    (is (= (testing-defrm-rule state-0) [[\a \b] state-1]))))
+          (testing-rm-rule (make-state "abc"))))
+    (is (= (testing-rm-rule state-0) [[\a \b] state-1]))))
 
 (defn inc-column
   "Meant to be used only with std-bundle states, or other states with an
