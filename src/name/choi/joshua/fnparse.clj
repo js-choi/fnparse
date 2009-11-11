@@ -38,7 +38,7 @@
   supposed to use state-context, which
   does all the work for you.")
 
-(defvar- *remainder-accessor*
+(defvar *remainder-accessor*
   ::remainder
   "The overridable var for the context's
   remainder accessor. If the current
@@ -77,10 +77,10 @@
   (apply assoc (make-state tokens) info-args))
 
 (with-test
-  (defvar- fetch-index
+  (defvar- get-index
     (comp ::index meta)
     "Gets the given state's index.")
-  (-> nil make-state fetch-index (= 0) is))
+  (-> nil make-state get-index (= 0) is))
 
 (defn- set-index
   "Sets the given state's index to the given new-index."
@@ -91,7 +91,7 @@
   "Sets the given state's index to the result of
   applying the given function to the old index."
   [state f]
-  (set-index state (f (fetch-index state))))
+  (set-index state (f (get-index state))))
 
 (defn new-info
   "Creates a new state with the given info."
@@ -122,16 +122,16 @@
       the sum of the indexes of state-a and
       state-b."
     [state-a state-b]
-    (let [index-b (fetch-index state-b)]
+    (let [index-b (get-index state-b)]
       (-> state-a
         (*add-info* state-b)
         (assoc-remainder (drop index-b (*remainder-accessor* state-a)))
-        (set-index (+ (fetch-index state-a) index-b)))))
+        (set-index (+ (get-index state-a) index-b)))))
   (let [state-a (-> '[a b c d] make-state (set-index 4))
         state-b (-> nil make-state (set-index 2))
         summed-state (add-states state-a state-b)]
     (-> '[c d] make-state (= summed-state) is)
-    (-> summed-state fetch-index (= 6) is)))
+    (-> summed-state get-index (= 6) is)))
 
 (with-test
   (defmacro complex
@@ -245,7 +245,6 @@
     It fails if there are no tokens left."
     []
     (let [remainder-accessor *remainder-accessor*]
-      (println ">anything" remainder-accessor)
       (fn [state]
         (if-let [tokens (remainder-accessor state)]
           [(first tokens)
@@ -436,7 +435,7 @@
       "created concatenated rule succeeds when all subrules fulfilled in order")
   (is (= (-> ["hi" "THEN" "bye"] make-state
            ((conc (lit "hi") (lit "THEN")))
-           second fetch-index)
+           second get-index)
          2)
       "created concatenated rule correctly deals with indexes")
   (is (nil? ((conc (lit "hi") (lit "THEN"))
@@ -468,7 +467,7 @@
          ["THEN" (make-state (list "bye"))]))
   (is (= (-> ["THEN" "bye"] make-state
            ((alt (lit "hi") (lit "THEN")))
-           second fetch-index)
+           second get-index)
          1))
   (is (nil? ((alt (lit "hi") (lit "THEN"))
              (make-state ["bye" "boom"])))))
@@ -1203,23 +1202,23 @@
           remainder-accessor *remainder-accessor*]
       (fn [state-0]
         (let [remainder-0 (remainder-accessor state-0)
-              index-0 (fetch-index state-0)]
+              index-0 (get-index state-0)]
           (if-let [found-result (find-mem-result @memory remainder-0)]
             (let [found-product (found-result 0)
                   found-state (found-result 1)
-                  found-state-index (fetch-index found-state)
+                  found-state-index (get-index found-state)
                   new-remainder (drop found-state-index remainder-0)
                   new-state (-> state-0
                               (add-states found-state)
                               (assoc-remainder new-remainder)
-                              (vary-index (+ index-0 found-state-index)))]
+                              (set-index (+ index-0 found-state-index)))]
               ; (println "> memory found" [found-product found-state])
               [found-product new-state])
             (if-let [subresult (subrule (make-state remainder-0))]
               (let [subproduct (subresult 0)
                     substate (subresult 1)
                     subremainder (remainder-accessor substate)
-                    subindex (fetch-index substate)
+                    subindex (get-index substate)
                     consumed-tokens (take subindex remainder-0)
                     mem-state (assoc-remainder substate nil)
                     returned-state (add-states state-0 mem-state)]
@@ -1229,12 +1228,29 @@
                 [subproduct returned-state])))))))
   (let [rule (mem (alt (conc (lit 'a) (lit 'b)) (lit 'c)))]
     (is (= (rule (make-state '[a b c]))
-           ['[a b] (make-state '[c])]))))
-;     (is (= (rule (make-state '[a b c])) ['[a b] (make-state '[c])]))
-;     (is (= (rule (make-state '[c s a])) ['c (make-state '[s a])]))
-;     (is (= (rule (make-state '[c])) ['c (make-state [])]))
-;     (is (nil? (rule (make-state '[s a]))))
-;     (is (nil? (rule (make-state '[s a]))))))
+           ['[a b] (make-state '[c])]))
+    (is (= (rule (make-state '[a b c])) ['[a b] (make-state '[c])]))
+    (is (= (rule (make-state '[c s a])) ['c (make-state '[s a])]))
+    (is (= (rule (make-state '[c])) ['c (make-state [])]))
+    (is (nil? (rule (make-state '[s a]))))
+    (is (nil? (rule (make-state '[s a]))))))
+
+(defn- testing-defrm-rule-maker
+  [arg1 arg2]
+  (println *remainder-accessor*)
+  (conc (opt arg1) (opt arg2)))
+
+(state-context std-template
+  (defvar- testing-defrm-rule
+    (testing-defrm-rule-maker (lit \a) (lit \b))))
+
+(deftest test-defrm
+  (let [state-0 (state-context std-template (make-state "ab"))
+        state-1 (state-context std-template (make-state nil))]
+    (is (thrown? RuntimeException
+          (testing-defrm-rule (make-state "abc"))))
+    (println "outside" *remainder-accessor*)
+    (is (= (testing-defrm-rule state-0) [[\a \b] state-1]))))
 
 (defn inc-column
   "Meant to be used only with std-bundle states, or other states with an

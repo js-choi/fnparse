@@ -157,7 +157,15 @@
         (-> [minus above-one below-one power] flatten apply-str
           Double/parseDouble
           ((if (or below-one power) identity int))
-          make-scalar-node))))
+          make-scalar-node)))
+    (is (= (number-lit (make-mock-state "123]" [] 3 4))
+           [(make-node :scalar 123) (make-mock-state "]" [] 6 4)]))
+    (is (= (number-lit (make-mock-state "-123]" [] 3 4))
+           [(make-node :scalar -123) (make-mock-state "]" [] 7 4)]))
+    (is (= (number-lit (make-mock-state "-123e3]" [] 3 4))
+           [(make-node :scalar -123e3) (make-mock-state "]" [] 9 4)]))
+    (is (= (number-lit (make-mock-state "-123.9e3]" [] 3 4))
+           [(make-node :scalar -123.9e3) (make-mock-state "]" [] 11 4)])))
     ;  (is (thrown-with-msg? Exception
     ;        #"JSON error at line 4, column 10: in number literal, after an exponent sign, decimal digit expected where \"e\" is"
     ;        (number-lit (make-mock-state "-123.9ee3]" [] 3 4)))))
@@ -172,9 +180,9 @@
     ; FIX TODO Uses remainder for some reason
     (def unicode-char-sequence
       (complex [_ (nb-char-lit \u)
-                  digits (factor= 4
-                           (failpoint hexadecimal-digit
-                             (expectation-error-fn "hexadecimal digit")))]
+                digits (factor= 4
+                         (failpoint hexadecimal-digit
+                           (expectation-error-fn "hexadecimal digit")))]
         (-> digits apply-str (Integer/parseInt 16) char)))
     (is (= (unicode-char-sequence (make-mock-state "u11A3a\"]" [] 3 4))
            [\u11A3 (make-mock-state (seq "a\"]") [] 8 4)]))
