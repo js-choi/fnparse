@@ -29,7 +29,7 @@
   forms can you form from this?")
 
 (defvar- *empty-state*
-  {::remainder nil}
+  {::tokens nil, ::position 0}
   "The overridable var for the context's
   empty state. It does not have an index
   assigned to its metadata; that's
@@ -38,26 +38,21 @@
   supposed to use state-context, which
   does all the work for you.")
 
-(defvar *remainder-accessor*
-  ::remainder
-  "The overridable var for the context's
-  remainder accessor. If the current
-  context uses a struct map, then this
-  var contains the speedy accessor for
-  ::remainder. But in any case, it refers
-  to the ::remainder key; I made that
-  std.
-  The var is private. That's because you're
-  supposed to use state-context, which
-  does all the work for you.")
-
-(defn get-remainder
-  "Gets the state's remainder."
-  [state]
-  (*remainder-accessor* state))
-
-(defn- assoc-remainder [state remainder]
-  (assoc state ::remainder remainder))
+; (defvar *remainder-accessor*
+;   ::remainder
+;   "The overridable var for the context's
+;   remainder accessor. If the current
+;   context uses a struct map, then this
+;   var contains the speedy accessor for
+;   ::remainder. But in any case, it refers
+;   to the ::remainder key; I made that
+;   std.
+;   The var is private. That's because you're
+;   supposed to use state-context, which
+;   does all the work for you.")
+; 
+; (defn- assoc-remainder [state remainder]
+;   (assoc state ::remainder remainder))
 
 (defn make-state
   "The general function that creates a state
@@ -65,8 +60,7 @@
   You really must use this function to create
   any states that you'll plug into rules."
   [tokens]
-  (with-meta (assoc-remainder *empty-state* tokens)
-    {::index 0}))
+  (assoc *empty-state* ::tokens tokens))
 
 (defn make-state-with-info
   "For mocking a state with already
@@ -77,21 +71,28 @@
   (apply assoc (make-state tokens) info-args))
 
 (with-test
-  (defvar- get-index
-    (comp ::index meta)
+  (defvar get-index ::index
     "Gets the given state's index.")
   (-> nil make-state get-index (= 0) is))
 
-(defn- set-index
+(defn set-index
   "Sets the given state's index to the given new-index."
   [state new-index]
-  (vary-meta state assoc ::index new-index))
+  (assoc state ::index new-index))
 
 (defn vary-index
   "Sets the given state's index to the result of
   applying the given function to the old index."
   [state f]
   (set-index state (f (get-index state))))
+
+(defvar get-tokens
+  ::tokens)
+
+(defn get-remainder
+  "Gets the state's remaining tokens."
+  [state]
+  (drop (get-tokens state) (get-index state)))
 
 (defn new-info
   "Creates a new state with the given info."
@@ -106,32 +107,32 @@
   adds its warnings, line numbers, and whatever
   info it has to the first state's.")
 
-(with-test
-  (defn- add-states
-    "This function is not expected to be
-    useful for users--only the mem rule maker
-    uses it. It adds state-b into state-a. First:
-    - The two states' info are added using the
-      overridable *add-info* function,
-      forming a new state.
-    - The remainder of the new state is changed
-      to state-a's remainder with the
-      first few tokens dropped off. The number
-      of tokens dropped is the 
-    - The index of the new state is changed to
-      the sum of the indexes of state-a and
-      state-b."
-    [state-a state-b]
-    (let [index-b (get-index state-b)]
-      (-> state-a
-        (*add-info* state-b)
-        (assoc-remainder (drop index-b (*remainder-accessor* state-a)))
-        (set-index (+ (get-index state-a) index-b)))))
-  (let [state-a (-> '[a b c d] make-state (set-index 4))
-        state-b (-> nil make-state (set-index 2))
-        summed-state (add-states state-a state-b)]
-    (-> '[c d] make-state (= summed-state) is)
-    (-> summed-state get-index (= 6) is)))
+; (with-test
+;   (defn- add-states
+;     "This function is not expected to be
+;     useful for users--only the mem rule maker
+;     uses it. It adds state-b into state-a. First:
+;     - The two states' info are added using the
+;       overridable *add-info* function,
+;       forming a new state.
+;     - The remainder of the new state is changed
+;       to state-a's remainder with the
+;       first few tokens dropped off. The number
+;       of tokens dropped is the 
+;     - The index of the new state is changed to
+;       the sum of the indexes of state-a and
+;       state-b."
+;     [state-a state-b]
+;     (let [index-b (get-index state-b)]
+;       (-> state-a
+;         (*add-info* state-b)
+;         (assoc-remainder (drop index-b (*remainder-accessor* state-a)))
+;         (set-index (+ (get-index state-a) index-b)))))
+;   (let [state-a (-> '[a b c d] make-state (set-index 4))
+;         state-b (-> nil make-state (set-index 2))
+;         summed-state (add-states state-a state-b)]
+;     (-> '[c d] make-state (= summed-state) is)
+;     (-> summed-state get-index (= 6) is)))
 
 (with-test
   (defmacro complex
@@ -184,7 +185,7 @@
     (fetch-val *remainder-accessor*) from
     clojure.contrib.monads.]"
     []
-    (fetch-val *remainder-accessor*))
+    (fetch-val get-remainder))
   (is (= ((complex [remainder (fetch-remainder)] remainder)
           (make-state ["hi" "THEN"]))
          [["hi" "THEN"] (make-state ["hi" "THEN"])]))
