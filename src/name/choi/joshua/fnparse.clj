@@ -3,19 +3,32 @@
         clojure.contrib.error-kit clojure.contrib.except
         clojure.contrib.def clojure.contrib.test-is])
 
-; A rule is a delay object that contains a function that:
-; - Takes a collection of tokens.
-; - If the token sequence is valid, it returns a (0) vector containing the (1)
-;   consumed symbols' products and (2) a state data object, usually a map. The
-;   state contains the (3) sequence of remaining tokens, usually with the key
-;   *remainder-accessor*.
-; - If the given token sequence is invalid, then the rule Fails, meaning that it
-;   simply returns nil.
- 
-; - (0) is called the rule's Result.
-; - (1) is called the rule's Product.
-; - (2) is called the rule's State.
-; - (3) is called the rule's Remainder.
+; A RULE is a a function that:
+; - Takes a state and returns either nil
+;   or a vector pair.
+;   - A STATE is a struct map that contains
+;     a remainder and maybe info.
+;     You create states using the make-state function.
+;   - A REMAINDER is a sequence or
+;     seqable collection of tokens.
+;     It is contained in the
+;     :name.choi.joshua.fnparse/remainder key.
+;   - A state can also contain INFO, which are
+;     any other attributes in the state. Common
+;     examples include current line and column numbers
+;     and a set of current warnings.
+; - If the remainder is VALID under the rule,
+;   it CONSUMES any valid tokens and returns a RESULT.
+;   - A RESULT is a vector pair containing
+;     a product and a new state.
+;   - The PRODUCT is the semantic data generated
+;     by the rule that corresponds to the
+;     information represented by the consumed tokens.
+;     It can be any object.
+;   - The new state is what the old state now looks like,
+;     after its first few tokens are consumed.
+; - If the given token sequence is INVALID, then
+;   the rule FAILS, meaning that it simply returns NIL.
  
 (declare lit rep* rep+ except state-context std-template)
  
@@ -1093,7 +1106,7 @@
     (is (thrown? RuntimeException
           (testing-rm-rule (make-state "abc"))))
     (is (= (testing-rm-rule state-0) [[\a \b] state-1]))))
- 
+
 (defn inc-column
   "Meant to be used only with std-bundle states, or other states with an
   integer :column val.
