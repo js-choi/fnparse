@@ -27,7 +27,7 @@
   (state-t maybe-m)
   "The parser monad of FnParse. What new
   forms can you form from this?")
- 
+
 (defvar- *empty-state*
   {::remainder nil}
   "The overridable var for the context's
@@ -37,7 +37,7 @@
   It's private. That's because you're
   supposed to use state-context, which
   does all the work for you.")
- 
+
 (defvar *remainder-accessor*
   ::remainder
   "The overridable var for the context's
@@ -1184,36 +1184,36 @@
     (is (= (find-mem-result memory remainder-2) 'dummy-2))
     (is (= (find-mem-result memory remainder-3) nil))))
  
-(defn mem
-  [subrule]
-  (let [memory (atom {})
-        remainder-accessor *remainder-accessor*]
-    (fn [state-0]
-      (let [remainder-0 (remainder-accessor state-0)
-            index-0 (get-index state-0)]
-        (if-let [found-result (find-mem-result @memory remainder-0)]
-          (let [found-product (found-result 0)
-                found-state (found-result 1)
-                found-state-index (get-index found-state)
-                new-remainder (drop found-state-index remainder-0)
-                new-state (-> state-0
-                            (add-states found-state)
-                            (assoc-remainder new-remainder)
-                            (set-index (+ index-0 found-state-index)))]
-            (println "> memory found" [found-product found-state])
-            [found-product new-state])
-          (if-let [subresult (subrule (make-state remainder-0))]
-            (let [subproduct (subresult 0)
-                  substate (subresult 1)
-                  subremainder (remainder-accessor substate)
-                  subindex (get-index substate)
-                  consumed-tokens (take subindex remainder-0)
-                  mem-state (assoc-remainder substate nil)
-                  returned-state (add-states state-0 mem-state)]
-              (println "> memory registered" consumed-tokens [consumed-tokens mem-state])
-              (swap! memory assoc consumed-tokens [subproduct mem-state])
-              (println "> memory " memory)
-              [subproduct returned-state])))))))
+; (defn mem
+;   [subrule]
+;   (let [memory (atom {})
+;         remainder-accessor *remainder-accessor*]
+;     (fn [state-0]
+;       (let [remainder-0 (remainder-accessor state-0)
+;             index-0 (get-index state-0)]
+;         (if-let [found-result (find-mem-result @memory remainder-0)]
+;           (let [found-product (found-result 0)
+;                 found-state (found-result 1)
+;                 found-state-index (get-index found-state)
+;                 new-remainder (drop found-state-index remainder-0)
+;                 new-state (-> state-0
+;                             (add-states found-state)
+;                             (assoc-remainder new-remainder)
+;                             (set-index (+ index-0 found-state-index)))]
+;             (println "> memory found" [found-product found-state])
+;             [found-product new-state])
+;           (if-let [subresult (subrule (make-state remainder-0))]
+;             (let [subproduct (subresult 0)
+;                   substate (subresult 1)
+;                   subremainder (remainder-accessor substate)
+;                   subindex (get-index substate)
+;                   consumed-tokens (take subindex remainder-0)
+;                   mem-state (assoc-remainder substate nil)
+;                   returned-state (add-states state-0 mem-state)]
+;               (println "> memory registered" consumed-tokens [consumed-tokens mem-state])
+;               (swap! memory assoc consumed-tokens [subproduct mem-state])
+;               (println "> memory " memory)
+;               [subproduct returned-state])))))))
  
 (defmacro memoize-rules
   "Turns the subrule contained in the vars
@@ -1249,7 +1249,7 @@
   [& subrule-names]
   (let [subrule-vars (vec (for [nm subrule-names] `(var ~nm)))]
     `(doseq [subrule-var# ~subrule-vars]
-       (alter-var-root subrule-var# mem))))
+       (alter-var-root subrule-var# memoize))))
  
 (defvar- mem-test-rule
   (alt (conc (lit 'a) (opt (lit 'b))) (lit 'c)))
@@ -1257,13 +1257,13 @@
 (memoize-rules mem-test-rule)
   ; Running (test memoize-rules), which repeats a bunch of
   ; calls on mem-test-rule two hundred times, takes about
-  ; 530 ms on my computer, which uses an 2.2 GHz Intel Core
+  ; 160 ms on my computer, which uses an 2.2 GHz Intel Core
   ; Duo and 2 GB of RAM.
   ; Omitting the memoize-rules form above causes the same test
-  ; to take 620 ms, a significant 17.0% difference.
+  ; to take 430 ms, a very high 92% difference.
  
 (set-test memoize-rules
-  (dotimes [_ 200]
+  (dotimes [n 200]
     ; Note: the two assertions below
     ; tests for bugs when first a certain
     ; valid state is registered, then another
@@ -1271,10 +1271,10 @@
     ; contains the first state's is also
     ; registered, and the first state cuts off
     ; the second during recognition.
-;     (is (= (mem-test-rule (make-state '[a c]))
-;            [['a nil] (make-state '[c])]))
-;     (is (= (mem-test-rule (make-state '[a b c]))
-;            ['[a b] (make-state '[c])]))
+    (is (= (mem-test-rule (make-state '[a c]))
+           [['a nil] (make-state '[c])]))
+    (is (= (mem-test-rule (make-state '[a b c]))
+           ['[a b] (make-state '[c])]))
     (is (= (mem-test-rule (make-state '[a b c]))
            ['[a b] (make-state '[c])]))
     (is (= (mem-test-rule (make-state '[c s a])) ['c (make-state '[s a])]))

@@ -5,5 +5,6 @@
   (:require name.choi.joshua.fnparse))
             ;name.choi.joshua.fnparse.json))
 
-(time (run-tests 'name.choi.joshua.fnparse))
+; (time (run-tests 'name.choi.joshua.fnparse))
+(time (test #'name.choi.joshua.fnparse/memoize-rules))
 ; (time (run-tests 'name.choi.joshua.fnparse.json))
