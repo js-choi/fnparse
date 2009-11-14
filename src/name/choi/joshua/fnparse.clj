@@ -31,9 +31,7 @@
 (defvar- *empty-state*
   {::remainder nil}
   "The overridable var for the context's
-  empty state. It does not have an index
-  assigned to its metadata; that's
-  make-state's job.
+  empty state.
   It's private. That's because you're
   supposed to use state-context, which
   does all the work for you.")
@@ -65,8 +63,7 @@
   You really must use this function to create
   any states that you'll plug into rules."
   [tokens]
-  (with-meta (assoc-remainder *empty-state* tokens)
-    {::index 0}))
+  (assoc-remainder *empty-state* tokens))
  
 (defn make-state-with-info
   "For mocking a state with already
@@ -75,28 +72,6 @@
   to assoc."
   [tokens & info-args]
   (apply assoc (make-state tokens) info-args))
- 
-(with-test
-  (defvar- get-index
-    (comp ::index meta)
-    "Gets the given state's index.")
-  (-> nil make-state get-index (= 0) is))
- 
-(defn- set-index
-  "Sets the given state's index to the given new-index."
-  [state new-index]
-  (vary-meta state assoc ::index new-index))
- 
-(defn vary-index
-  "Sets the given state's index to the result of
-  applying the given function to the old index."
-  [state f]
-  (set-index state (f (get-index state))))
- 
-(defn new-info
-  "Creates a new state with the given info."
-  [& info-keys-and-vals]
-  (apply assoc *empty-state* info-keys-and-vals))
  
 (defvar- *add-info*
   merge
@@ -221,17 +196,10 @@
       (fn [state]
         (if-let [tokens (remainder-accessor state)]
           [(first tokens)
-           (-> state (assoc-remainder (next tokens))
-             (vary-index inc))]))))
+           (assoc-remainder state (next tokens))]))))
   (is (= ((anything) (make-state '(A B C)))
          ['A (make-state '(B C))])
     "anything rule matches first token")
-  (is (= ((anything) (make-state '(A B C)))
-         ['A (make-state '(B C))])
-    "anything rule matches first token without index")
-  (is (-> '(A B C) make-state ((anything)) second meta ::index (= 1)))
-  (is (-> '(A B C) make-state (vary-meta assoc ::index 5)
-        ((anything)) second meta ::index (= 6)))
   (is (nil? ((anything) (make-state nil)))
     "anything rule fails with no tokens left")
   (is (= ((rep* (anything)) (make-state '(A B C)))
@@ -406,11 +374,6 @@
           (make-state ["hi" "THEN" "bye"]))
          [["hi" "THEN"] (make-state (list "bye"))])
       "created concatenated rule succeeds when all subrules fulfilled in order")
-  (is (= (-> ["hi" "THEN" "bye"] make-state
-           ((conc (lit "hi") (lit "THEN")))
-           second get-index)
-         2)
-      "created concatenated rule correctly deals with indexes")
   (is (nil? ((conc (lit "hi") (lit "THEN"))
              (make-state ["hi" "bye" "boom"])))
       "created concatenated rule fails when one subrule fails"))
@@ -438,10 +401,6 @@
   (is (= ((alt (lit "hi") (lit "THEN"))
           (make-state ["THEN" "bye"]))
          ["THEN" (make-state (list "bye"))]))
-  (is (= (-> ["THEN" "bye"] make-state
-           ((alt (lit "hi") (lit "THEN")))
-           second get-index)
-         1))
   (is (nil? ((alt (lit "hi") (lit "THEN"))
              (make-state ["bye" "boom"])))))
  
@@ -872,7 +831,9 @@
   (validator b-state) is true. The new rule's
   product would be b-product."
   [subrule validator]
-  (complex [subproduct subrule, substate get-state, :when (validator substate)]
+  (complex [subproduct subrule
+            substate get-state
+            :when (validator substate)]
     subproduct))
  
 (defn validate-remainder
@@ -891,49 +852,54 @@
             :when (validator subremainder)]
     subproduct))
  
-(defnk make-template
-  [:default-info {}, :add-info merge]
+(defn make-template
+  [default-info]
   (let [struct-keys
           (cons ::remainder (keys default-info))
         state-struct
           (apply create-struct struct-keys)]
     {:state-struct state-struct
-     :add-info add-info
      :default-info default-info}))
- 
-(defn- merge-std-info
-  "The std-template needs special
-  behavior for merging its states. Firstly,
-  warnings are always just merged into each
-  other; it's commutative.
-  However, line and column numbers are
-  different. If you add a state with a line
-  of 0: in other words, "
-  [s0 s1]
-  (let [new-warnings (into (:warnings s0) (:warnings s1))
-        s1-line (s1 :line)
-        s1-column (s1 :column)
-        new-line (+ (s0 :line) s1-line)
-        new-column (if (pos? s1-line)
-                     s1-column
-                     (+ (s0 :column) s1-column))]
-   (new-info
-     :warnings new-warnings
-     :line new-line
-     :column new-column)))
  
 (defvar std-template
   (make-template
-    :default-info
-      {:warnings []
-       :line 0
-       :column 0}
-    :add-info
-      merge-std-info))
+    {:warnings []
+     :line 0
+     :column 0}))
  
 (defvar minimal-template
-  (make-template))
- 
+  (make-template {}))
+
+(with-test
+  (defn match-rule
+    "Creates a function that tries to completely
+    match the given rule to the given tokens,
+    with no remainder left over after the match.
+    - If (-> tokens make-state rule) fails, then
+      (failure-fn given-state) is called.
+    - If the remainder of (-> tokens make-state rule)
+      is not empty, then...
+        (incomplete-fn
+          product-from-consumed-tokens
+          new-state-after-rule
+          initial-state)
+      ...is called.
+    - If the new remainder is empty, then the
+      product of the rule is returned."
+    [rule failure-fn incomplete-fn tokens]
+    (let [state-0 (make-state tokens)]
+      (if-let [[product state-1] (rule state-0)]
+        (if (empty? (*remainder-accessor* state-1))
+          product
+          (incomplete-fn product state-1 state-0))
+        (failure-fn state-0))))
+  (let [rule (lit "A")
+        matcher (partial match-rule rule identity vector)]
+    (is (= (matcher ["A"]) "A"))
+    (is (= (matcher ["B"]) (make-state ["B"])))
+    (is (= (matcher ["A" "B"])
+           ["A" (make-state ["B"]) (make-state ["A" "B"])])))) 
+
 (with-test
   (defmacro state-context
     "Puts all Clojure forms inside into a state context.
@@ -950,57 +916,22 @@
     This form uses the binding form, so the context formed
     is thread-specific.
     
-    You can (and must, if you use things like memoizing
-    rules) provide a special info addition recipe in the
-    template with the key :name.choi.joshua.fnparse/add-info.
-    Corresponding to it would be a two-argument function that
-    merges its second argument (a state) into the first
-    argument (another state). This is important. It is
-    essential if you use the memo rule-maker. Read the example
-    below to learn how to implement a proper add-info.
-    
     Here is an example to make it clearer how you
     customize states. Let's say that I want my states to
     store: (1) any warnings that a rule might want to raise
     for the user during parsing, (2) the current line number,
-    and (3) the current column number. Also, whenever two
-    states are merged, I want to do it in a particular way.
-    I want the warnings to simply be merged together. Also, I
-    want the new state's line and column to similarly be
-    the sum of the lines and column of the two states.
-    
-    But! if the line of the second state's column is above zero,
-    then that means that merging the second state into the
-    first state should RESET the new column number, since the
-    new state is at a new line, a different line from the first
-    state! Here's the code...
+    and (3) the current column number.
     
     (use 'name.choi.joshua.fnparse)
-    (require '[name.choi.joshua.fnparse :as p])
-      ; Did you know that you can shorten double-colon-ed
-      ; namespace-qualified keywords using the namespaces'
-      ; abbreviations from require? It's true! Thanks to
-      ; the above require form, the ::p/remainder keyword
-      ; is equivalent to :name.choi.joshua.fnparse/remainder!
     
-    (defn add-info [s0 s1]
-      (let [new-warnings (into (:warnings s0) (:warnings s1))
-            s1-line (s1 :line)
-            s1-column (s1 :column)
-            new-line (+ (s0 :line) s1-line)
-            new-column (if (pos? s1-line)
-                         s1-column
-                         (+ (s0 :column) s1-column))]
-       (new-info
-         :warnings new-warnings
-         :line new-line
-         :column new-column)))
+    (def my-template
+      (make-template
+        {:warnings []
+         :line 0
+         :column 0
+         ::p/add-info add-info}))
     
-    (state-context
-      {:warnings []
-       :line 0
-       :column 0
-       ::p/add-info add-info}
+    (state-context my-template
       ; Define your rules and create states inside the context.
       (def line-break
         (invisi-conc (lit \\newline)
@@ -1077,7 +1008,7 @@
     (is (= (rule-c state-0) [\a state-a]))
     (is (thrown? ClassCastException
           (rule-c (make-state "abc")))))
-  (state-context (make-template :default-info {:warnings []})
+  (state-context (make-template {:warnings []})
     (is (= (emptiness (make-state "abc"))))
     (is (= ((lit \a) (make-state "abc"))
            [\a (-> "bc" seq make-state (assoc :warnings []))]))
@@ -1090,76 +1021,18 @@
             :warnings []}
            (make-state "ABZ\nC"))))
   (is (= (state-context minimal-template 5) 5)))
- 
-(with-test
-  (defn match-rule
-    "Creates a function that tries to completely
-    match the given rule to the given tokens,
-    with no remainder left over after the match.
-    - If (-> tokens make-state rule) fails, then
-      (failure-fn given-state) is called.
-    - If the remainder of (-> tokens make-state rule)
-      is not empty, then...
-        (incomplete-fn
-          product-from-consumed-tokens
-          new-state-after-rule
-          initial-state)
-      ...is called.
-    - If the new remainder is empty, then the
-      product of the rule is returned."
-    [rule failure-fn incomplete-fn tokens]
-    (let [state-0 (make-state tokens)]
-      (if-let [[product state-1] (rule state-0)]
-        (if (empty? (*remainder-accessor* state-1))
-          product
-          (incomplete-fn product state-1 state-0))
-        (failure-fn state-0))))
-  (let [rule (lit "A")
-        matcher (partial match-rule rule identity vector)]
-    (is (= (matcher ["A"]) "A"))
-    (is (= (matcher ["B"]) (make-state ["B"])))
-    (is (= (matcher ["A" "B"])
-           ["A" (make-state ["B"]) (make-state ["A" "B"])]))))
- 
-(defn- starts-with? [subject-seq query-seq]
-  (every? identity (map = subject-seq query-seq)))
- 
-(with-test
-  (defn- find-mem-result [memory-map query-key]
-    (if-let [candidates (seq (filter #(starts-with? (key %) query-key)
-                               memory-map))]
-      (if (> (count candidates) 1)
-        ; Just in case more than one entry is found, which isn't supposed to
-        ; happen
-        (raise fnparse-error
-          "found more than one entry that matches the token remainder %s: %s"
-          query-key candidates)
-        (val (first candidates)))))
-  (let [remainder-1 '[a b c d]
-        remainder-2 '[d e f]
-        remainder-3 '[a c b d]
-        memory {'[a b] 'dummy-1
-                '[d e f] 'dummy-2}]
-    (is (= (find-mem-result memory remainder-1) 'dummy-1))
-    (is (= (find-mem-result memory remainder-2) 'dummy-2))
-    (is (= (find-mem-result memory remainder-3) nil))))
 
 (defmacro memoize-rules
-  "Turns the subrule contained in the vars
+  "Turns the subrules contained in the vars
   referred to by the given symbols
-  into a memoizing rule that caches
-  its's results in an atom.
+  into memoizing rules that caches
+  their results in atoms. In effect, memoize
+  is called on all of the rules.
   Whenever the new mem rule is called,
   it checks the cache to see if there is an
   existing match; otherwise, the subrule is called.
  
-  If you use a customized state context,
-  mem requires that you implement a
-  ::fnparse/add-info function in your
-  state template. See state-context's docs
-  for information on how to do that.
-  
-  Why didn't I just implement it as a
+  Why didn't I just implement this as a
   regular rule-making function? Because this
   is truly only useful for optimization.
   It is better to separate this non-essential
@@ -1170,11 +1043,11 @@
   with a variable.
   
   Running (test memoize-rules), which repeats a bunch of
-  calls on a memozing test rule two hundred times, takes about
-  530 ms on my computer, which uses an 2.2 GHz Intel Core
+  calls on mem-test-rule two hundred times, takes about
+  160 ms on my computer, which uses an 2.2 GHz Intel Core
   Duo and 2 GB of RAM.
-  Omitting the memoization of that test rule causes the same test
-  function to take 620 ms, a significant 17.0% difference."
+  Omitting the memoize-rules form above causes the same test
+  to take 430 ms, a very high 92% difference."
   [& subrule-names]
   (let [subrule-vars (vec (for [nm subrule-names] `(var ~nm)))]
     `(doseq [subrule-var# ~subrule-vars]
@@ -1193,13 +1066,6 @@
  
 (set-test memoize-rules
   (dotimes [n 200]
-    ; Note: the two assertions below
-    ; tests for bugs when first a certain
-    ; valid state is registered, then another
-    ; valid state whose remainder's beginning
-    ; contains the first state's is also
-    ; registered, and the first state cuts off
-    ; the second during recognition.
     (is (= (mem-test-rule (make-state '[a c]))
            [['a nil] (make-state '[c])]))
     (is (= (mem-test-rule (make-state '[a b c]))
