@@ -107,33 +107,6 @@
   info it has to the first state's.")
  
 (with-test
-  (defn- add-states
-    "This function is not expected to be
-    useful for users--only the mem rule maker
-    uses it. It adds state-b into state-a. First:
-    - The two states' info are added using the
-      overridable *add-info* function,
-      forming a new state.
-    - The remainder of the new state is changed
-      to state-a's remainder with the
-      first few tokens dropped off. The number
-      of tokens dropped is the 
-    - The index of the new state is changed to
-      the sum of the indexes of state-a and
-      state-b."
-    [state-a state-b]
-    (let [index-b (get-index state-b)]
-      (-> state-a
-        (*add-info* state-b)
-        (assoc-remainder (drop index-b (*remainder-accessor* state-a)))
-        (set-index (+ (get-index state-a) index-b)))))
-  (let [state-a (-> '[a b c d] make-state (set-index 4))
-        state-b (-> nil make-state (set-index 2))
-        summed-state (add-states state-a state-b)]
-    (-> '[c d] make-state (= summed-state) is)
-    (-> summed-state get-index (= 6) is)))
- 
-(with-test
   (defmacro complex
     "Creates a complex rule in monadic
     form. It's a lot easier than it sounds.
@@ -1115,20 +1088,7 @@
             :line 0
             :column 0
             :warnings []}
-           (make-state "ABZ\nC")))
-    (is (= (assoc (make-state (seq "D"))
-             :line 1
-             :column 1
-             :warnings ["I'm a warning!"])
-           (add-states
-             (assoc (make-state "\nCD")
-               :line 0
-               :column 3
-               :warnings [])
-             (assoc (set-index (make-state nil) 2)
-               :line 1
-               :column 1
-               :warnings ["I'm a warning!"])))))
+           (make-state "ABZ\nC"))))
   (is (= (state-context minimal-template 5) 5)))
  
 (with-test
@@ -1183,38 +1143,7 @@
     (is (= (find-mem-result memory remainder-1) 'dummy-1))
     (is (= (find-mem-result memory remainder-2) 'dummy-2))
     (is (= (find-mem-result memory remainder-3) nil))))
- 
-; (defn mem
-;   [subrule]
-;   (let [memory (atom {})
-;         remainder-accessor *remainder-accessor*]
-;     (fn [state-0]
-;       (let [remainder-0 (remainder-accessor state-0)
-;             index-0 (get-index state-0)]
-;         (if-let [found-result (find-mem-result @memory remainder-0)]
-;           (let [found-product (found-result 0)
-;                 found-state (found-result 1)
-;                 found-state-index (get-index found-state)
-;                 new-remainder (drop found-state-index remainder-0)
-;                 new-state (-> state-0
-;                             (add-states found-state)
-;                             (assoc-remainder new-remainder)
-;                             (set-index (+ index-0 found-state-index)))]
-;             (println "> memory found" [found-product found-state])
-;             [found-product new-state])
-;           (if-let [subresult (subrule (make-state remainder-0))]
-;             (let [subproduct (subresult 0)
-;                   substate (subresult 1)
-;                   subremainder (remainder-accessor substate)
-;                   subindex (get-index substate)
-;                   consumed-tokens (take subindex remainder-0)
-;                   mem-state (assoc-remainder substate nil)
-;                   returned-state (add-states state-0 mem-state)]
-;               (println "> memory registered" consumed-tokens [consumed-tokens mem-state])
-;               (swap! memory assoc consumed-tokens [subproduct mem-state])
-;               (println "> memory " memory)
-;               [subproduct returned-state])))))))
- 
+
 (defmacro memoize-rules
   "Turns the subrule contained in the vars
   referred to by the given symbols
