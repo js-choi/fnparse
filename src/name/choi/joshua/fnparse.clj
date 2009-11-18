@@ -41,17 +41,26 @@
     "Returns a state that's the old state
     associated with the new remainder."))
 
-(extend PersistentArrayMap AParseState
+(extend IPersistentMap AParseState
   {:get-remainder :remainder
    :assoc-remainder #(assoc %1 :remainder %2)})
 
 (deftype BasicState [remainder] [IPersistentMap])
 
+(defn- general-assoc-remainder [state new-remainder]
+  (assoc state :remainder new-remainder))
+
 (extend ::BasicState AParseState
   {:get-remainder :remainder
-   :assoc-remainder #(assoc %1 :remainder %2)})
+   :assoc-remainder general-assoc-remainder})
 
 ; (println ">>" (get-remainder (BasicState '[a b])))
+
+(deftype StdState [remainder line column warnings] [IPersistentMap])
+
+(extend ::StdState AParseState
+  {:get-remainder :remainder
+   :assoc-remainder general-assoc-remainder})
 
 (deferror fnparse-error [] [message-template & template-args]
   {:msg (str "FnParse error: " (apply format message-template template-args))
