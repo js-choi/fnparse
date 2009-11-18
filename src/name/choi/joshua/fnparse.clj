@@ -1,7 +1,8 @@
 (ns name.choi.joshua.fnparse
   [:use clojure.contrib.monads clojure.contrib.except
         clojure.contrib.error-kit clojure.contrib.def
-        clojure.test])
+        clojure.test]
+  [:import [clojure.lang IPersistentMap PersistentArrayMap]])
 
 ; A RULE is a a function that:
 ; - Takes a state and returns either nil
@@ -40,7 +41,11 @@
     "Returns a state that's the old state
     associated with the new remainder."))
 
-(deftype BasicState [remainder] [clojure.lang.IPersistentMap])
+(extend PersistentArrayMap AParseState
+  {:get-remainder :remainder
+   :assoc-remainder #(assoc %1 :remainder %2)})
+
+(deftype BasicState [remainder] [IPersistentMap])
 
 (extend ::BasicState AParseState
   {:get-remainder :remainder
@@ -179,6 +184,8 @@
     (if-let [tokens (get-remainder state)]
       [(first tokens)
        (assoc-remainder state (next tokens))]))
+  (is (= (anything {:remainder '(A B C)})
+         ['A {:remainder '(B C)}]))
   (is (= (anything (BasicState '(A B C)))
          ['A (BasicState '(B C))])
     "anything rule matches first token")
