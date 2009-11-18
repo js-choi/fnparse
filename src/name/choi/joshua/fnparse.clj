@@ -8,7 +8,7 @@
 ;   or a vector pair.
 ;   - A STATE is a struct map that contains
 ;     a remainder and maybe info.
-;     You create states using the make-state function.
+;     You create states using the BasicState function.
 ;   - A REMAINDER is a sequence or
 ;     seqable collection of tokens.
 ;     It is contained in the
@@ -32,16 +32,20 @@
  
 (declare lit rep* rep+ except state-context std-template)
 
-(defprotocol AState
+(defprotocol AParseState
   "The protocol representing general FnParse states."
   (get-remainder [state]
     "Gets the state's remainder.")
-  (set-remainder [state new-remainder]
+  (assoc-remainder [state new-remainder]
     "Returns a state that's the old state
     associated with the new remainder."))
 
-(deftype BasicState [remainder])
+(deftype BasicState [remainder] [clojure.lang.IPersistentMap])
 
+(extend ::BasicState AParseState
+  {:get-remainder :remainder})
+
+; (println ">>" (get-remainder (BasicState '[a b])))
 
 (deferror fnparse-error [] [message-template & template-args]
   {:msg (str "FnParse error: " (apply format message-template template-args))
@@ -60,51 +64,6 @@
   supposed to use state-context, which
   does all the work for you.")
 
-(defvar *remainder-accessor*
-  ::remainder
-  "The overridable var for the context's
-  remainder accessor. If the current
-  context uses a struct map, then this
-  var contains the speedy accessor for
-  ::remainder. But in any case, it refers
-  to the ::remainder key; I made that
-  std.
-  The var is private. That's because you're
-  supposed to use state-context, which
-  does all the work for you.")
- 
-(defn get-remainder
-  "Gets the state's remainder."
-  [state]
-  (*remainder-accessor* state))
- 
-(defn- assoc-remainder [state remainder]
-  (assoc state ::remainder remainder))
- 
-(defn make-state
-  "The general function that creates a state
-  from the given sequence of tokens.
-  You really must use this function to create
-  any states that you'll plug into rules."
-  [tokens]
-  (assoc-remainder *empty-state* tokens))
- 
-(defn make-state-with-info
-  "For mocking a state with already
-  provided info. Basically calls make-state
-  on the tokens and then applies info-args
-  to assoc."
-  [tokens & info-args]
-  (apply assoc (make-state tokens) info-args))
- 
-(defvar- *add-info*
-  merge
-  "Overridable by using state-context.
-  Merges two states' info together. The first
-  state is the primary one, and the second state
-  adds its warnings, line numbers, and whatever
-  info it has to the first state's.")
- 
 (with-test
   (defmacro complex
     "Creates a complex rule in monadic
@@ -147,22 +106,22 @@
   [key]
   (fetch-val key))
  
-; (with-test
-;   (defn fetch-remainder
-;     "Generates a rule whose product is the
-;     sequence of the remaining tokens of any states
-;     that it is given. It consumes no tokens.
-;     [(fetch-remainder) is equivalent to
-;     (fetch-val *remainder-accessor*) from
-;     clojure.contrib.monads.]"
-;     []
-;     (fetch-val *remainder-accessor*))
-;   (is (= ((complex [remainder (fetch-remainder)] remainder)
-;           (make-state ["hi" "THEN"]))
-;          [["hi" "THEN"] (make-state ["hi" "THEN"])]))
+(with-test
+  (defn fetch-remainder
+    "Generates a rule whose product is the
+    sequence of the remaining tokens of any states
+    that it is given. It consumes no tokens.
+    [(fetch-remainder) is equivalent to
+    (fetch-val get-remainder) from
+    clojure.contrib.monads.]"
+    []
+    (fetch-val get-remainder))
+  (is (= ((complex [remainder (fetch-remainder)] remainder)
+          (BasicState ["hi" "THEN"]))
+         [["hi" "THEN"] (BasicState ["hi" "THEN"])])))
 ;   (let [rule (complex [remainder (fetch-remainder)] remainder)
 ;         remainder '[A B]
-;         state (make-state remainder)]
+;         state (BasicState remainder)]
 ;     (state-context std-template
 ;       (is (= (rule state) [remainder state])))))
  
@@ -189,9 +148,9 @@
     [Equivalent to update-val from clojure.contrib.monads.]"
     [key val-update-fn & args]
     (update-val key #(apply val-update-fn % args)))
-  (is (= (-> [\a] make-state (assoc :column 3)
+  (is (= (-> [\a] BasicState (assoc :column 3)
            ((update-info :column inc)))
-         [3 (-> [\a] make-state (assoc :column 4))])))
+         [3 (-> [\a] BasicState (assoc :column 4))])))
  
 (with-test
   (with-monad parser-m
@@ -205,8 +164,8 @@
       to the EBNF a = ; This rule's product
       is always nil, and it therefore always
       returns [nil given-state]."))
-  (is (= (emptiness (make-state '(A B C)))
-         [nil (make-state '(A B C))])
+  (is (= (emptiness (BasicState '(A B C)))
+         [nil (BasicState '(A B C))])
       "emptiness rule matches emptiness"))
  
 ; (with-test
@@ -221,13 +180,13 @@
 ;         (if-let [tokens (remainder-accessor state)]
 ;           [(first tokens)
 ;            (assoc-remainder state (next tokens))]))))
-;   (is (= ((anything) (make-state '(A B C)))
-;          ['A (make-state '(B C))])
+;   (is (= ((anything) (BasicState '(A B C)))
+;          ['A (BasicState '(B C))])
 ;     "anything rule matches first token")
-;   (is (nil? ((anything) (make-state nil)))
+;   (is (nil? ((anything) (BasicState nil)))
 ;     "anything rule fails with no tokens left")
-;   (is (= ((rep* (anything)) (make-state '(A B C)))
-;          ['(A B C) (make-state nil)])
+;   (is (= ((rep* (anything)) (BasicState '(A B C)))
+;          ['(A B C) (BasicState nil)])
 ;     "repeated anything rule does not create infinite loop"))
 ;  
 ; (with-test
@@ -241,12 +200,12 @@
 ;     [subrule validator]
 ;     (complex [subproduct subrule, :when (validator subproduct)]
 ;       subproduct))
-;   (is (= ((validate (lit "hi") (partial = "hi")) (make-state ["hi" "THEN"]))
-;          ["hi" (make-state (list "THEN"))])
+;   (is (= ((validate (lit "hi") (partial = "hi")) (BasicState ["hi" "THEN"]))
+;          ["hi" (BasicState (list "THEN"))])
 ;       "created validator rule succeeds when given subrule and validator succeed")
-;   (is (nil? ((validate (lit "hi") (partial = "RST")) (make-state ["RST"])))
+;   (is (nil? ((validate (lit "hi") (partial = "RST")) (BasicState ["RST"])))
 ;       "created validator rule fails when given subrule fails")
-;   (is (nil? ((validate (lit "hi") (partial = "hi")) (make-state "hi")))
+;   (is (nil? ((validate (lit "hi") (partial = "hi")) (BasicState "hi")))
 ;       "created validator rule fails when given validator fails"))
 ;  
 ; (with-test
@@ -262,11 +221,11 @@
 ;     [validator]
 ;     (validate (anything) validator))
 ;   (let [rule (term (partial = 'A))]
-;     (is (= (rule (make-state '[A B])) ['A (make-state '[B])])
+;     (is (= (rule (BasicState '[A B])) ['A (BasicState '[B])])
 ;       "created terminal rule works when first token fulfills validator")
-;     (is (nil? (rule (make-state '[B B])))
+;     (is (nil? (rule (BasicState '[B B])))
 ;       "created terminal rule fails when first token fails validator")
-;     (is (= (rule (make-state '[A])) ['A (make-state nil)])
+;     (is (= (rule (BasicState '[A])) ['A (BasicState nil)])
 ;       "created terminal rule works when no remainder")))
 ;  
 ; (with-test
@@ -281,10 +240,10 @@
 ;       a = \"...\";
 ;     The new rule's product would be the first
 ;     token, if it equals the given literal token.")
-;   (is (= ((lit 'A) (make-state '[A B]))
-;          ['A (make-state '[B])])
+;   (is (= ((lit 'A) (BasicState '[A B]))
+;          ['A (BasicState '[B])])
 ;       "created literal rule works when literal token present")
-;   (is (nil? ((lit 'A) (make-state '[B])))
+;   (is (nil? ((lit 'A) (BasicState '[B])))
 ;       "created literal rule fails when literal token not present"))
 ;  
 ; (with-test
@@ -297,24 +256,24 @@
 ;       a = ? (re-matches #\"...\" %) evaluates to true ?;
 ;     The new rule's product would be the first token, if it matches the given
 ;     regex.")
-;   (is (= ((re-term #"\s*true\s*") (make-state ["  true" "THEN"]))
-;          ["  true" (make-state ["THEN"])])
+;   (is (= ((re-term #"\s*true\s*") (BasicState ["  true" "THEN"]))
+;          ["  true" (BasicState ["THEN"])])
 ;       "created re-term rule works when first token matches regex")
-;   (is (nil? ((re-term #"\s*true\s*") (make-state ["false" "THEN"])))
+;   (is (nil? ((re-term #"\s*true\s*") (BasicState ["false" "THEN"])))
 ;       "created re-term rule fails when first token does not match regex")
-;   (is (nil? ((re-term #"\s*true\s*") (make-state nil)))
+;   (is (nil? ((re-term #"\s*true\s*") (BasicState nil)))
 ;       "created re-term rule fails when no tokens are left"))
 ;  
 ; (deftest complex-test
 ;   (let [rule1 (complex [a (lit 'A)] (str a "!"))
 ;         rule2 (complex [a (lit 'A), b (lit 'B)] (str a "!" b))]
-;     (is (= (rule1 (make-state '[A B])) ["A!" (make-state '[B])])
+;     (is (= (rule1 (BasicState '[A B])) ["A!" (BasicState '[B])])
 ;       "created complex rule applies semantic hook to valid subresult")
-;     (is (nil? (rule1 (make-state '[B A])))
+;     (is (nil? (rule1 (BasicState '[B A])))
 ;       "created complex rule fails when a given subrule fails")
-;     (is (= (rule2 (make-state '[A B C])) ["A!B" (make-state '[C])])
+;     (is (= (rule2 (BasicState '[A B C])) ["A!B" (BasicState '[C])])
 ;       "created complex rule succeeds when all subrules fulfilled in order")
-;     (is (nil? (rule2 (make-state '[A C])))
+;     (is (nil? (rule2 (BasicState '[A C])))
 ;       "created complex rule fails when one subrule fails")))
 ;  
 ; (with-test
@@ -325,9 +284,9 @@
 ;     [subrule]
 ;     (complex [state get-state, subproduct subrule, _ (set-state state)]
 ;       subproduct))
-;   (is (= ((followed-by (lit 'A)) (make-state '[A B C]))
-;          ['A (make-state '[A B C])]))
-;   (is (nil? ((followed-by (lit 'A)) (make-state '[B C])))))
+;   (is (= ((followed-by (lit 'A)) (BasicState '[A B C]))
+;          ['A (BasicState '[A B C])]))
+;   (is (nil? ((followed-by (lit 'A)) (BasicState '[B C])))))
 ;  
 ; (with-test
 ;   (defn not-followed-by
@@ -337,9 +296,9 @@
 ;     (fn [state]
 ;       (if (nil? (subrule state))
 ;         [true state])))
-;   (is (= ((not-followed-by (lit 'A)) (make-state '[B C]))
-;          [true (make-state '[B C])]))
-;   (is (nil? ((not-followed-by (lit 'A)) (make-state '[A B C])))))
+;   (is (= ((not-followed-by (lit 'A)) (BasicState '[B C]))
+;          [true (BasicState '[B C])]))
+;   (is (nil? ((not-followed-by (lit 'A)) (BasicState '[A B C])))))
 ;  
 ; (with-test
 ;   (defn semantics
@@ -351,8 +310,8 @@
 ;     [subrule semantic-hook]
 ;     (complex [subproduct subrule]
 ;       (semantic-hook subproduct)))
-;   (is (= ((semantics (lit "hi") #(str % "!")) (make-state ["hi" "THEN"]))
-;          ["hi!" (make-state (list "THEN"))])
+;   (is (= ((semantics (lit "hi") #(str % "!")) (BasicState ["hi" "THEN"]))
+;          ["hi!" (BasicState (list "THEN"))])
 ;       "created simple semantic rule applies semantic hook to valid result of given rule"))
 ;  
 ; (defn constant-semantics
@@ -371,8 +330,8 @@
 ;     []
 ;     (complex [remainder (fetch-remainder)]
 ;       (first remainder)))
-;   (is (= ((remainder-peek) (make-state (seq "ABC")))
-;          [\A (make-state (seq "ABC"))])))
+;   (is (= ((remainder-peek) (BasicState (seq "ABC")))
+;          [\A (BasicState (seq "ABC"))])))
 ;  
 ; (with-test
 ;   (defmacro conc
@@ -395,11 +354,11 @@
 ;  
 ; (set-test conc
 ;   (is (= ((conc (lit "hi") (lit "THEN"))
-;           (make-state ["hi" "THEN" "bye"]))
-;          [["hi" "THEN"] (make-state (list "bye"))])
+;           (BasicState ["hi" "THEN" "bye"]))
+;          [["hi" "THEN"] (BasicState (list "bye"))])
 ;       "created concatenated rule succeeds when all subrules fulfilled in order")
 ;   (is (nil? ((conc (lit "hi") (lit "THEN"))
-;              (make-state ["hi" "bye" "boom"])))
+;              (BasicState ["hi" "bye" "boom"])))
 ;       "created concatenated rule fails when one subrule fails"))
 ;  
 ; (defmacro alt
@@ -423,10 +382,10 @@
 ;  
 ; (set-test alt
 ;   (is (= ((alt (lit "hi") (lit "THEN"))
-;           (make-state ["THEN" "bye"]))
-;          ["THEN" (make-state (list "bye"))]))
+;           (BasicState ["THEN" "bye"]))
+;          ["THEN" (BasicState (list "bye"))]))
 ;   (is (nil? ((alt (lit "hi") (lit "THEN"))
-;              (make-state ["bye" "boom"])))))
+;              (BasicState ["bye" "boom"])))))
 ;  
 ; (with-test
 ;   (defn opt
@@ -441,11 +400,11 @@
 ;     (with-monad parser-m
 ;       (m-plus subrule emptiness)))
 ;   (let [opt-true (opt (lit "true"))]
-;     (is (= (opt-true (make-state ["true" "THEN"]))
-;            ["true" (make-state (list "THEN"))])
+;     (is (= (opt-true (BasicState ["true" "THEN"]))
+;            ["true" (BasicState (list "THEN"))])
 ;         "created option rule works when symbol present")
-;     (is (= (opt-true (make-state (list "THEN")))
-;            [nil (make-state (list "THEN"))])
+;     (is (= (opt-true (BasicState (list "THEN")))
+;            [nil (BasicState (list "THEN"))])
 ;         "created option rule works when symbol absent")))
 ;  
 ; (with-test
@@ -464,8 +423,8 @@
 ;  
 ; (set-test invisi-conc
 ;   (is (= ((invisi-conc (lit \a) (update-info :column inc))
-;            (-> "abc" make-state (assoc :column 4)))
-;          [\a (-> "bc" seq make-state (assoc :column 5))])))
+;            (-> "abc" BasicState (assoc :column 4)))
+;          [\a (-> "bc" seq BasicState (assoc :column 5))])))
 ;  
 ; (with-test
 ;   (defn lit-conc-seq
@@ -485,15 +444,15 @@
 ;     ([token-seq rule-maker]
 ;      (with-monad parser-m
 ;        (m-seq (map rule-maker token-seq)))))
-;   (is (= ((lit-conc-seq "THEN") (make-state "THEN print 42;"))
-;          [(vec "THEN") (make-state (seq " print 42;"))])
+;   (is (= ((lit-conc-seq "THEN") (BasicState "THEN print 42;"))
+;          [(vec "THEN") (BasicState (seq " print 42;"))])
 ;       "created literal-sequence rule is based on sequence of given token sequencible")
 ;   (is (= ((lit-conc-seq "THEN"
 ;             (fn [lit-token]
 ;               (invisi-conc (lit lit-token)
 ;                 (update-info :column inc))))
-;           (-> "THEN print 42;" make-state (assoc :column 1)))
-;          [(vec "THEN") (-> (seq " print 42;") make-state (assoc :column 5))])
+;           (-> "THEN print 42;" BasicState (assoc :column 1)))
+;          [(vec "THEN") (-> (seq " print 42;") BasicState (assoc :column 5))])
 ;       "created literal-sequence rule uses given rule-maker"))
 ;  
 ; (with-test
@@ -509,11 +468,11 @@
 ;     ([token-seq rule-maker]
 ;      (with-monad parser-m
 ;        (apply m-plus (map rule-maker token-seq)))))
-;   (is (= ((lit-alt-seq "ABCD") (make-state (seq "B 2")))
-;          [\B (make-state (seq " 2"))])
+;   (is (= ((lit-alt-seq "ABCD") (BasicState (seq "B 2")))
+;          [\B (BasicState (seq " 2"))])
 ;       (str "created literal-alternative-sequence rule "
 ;            "works when literal symbol present in sequence"))
-;   (is (nil? ((lit-alt-seq "ABCD") (make-state (seq "E 2"))))
+;   (is (nil? ((lit-alt-seq "ABCD") (BasicState (seq "E 2"))))
 ;       (str "created literal-alternative-sequence "
 ;            "rule fails when literal symbol not "
 ;            "present in sequence"))
@@ -521,8 +480,8 @@
 ;             (fn [lit-token]
 ;               (invisi-conc (lit lit-token)
 ;                            (update-info :column inc))))
-;           (-> "B 2" make-state (assoc :column 1)))
-;          [\B (-> (seq " 2") make-state (assoc :column 2))])
+;           (-> "B 2" BasicState (assoc :column 1)))
+;          [\B (-> (seq " 2") BasicState (assoc :column 2))])
 ;       "created literal-alternative-sequence rule uses given rule-maker"))
 ;  
 ; (with-test
@@ -557,29 +516,29 @@
 ;   ;  (opt (rep+ subrule)))
 ;   (let [rep*-true (rep* (lit true))
 ;         rep*-untrue (rep* (except (anything) (lit true)))]
-;     (is (= (rep*-true (-> [true "THEN"] make-state (assoc :a 3)))
-;            [[true] (-> (list "THEN") make-state (assoc :a 3))])
+;     (is (= (rep*-true (-> [true "THEN"] BasicState (assoc :a 3)))
+;            [[true] (-> (list "THEN") BasicState (assoc :a 3))])
 ;         "created zero-or-more-repetition rule works when symbol present singularly")
-;     (is (= (rep*-true (-> [true true true "THEN"] make-state (assoc :a 3)))
-;            [[true true true] (-> (list "THEN") make-state (assoc :a 3))])
+;     (is (= (rep*-true (-> [true true true "THEN"] BasicState (assoc :a 3)))
+;            [[true true true] (-> (list "THEN") BasicState (assoc :a 3))])
 ;         "created zero-or-more-repetition rule works when symbol present multiply")
-;     (is (= (rep*-true (-> ["THEN"] make-state (assoc :a 3)))
-;            [nil (-> (list "THEN") make-state (assoc :a 3))])
+;     (is (= (rep*-true (-> ["THEN"] BasicState (assoc :a 3)))
+;            [nil (-> (list "THEN") BasicState (assoc :a 3))])
 ;      "created zero-or-more-repetition rule works when symbol absent")
-;     (is (= (rep*-true (make-state [true true true]))
-;            [[true true true] (make-state nil)])
+;     (is (= (rep*-true (BasicState [true true true]))
+;            [[true true true] (BasicState nil)])
 ;         "created zero-or-more-repetition rule works with no remainder after symbols")
-;     (is (= (rep*-true (make-state nil))
-;            [nil (make-state nil)])
+;     (is (= (rep*-true (BasicState nil))
+;            [nil (BasicState nil)])
 ;         "created zero-or-more-repetition rule works with no remainder")
-;     (is (= (rep*-untrue (make-state [false false]))
-;            [[false false] (make-state nil)])
+;     (is (= (rep*-untrue (BasicState [false false]))
+;            [[false false] (BasicState nil)])
 ;         "created zero-or-more-repetition negative rule works consuming up to end")
-;     (is (= (rep*-untrue (make-state [false false true]))
-;            [[false false] (make-state [true])])
+;     (is (= (rep*-untrue (BasicState [false false true]))
+;            [[false false] (BasicState [true])])
 ;         "created zero-or-more-repetition negative rule works consuming until exception")
-;     (is (= (rep*-untrue (make-state nil))
-;            [nil (make-state nil)])
+;     (is (= (rep*-untrue (BasicState nil))
+;            [nil (BasicState nil)])
 ;         "created zero-or-more-repetition negative rule works with no remainder")))
 ;  
 ; (with-test
@@ -606,13 +565,13 @@
 ;   ;            rest-subproducts (rep* subrule)]
 ;   ;    (cons first-subproduct rest-subproducts)))
 ;   (let [rep+-true (rep+ (lit true))]
-;     (is (= (rep+-true (make-state [true "THEN"]))
-;            [[true] (make-state (list "THEN"))])
+;     (is (= (rep+-true (BasicState [true "THEN"]))
+;            [[true] (BasicState (list "THEN"))])
 ;         "created one-or-more-repetition rule works when symbol present singularly")
-;     (is (= (rep+-true (make-state [true true true "THEN"]))
-;            [[true true true] (make-state (list "THEN"))])
+;     (is (= (rep+-true (BasicState [true true true "THEN"]))
+;            [[true true true] (BasicState (list "THEN"))])
 ;         "created one-or-more-repetition rule works when symbol present multiply")
-;     (is (nil? (rep+-true (make-state (list "THEN"))))
+;     (is (nil? (rep+-true (BasicState (list "THEN"))))
 ;         "created one-or-more-repetition rule fails when symbol absent")))
 ;  
 ; (with-test
@@ -632,12 +591,12 @@
 ;               :when (not (subtrahend state))]
 ;       minuend-product))
 ;   (let [except-rule (except (lit-alt-seq "ABC") (alt (lit \B) (lit \C)))]
-;     (is (= (-> "ABC" make-state (assoc :a 1) except-rule)
-;             [\A (-> (seq "BC") make-state (assoc :a 1))])
+;     (is (= (-> "ABC" BasicState (assoc :a 1) except-rule)
+;             [\A (-> (seq "BC") BasicState (assoc :a 1))])
 ;         "created exception rule works when symbol is not one of the syntatic exceptions")
-;     (is (nil? (except-rule (make-state (seq "BAC"))))
+;     (is (nil? (except-rule (BasicState (seq "BAC"))))
 ;         "created exception rule fails when symbol is one of the syntactic exceptions")
-;     (is (nil? (except-rule (make-state (seq "DAB"))))
+;     (is (nil? (except-rule (BasicState (seq "DAB"))))
 ;         "created exception rule fails when symbol does not fulfill subrule")))
 ;  
 ; (with-test
@@ -650,13 +609,13 @@
 ;   (let [tested-rule-fn (rep-predicate (partial > 3) (lit "A"))
 ;         infinity-rule (rep-predicate (partial > Double/POSITIVE_INFINITY)
 ;                         (lit "A"))]
-;     (is (= (tested-rule-fn (make-state (list "A" "A" "C")))
-;            [["A" "A"] (make-state (list "C"))])
+;     (is (= (tested-rule-fn (BasicState (list "A" "A" "C")))
+;            [["A" "A"] (BasicState (list "C"))])
 ;         "created rep rule works when predicate returns true")
-;     (is (nil? (tested-rule-fn (make-state (list "A" "A" "A"))))
+;     (is (nil? (tested-rule-fn (BasicState (list "A" "A" "A"))))
 ;         "created rep rule fails when predicate returns false")
-;     (is (= (tested-rule-fn (make-state (list "D" "A" "B")))
-;            [nil (make-state (list "D" "A" "B"))])
+;     (is (= (tested-rule-fn (BasicState (list "D" "A" "B")))
+;            [nil (BasicState (list "D" "A" "B"))])
 ;         "created rep rule succeeds when symbol does not fulfill subrule at all")))
 ;  
 ; (defn rep=
@@ -711,19 +670,19 @@
 ;       (m-seq (replicate factor subrule))))
 ;   (let [tested-rule-3 (factor= 3 (lit "A"))
 ;         tested-rule-0 (factor= 0 (lit "A"))]
-;     (is (= (tested-rule-3 (make-state (list "A" "A" "A" "A" "C")))
-;            [["A" "A" "A"] (make-state (list "A" "C"))])
+;     (is (= (tested-rule-3 (BasicState (list "A" "A" "A" "A" "C")))
+;            [["A" "A" "A"] (BasicState (list "A" "C"))])
 ;         (str "created factor= rule works when symbol fulfills all subrule multiples and"
 ;              "leaves strict remainder"))
-;     (is (= (tested-rule-3 (make-state (list "A" "A" "A" "C")))
-;            [["A" "A" "A"] (make-state (list "C"))])
+;     (is (= (tested-rule-3 (BasicState (list "A" "A" "A" "C")))
+;            [["A" "A" "A"] (BasicState (list "C"))])
 ;         "created factor= rule works when symbol fulfills all subrule multiples only")
-;     (is (= (tested-rule-3 (make-state (list "A" "A" "C"))) nil)
+;     (is (= (tested-rule-3 (BasicState (list "A" "A" "C"))) nil)
 ;         "created factor= rule fails when symbol does not fulfill all subrule multiples")
-;     (is (= (tested-rule-3 (make-state (list "D" "A" "B"))) nil)
+;     (is (= (tested-rule-3 (BasicState (list "D" "A" "B"))) nil)
 ;         "created factor= rule fails when symbol does not fulfill subrule at all")
-;     (is (= (tested-rule-0 (make-state (list "D" "A" "B")))
-;            [[] (make-state (list "D" "A" "B"))])
+;     (is (= (tested-rule-0 (BasicState (list "D" "A" "B")))
+;            [[] (BasicState (list "D" "A" "B"))])
 ;         "created factor= rule works when symbol fulfils no multiples and factor is zero")))
 ;  
 ; (with-test
@@ -739,17 +698,17 @@
 ;     [factor subrule]
 ;     (alt (factor= (dec factor) subrule) (rep< factor subrule)))
 ;   (let [tested-rule (factor< 3 (lit \A))]
-;     (is (= (tested-rule (make-state (seq "AAAAC")))
-;            [[\A \A] (make-state (seq "AAC"))])
+;     (is (= (tested-rule (BasicState (seq "AAAAC")))
+;            [[\A \A] (BasicState (seq "AAC"))])
 ;         (str "created factor< rule works when symbol fulfills all subrule multiples and"
 ;              "leaves strict remainder"))
-;     (is (= (tested-rule (make-state (seq "AAAC")))
-;            [[\A \A] (make-state (seq "AC"))])
+;     (is (= (tested-rule (BasicState (seq "AAAC")))
+;            [[\A \A] (BasicState (seq "AC"))])
 ;         "created factor< rule works when symbol fulfills all subrule multiples only")
-;     (is (= (tested-rule (make-state (seq "AAC"))) [[\A \A] (make-state (seq "C"))])
+;     (is (= (tested-rule (BasicState (seq "AAC"))) [[\A \A] (BasicState (seq "C"))])
 ;         "created factor< rule works when symbol does not fulfill all subrule multiples")
-;     (is (= (tested-rule (make-state (seq "DAB")))
-;            [nil (make-state (seq "DAB"))])
+;     (is (= (tested-rule (BasicState (seq "DAB")))
+;            [nil (BasicState (seq "DAB"))])
 ;         "created factor< rule works when symbol does not fulfill subrule at all")))
 ;  
 ; (defn factor<=
@@ -782,12 +741,12 @@
 ;                           (fn [remainder state]
 ;                             (throw-arg "ERROR %s at line %s"
 ;                               (first remainder) (:line state))))]
-;     (is (= (exception-rule (-> ["A"] make-state (assoc :line 3)))
-;            ["A" (-> nil make-state (assoc :line 3))])
+;     (is (= (exception-rule (-> ["A"] BasicState (assoc :line 3)))
+;            ["A" (-> nil BasicState (assoc :line 3))])
 ;         "failing rules succeed when their subrules are fulfilled")
 ;     (is (thrown-with-msg? IllegalArgumentException
 ;           #"ERROR B at line 3"
-;           (exception-rule (-> ["B"] make-state (assoc :line 3)))
+;           (exception-rule (-> ["B"] BasicState (assoc :line 3)))
 ;         "failing rules fail with given exceptions when their subrules fail"))))
 ;  
 ; (with-test
@@ -808,8 +767,8 @@
 ;                                       (println "YES" line-number))]
 ;            subproduct)]
 ;     (is (= (with-out-str
-;              (is (= (rule (-> ["A" "B"] make-state (assoc :line 3)))
-;                     ["A" (-> (list "B") make-state (assoc :line 3))])
+;              (is (= (rule (-> ["A" "B"] BasicState (assoc :line 3)))
+;                     ["A" (-> (list "B") BasicState (assoc :line 3))])
 ;                  "pre-effect rules succeed when their subrules are fulfilled"))
 ;            "! A\nYES 3\n")
 ;         "effect rule should call their effect and return the same state")))
@@ -841,7 +800,7 @@
 ;             (fn [rule-call]
 ;               (try (rule-call)
 ;                 (catch Exception e :error))))]
-;     (is (= (intercept-rule (make-state "ABC")) :error))))
+;     (is (= (intercept-rule (BasicState "ABC")) :error))))
 ;  
 ; (defn validate-state
 ;   "Creates a rule from attaching a
@@ -899,9 +858,9 @@
 ;     "Creates a function that tries to completely
 ;     match the given rule to the given tokens,
 ;     with no remainder left over after the match.
-;     - If (-> tokens make-state rule) fails, then
+;     - If (-> tokens BasicState rule) fails, then
 ;       (failure-fn given-state) is called.
-;     - If the remainder of (-> tokens make-state rule)
+;     - If the remainder of (-> tokens BasicState rule)
 ;       is not empty, then...
 ;         (incomplete-fn
 ;           product-from-consumed-tokens
@@ -911,7 +870,7 @@
 ;     - If the new remainder is empty, then the
 ;       product of the rule is returned."
 ;     [rule failure-fn incomplete-fn tokens]
-;     (let [state-0 (make-state tokens)]
+;     (let [state-0 (BasicState tokens)]
 ;       (if-let [[product state-1] (rule state-0)]
 ;         (if (empty? (*remainder-accessor* state-1))
 ;           product
@@ -920,22 +879,22 @@
 ;   (let [rule (lit "A")
 ;         matcher (partial match-rule rule identity vector)]
 ;     (is (= (matcher ["A"]) "A"))
-;     (is (= (matcher ["B"]) (make-state ["B"])))
+;     (is (= (matcher ["B"]) (BasicState ["B"])))
 ;     (is (= (matcher ["A" "B"])
-;            ["A" (make-state ["B"]) (make-state ["A" "B"])])))) 
+;            ["A" (BasicState ["B"]) (BasicState ["A" "B"])])))) 
 ; 
 ; (with-test
 ;   (defmacro state-context
 ;     "Puts all Clojure forms inside into a state context.
 ;     This is for customization of states, which affect
-;     make-state and all rules within the context.
+;     BasicState and all rules within the context.
 ;     
 ;     You customize by providing as a template a map of
 ;     your states' desired keys and their default values.
 ;     
 ;     In addition, you get a speed boost from the automatic
 ;     generation and use of a struct map and accessors, which
-;     are invisibly used by make-state and all rules.
+;     are invisibly used by BasicState and all rules.
 ;     
 ;     This form uses the binding form, so the context formed
 ;     is thread-specific.
@@ -976,7 +935,7 @@
 ;           (update-info :column inc)))
 ;       (def text
 ;         (-> (alt line-break non-break) rep+ mem))
-;       (def a-state (make-state \"ABZ\\nC\"))
+;       (def a-state (BasicState \"ABZ\\nC\"))
 ;         ; Returns
 ;         ; {::p/remainder \"ABZ\\nC\"
 ;         ;  :line 1
@@ -1013,29 +972,29 @@
 ;     (is (thrown? ClassCastException (state-context-test-rule {})))))
 ;  
 ; (set-test state-context
-;   (let [state-0 (state-context std-template (make-state "abc"))]
+;   (let [state-0 (state-context std-template (BasicState "abc"))]
 ;     (is (= (state-context-test-rule state-0)))
 ;     (is (thrown? ClassCastException
-;           (state-context-test-rule (make-state "abc")))))
+;           (state-context-test-rule (BasicState "abc")))))
 ;   (let [rule-a (state-context std-template (anything))
 ;         rule-b (state-context std-template (lit \a))
 ;         rule-c (state-context std-template (complex [x (anything)] x))
-;         state-0 (state-context std-template (make-state "abc"))
+;         state-0 (state-context std-template (BasicState "abc"))
 ;         state-a (state-context std-template
-;                   (-> "bc" seq make-state (assoc :warnings [])))]
+;                   (-> "bc" seq BasicState (assoc :warnings [])))]
 ;     (is (= (rule-a state-0) [\a state-a]))
 ;     (is (thrown? ClassCastException
-;           (rule-a (make-state "abc"))))
+;           (rule-a (BasicState "abc"))))
 ;     (is (= (rule-b state-0) [\a state-a]))
 ;     (is (thrown? ClassCastException
-;           (rule-b (make-state "abc"))))
+;           (rule-b (BasicState "abc"))))
 ;     (is (= (rule-c state-0) [\a state-a]))
 ;     (is (thrown? ClassCastException
-;           (rule-c (make-state "abc")))))
+;           (rule-c (BasicState "abc")))))
 ;   (state-context (make-template {:warnings []})
-;     (is (= (emptiness (make-state "abc"))))
-;     (is (= ((lit \a) (make-state "abc"))
-;            [\a (-> "bc" seq make-state (assoc :warnings []))]))
+;     (is (= (emptiness (BasicState "abc"))))
+;     (is (= ((lit \a) (BasicState "abc"))
+;            [\a (-> "bc" seq BasicState (assoc :warnings []))]))
 ;     (is (thrown? ClassCastException
 ;           ((lit \a) {::remainder []}))))
 ;   (state-context std-template
@@ -1043,7 +1002,7 @@
 ;             :line 0
 ;             :column 0
 ;             :warnings []}
-;            (make-state "ABZ\nC"))))
+;            (BasicState "ABZ\nC"))))
 ;   (is (= (state-context minimal-template 5) 5)))
 ; 
 ; (defmacro memoize-rules
@@ -1090,18 +1049,18 @@
 ;  
 ; (set-test memoize-rules
 ;   (dotimes [n 200]
-;     (is (= (mem-test-rule (make-state '[a c]))
-;            [['a nil] (make-state '[c])]))
-;     (is (= (mem-test-rule (make-state '[a b c]))
-;            ['[a b] (make-state '[c])]))
-;     (is (= (mem-test-rule (make-state '[a b c]))
-;            ['[a b] (make-state '[c])]))
-;     (is (= (mem-test-rule (make-state '[c s a])) ['c (make-state '[s a])]))
-;     (let [result (mem-test-rule (make-state '(c)))]
+;     (is (= (mem-test-rule (BasicState '[a c]))
+;            [['a nil] (BasicState '[c])]))
+;     (is (= (mem-test-rule (BasicState '[a b c]))
+;            ['[a b] (BasicState '[c])]))
+;     (is (= (mem-test-rule (BasicState '[a b c]))
+;            ['[a b] (BasicState '[c])]))
+;     (is (= (mem-test-rule (BasicState '[c s a])) ['c (BasicState '[s a])]))
+;     (let [result (mem-test-rule (BasicState '(c)))]
 ;       (is (= (first result) 'c))
 ;       (is (empty? (seq (get-remainder (second result))))))
-;     (is (nil? (mem-test-rule (make-state '[s a]))))
-;     (is (nil? (mem-test-rule (make-state '[s a]))))))
+;     (is (nil? (mem-test-rule (BasicState '[s a]))))
+;     (is (nil? (mem-test-rule (BasicState '[s a]))))))
 ;  
 ; (defn- testing-rule-maker
 ;   [arg1 arg2]
@@ -1112,10 +1071,10 @@
 ;     (testing-rule-maker (lit \a) (lit \b))))
 ;  
 ; (deftest test-rule-makers
-;   (let [state-0 (state-context std-template (make-state "ab"))
-;         state-1 (state-context std-template (make-state nil))]
+;   (let [state-0 (state-context std-template (BasicState "ab"))
+;         state-1 (state-context std-template (BasicState nil))]
 ;     (is (thrown? RuntimeException
-;           (testing-rm-rule (make-state "abc"))))
+;           (testing-rm-rule (BasicState "abc"))))
 ;     (is (= (testing-rm-rule state-0) [[\a \b] state-1]))))
 ; 
 ; (defn inc-column
