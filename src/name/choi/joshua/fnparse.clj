@@ -54,8 +54,6 @@
   {:get-remainder :remainder
    :assoc-remainder general-assoc-remainder})
 
-; (println ">>" (get-remainder (BasicState '[a b])))
-
 (deftype StdState [remainder line column warnings] [IPersistentMap])
 
 (extend ::StdState AParseState
@@ -70,14 +68,6 @@
   (state-t maybe-m)
   "The parser monad of FnParse. What new
   forms can you form from this?")
-
-(defvar- *empty-state*
-  {::remainder nil}
-  "The overridable var for the context's
-  empty state.
-  It's private. That's because you're
-  supposed to use state-context, which
-  does all the work for you.")
 
 (with-test
   (defmacro complex
@@ -134,11 +124,6 @@
   (is (= ((complex [remainder (fetch-remainder)] remainder)
           (BasicState ["hi" "THEN"]))
          [["hi" "THEN"] (BasicState ["hi" "THEN"])])))
-;   (let [rule (complex [remainder (fetch-remainder)] remainder)
-;         remainder '[A B]
-;         state (BasicState remainder)]
-;     (state-context std-template
-;       (is (= (rule state) [remainder state])))))
  
 (defn set-info
   "Creates a rule that consumes no tokens.
@@ -865,37 +850,42 @@
 ;  
 ; (defvar minimal-template
 ;   (make-template {}))
-; 
-; (with-test
-;   (defn match-rule
-;     "Creates a function that tries to completely
-;     match the given rule to the given tokens,
-;     with no remainder left over after the match.
-;     - If (-> tokens BasicState rule) fails, then
-;       (failure-fn given-state) is called.
-;     - If the remainder of (-> tokens BasicState rule)
-;       is not empty, then...
-;         (incomplete-fn
-;           product-from-consumed-tokens
-;           new-state-after-rule
-;           initial-state)
-;       ...is called.
-;     - If the new remainder is empty, then the
-;       product of the rule is returned."
-;     [rule failure-fn incomplete-fn tokens]
-;     (let [state-0 (BasicState tokens)]
-;       (if-let [[product state-1] (rule state-0)]
-;         (if (empty? (*get-remainder* state-1))
-;           product
-;           (incomplete-fn product state-1 state-0))
-;         (failure-fn state-0))))
-;   (let [rule (lit "A")
-;         matcher (partial match-rule rule identity vector)]
-;     (is (= (matcher ["A"]) "A"))
-;     (is (= (matcher ["B"]) (BasicState ["B"])))
-;     (is (= (matcher ["A" "B"])
-;            ["A" (BasicState ["B"]) (BasicState ["A" "B"])])))) 
-; 
+
+(defvar- constantly-nil
+  (constantly nil))
+
+(with-test
+  (defnk match-rule
+    "Creates a function that tries to completely
+    match the given rule to the given state,
+    with no remainder left over after the match.
+    - If (rule state-0) fails, then
+      (failure state-0) is called.
+    - If the remainder of the state in the result of
+      (rule state-0) is not empty, then...
+        (incomplete
+          product-from-consumed-tokens
+          new-state-after-rule
+          initial-state)
+      ...is called.
+    - If the new remainder is empty, then the
+      product of the rule is returned.
+    - The failure and incomplete functions are by
+      default (constantly nil)."
+    [state-0 rule :failure constantly-nil, :incomplete constantly-nil]
+    (if-let [[product state-1] (rule state-0)]
+      (if (empty? (get-remainder state-1))
+        product
+        (incomplete product state-1 state-0))
+      (failure state-0)))
+  (let [rule (lit "A")
+        matcher #(match-rule % rule
+                   :failure identity, :incomplete vector)]
+    (is (= (matcher (BasicState ["A"])) "A"))
+    (is (= (matcher (BasicState ["B"])) (BasicState ["B"])))
+    (is (= (matcher (BasicState ["A" "B"]))
+           ["A" (BasicState ["B"]) (BasicState ["A" "B"])]))))
+
 ; (with-test
 ;   (defmacro state-context
 ;     "Puts all Clojure forms inside into a state context.
