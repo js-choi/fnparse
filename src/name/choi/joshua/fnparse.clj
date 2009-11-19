@@ -98,18 +98,13 @@
 (with-test
   (defn- remember
     [subrule]
-    (fn [state-0]
-      (if-let [[existing-product existing-state]
-                (get-in-memory state-0 subrule)]
-        [existing-product
-         (vary-meta existing-state assoc
-           :memory (:memory ^state-0))]
-        (let [[product state-1 :as result]
-                (subrule state-0)
-              processed-state-1
-                (assoc-in-memory state-1
-                  subrule state-0 result)]
-          [product processed-state-1]))))
+    (let [memory (atom {})]
+      (fn [state]
+        (if-let [existing-result (get memory state)]
+          existing-result
+          (let [new-result (subrule state)]
+            (swap! memory assoc state new-result)
+            new-result)))))
   ; In the following forms, the suffix "-0"
   ; means "initial". The suffix "-1" means "final".
   ; The suffix "a" and "b" indicate first pass
@@ -120,18 +115,13 @@
         expected-state-1 (make-state remainder-1 nil)
         expected-result ['a expected-state-1]
         expected-meta-1 (ParseStateMeta {anything* {0 expected-result}} 1)
+        state-0 (make-state remainder-0 nil)
         ; First pass
-        state-0a (make-state remainder-0 nil)
-        [_ calc-state-1a :as calc-results-a] (rule state-0a)
-        calc-meta-1a ^calc-state-1a
+        [_ calc-state-1a :as calc-results-a] (rule state-0)
         ; Second pass
-        meta-0b (assoc calc-meta-1a :index 0)
-        state-0b (with-meta state-0a meta-0b)
-        [_ calc-state-1b :as calc-results-b] (rule state-0b)]
+        [_ calc-state-1b :as calc-results-b] (rule state-0)]
     (is (= expected-result calc-results-a))
-    (is (= expected-meta-1 calc-meta-1a))
-    (is (= expected-result calc-results-b))
-    (is (= expected-meta-1 ^calc-state-1b))))
+    (is (= expected-result calc-results-b))))
 
 (defvar parser-m
   (state-t maybe-m)
