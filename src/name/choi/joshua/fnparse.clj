@@ -376,7 +376,7 @@
          [\A (mock-state (seq "ABC"))])))
  
 (with-test
-  (defmacro conc
+  (defn conc
     "Creates a rule that is the concatenation
     of the given subrules. Basically a simple
     version of complex, each subrule consumes
@@ -390,10 +390,10 @@
     it receives, so that it accepts expressions
     containing unbound variables that are defined later."
     [& subrules]
-    `(with-monad parser-m
-       (remember
-         (fn [state#]
-           ((m-seq ~(vec subrules)) state#))))))
+    (with-monad parser-m
+      (remember
+        (fn [state]
+          ((m-seq subrules) state))))))
 
 (set-test conc
   (is (= ((conc (lit "hi") (lit "THEN"))
@@ -404,7 +404,7 @@
              (mock-state ["hi" "bye" "boom"])))
       "created concatenated rule fails when one subrule fails"))
 
-(defmacro alt
+(defn alt
   "Creates a rule that is the alternation
   of the given subrules. It succeeds when
   any of its subrules succeed, and fails
@@ -419,10 +419,10 @@
   receives, so that it accepts expressions containing
   unbound variables that are defined later."
   [& subrules]
-  `(with-monad parser-m
-     (remember
-       (fn [state#]
-         ((~'m-plus ~@subrules) state#)))))
+  (with-monad parser-m
+    (remember
+      (fn [state]
+        ((apply m-plus subrules) state)))))
  
 (set-test alt
   (is (= ((alt (lit "hi") (lit "THEN"))
@@ -435,7 +435,7 @@
 (declare left-recursive-rule)
 (with-test
   (defvar- left-recursive-rule
-    (alt (conc left-recursive-rule (lit \-) number-rule)
+    (alt (conc #'left-recursive-rule (lit \-) number-rule)
          number-rule))
   (is (= [[\1 \- \0] (make-state nil nil)]
          (left-recursive-rule (make-state "1-0" nil)))))
