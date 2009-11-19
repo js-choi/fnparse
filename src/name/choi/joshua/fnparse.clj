@@ -101,14 +101,16 @@
     (println "A>" subrule)
     (let [memory (atom {})]
       (fn [state]
-        (if-let [existing-result (get memory state)]
-          existing-result
-          (do
-            (swap! memory assoc state nil)
-            (println ">>" memory)
-            (let [new-result (subrule state)]
-              (swap! memory assoc state new-result)
-              new-result))))))
+        (println "call>" state memory)
+        (let [current-memory @memory]
+          (if (contains? current-memory state)
+            (get current-memory state)
+            (do
+              (swap! memory assoc state nil)
+              (println "swap>" memory)
+              (let [new-result (subrule state)]
+                (swap! memory assoc state new-result)
+                new-result)))))))
   ; In the following forms, the suffix "-0"
   ; means "initial". The suffix "-1" means "final".
   ; The suffix "a" and "b" indicate first pass
@@ -118,7 +120,6 @@
         remainder-1 (next remainder-0)
         expected-state-1 (make-state remainder-1 nil)
         expected-result ['a expected-state-1]
-        expected-meta-1 (ParseStateMeta {anything* {0 expected-result}} 1)
         state-0 (make-state remainder-0 nil)
         ; First pass
         [_ calc-state-1a :as calc-results-a] (rule state-0)
