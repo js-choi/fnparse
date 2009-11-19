@@ -50,7 +50,55 @@
 (deferror fnparse-error [] [message-template & template-args]
   {:msg (str "FnParse error: " (apply format message-template template-args))
    :unhandled (throw-msg Exception)})
- 
+
+(defn- get-memory [state rule]
+  (get-in state :memory rule (get-remainder state)))
+
+(defn- assoc-memory [new-state rule old-state]
+  (assoc-in new-state :memory rule (get-remainder old-state)))
+
+(defn- anything* [state]
+  (if-let [tokens (get-remainder state)]
+    [(first tokens)
+     (assoc-remainder state (next tokens))]))
+
+(with-test
+  (defn anything
+    "A rule that matches anything--that is, it matches
+    the first token of the tokens it is given.
+    This rule's product is the first token it receives.
+    It fails if there are no tokens left."
+    [state]
+    (if-let [tokens (get-remainder state)]
+      [(first tokens)
+       (assoc-remainder state (next tokens))]))
+  (is (= (anything {:remainder '(A B C)})
+         ['A {:remainder '(B C)}]))
+  (is (= (anything (mock-state '(A B C)))
+         ['A (mock-state '(B C))])
+    "anything rule matches first token")
+  (is (nil? (anything (mock-state nil)))
+    "anything rule fails with no tokens left")
+  (is (= ((rep* anything) (mock-state '(A B C)))
+         ['(A B C) (mock-state nil)])
+    "repeated anything rule does not create infinite loop"))
+
+; (with-test
+;   (defn- remember
+;     [subrule]
+;     (fn [state-0]
+;       (if-let [existing-memory (get-memory state-0 subrule)]
+;         existing-memory
+;         (let [[product state-1] (subrule state-0)
+;               processed-state-1 (assoc-memory state-1 rule state-0)]
+;           [product processed-state-1]))))
+;   (let [remembering-rule (remember anything*)
+;         remainder-0 '(a b c)
+;         remainder-1 (next remainder-0)
+;         state-0 (ParseState remainder-0 nil {})]
+;     (is (= ['a (ParseState remainder-1 nil
+;                  {base-rule {1 ['a (ParseState remainder-1 nil)]}})
+
 (defvar parser-m
   (state-t maybe-m)
   "The parser monad of FnParse. What new
@@ -154,28 +202,7 @@
   (is (= (emptiness (mock-state '(A B C)))
          [nil (mock-state '(A B C))])
       "emptiness rule matches emptiness"))
- 
-(with-test
-  (defn anything
-    "A rule that matches anything--that is, it matches
-    the first token of the tokens it is given.
-    This rule's product is the first token it receives.
-    It fails if there are no tokens left."
-    [state]
-    (if-let [tokens (get-remainder state)]
-      [(first tokens)
-       (assoc-remainder state (next tokens))]))
-  (is (= (anything {:remainder '(A B C)})
-         ['A {:remainder '(B C)}]))
-  (is (= (anything (mock-state '(A B C)))
-         ['A (mock-state '(B C))])
-    "anything rule matches first token")
-  (is (nil? (anything (mock-state nil)))
-    "anything rule fails with no tokens left")
-  (is (= ((rep* anything) (mock-state '(A B C)))
-         ['(A B C) (mock-state nil)])
-    "repeated anything rule does not create infinite loop"))
- 
+
 (with-test
   (defn validate
     "Creates a rule from attaching a product-validating function to the given
