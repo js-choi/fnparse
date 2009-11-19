@@ -387,9 +387,10 @@
     containing unbound variables that are defined later."
     [& subrules]
     `(with-monad parser-m
-       (fn [state#]
-         ((m-seq ~(vec subrules)) state#)))))
- 
+       (remember
+         (fn [state#]
+           ((m-seq ~(vec subrules)) state#))))))
+
 (set-test conc
   (is (= ((conc (lit "hi") (lit "THEN"))
           (mock-state ["hi" "THEN" "bye"]))
@@ -398,7 +399,7 @@
   (is (nil? ((conc (lit "hi") (lit "THEN"))
              (mock-state ["hi" "bye" "boom"])))
       "created concatenated rule fails when one subrule fails"))
- 
+
 (defmacro alt
   "Creates a rule that is the alternation
   of the given subrules. It succeeds when
@@ -424,7 +425,16 @@
          ["THEN" (mock-state (list "bye"))]))
   (is (nil? ((alt (lit "hi") (lit "THEN"))
              (mock-state ["bye" "boom"])))))
- 
+
+(defvar- number-rule (alt (lit \1) (lit \0)))
+(declare left-recursive-rule)
+(with-test
+  (defvar- left-recursive-rule
+    (alt (conc left-recursive-rule (lit \-) number-rule)
+         number-rule))
+  (is (= [[\1 \- \0] (make-state nil nil)]
+         (left-recursive-rule (make-state "1-0" nil)))))
+
 (with-test
   (defn opt
     "Creates a rule that is the optional form
