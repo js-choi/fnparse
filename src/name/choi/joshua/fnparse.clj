@@ -65,9 +65,9 @@
 (defn- get-in-memory [state rule]
   (get-in ^state [:memory rule (get-index state)]))
 
-(defn- assoc-in-memory [new-state rule old-state]
+(defn- assoc-in-memory [new-state rule old-state result]
   (vary-meta new-state assoc-in
-    [:memory rule (get-index old-state)] new-state))
+    [:memory rule (get-index old-state)] result))
 
 (defn- anything* [state]
   (if-let [tokens (get-remainder state)]
@@ -99,21 +99,39 @@
   (defn- remember
     [subrule]
     (fn [state-0]
-      (if-let [existing-memory (get-in-memory state-0 subrule)]
-        existing-memory
-        (let [[product state-1] (subrule state-0)
-              processed-state-1 (assoc-in-memory state-1 subrule state-0)]
+      (if-let [[existing-product existing-state]
+                (get-in-memory state-0 subrule)]
+        [existing-product
+         (vary-meta existing-state assoc
+           :memory (:memory ^state-0))]
+        (let [[product state-1 :as result]
+                (subrule state-0)
+              processed-state-1
+                (assoc-in-memory state-1
+                  subrule state-0 result)]
           [product processed-state-1]))))
+  ; In the following forms, the suffix "-0"
+  ; means "initial". The suffix "-1" means "final".
+  ; The suffix "a" and "b" indicate first pass
+  ; and second pass respectively.
   (let [rule (remember anything*)
         remainder-0 '(a b c)
         remainder-1 (next remainder-0)
-        state-0 (make-state remainder-0 nil)
-        expected-state-1 (ParseState remainder-1 nil)
-        expected-results-1 ['a expected-state-1]
-        [_ calc-state-1 :as calc-results-1] (rule state-0)]
-    (is (= expected-results-1 calc-results-1))
-    (is (= (ParseStateMeta {anything* {0 expected-state-1}} 1)
-           (meta calc-state-1)))))
+        expected-state-1 (make-state remainder-1 nil)
+        expected-result ['a expected-state-1]
+        expected-meta-1 (ParseStateMeta {anything* {0 expected-result}} 1)
+        ; First pass
+        state-0a (make-state remainder-0 nil)
+        [_ calc-state-1a :as calc-results-a] (rule state-0a)
+        calc-meta-1a ^calc-state-1a
+        ; Second pass
+        meta-0b (assoc calc-meta-1a :index 0)
+        state-0b (with-meta state-0a meta-0b)
+        [_ calc-state-1b :as calc-results-b] (rule state-0b)]
+    (is (= expected-result calc-results-a))
+    (is (= expected-meta-1 calc-meta-1a))
+    (is (= expected-result calc-results-b))
+    (is (= expected-meta-1 ^calc-state-1b))))
 
 (defvar parser-m
   (state-t maybe-m)
