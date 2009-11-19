@@ -100,9 +100,12 @@
   given rule given the seed parse in the
   given result."
   [rule state-0 memory h]
+  (println "Start grow>" rule state-0 memory)
   (loop []
+    (println "Grow loop>" (@memory state-0))
     (let [cur-result (rule state-0) ; Differs depending on memory
           cur-memory-val (@memory state-0)]
+      (println "Grow loop rule call>" cur-result cur-memory-val)
       (if (or (nil? cur-result) ) ; TODO Check if right
         cur-memory-val
         (do
@@ -115,16 +118,18 @@
 (with-test
   (defn- remember
     [subrule]
-    (println "A>" subrule)
+    (println "REMEMBER>" subrule)
     (let [memory (atom {})]
       (fn [state]
-        (println "call>" state memory)
+        (println "call>" state memory subrule)
         (let [current-memory @memory]
           (if (contains? current-memory state)
             (let [found-result (current-memory state)]
+              (println "result found>" found-result)
               (if (left-recursion-result? found-result)
                 (do
                   (swap! memory assoc state :left-recursion-found)
+                  (println "LR found>" memory)
                   nil)
                 found-result))
             (do
@@ -133,7 +138,7 @@
               (let [new-result (subrule state) ; Modifies memory
                     new-memory (@memory state)] ; TODO Check if right
                 (swap! memory assoc state new-result)
-                (if (and (= new-memory :left-recursion-found)
+                (if (and (= new-memory :left-recursion-detected)
                          new-result)
                   (grow-left-recursion subrule state memory nil)
                   new-result))))))))
@@ -418,9 +423,9 @@
     containing unbound variables that are defined later."
     [& subrules]
     (with-monad parser-m
-      (remember
+;      (remember
         (fn [state]
-          ((m-seq subrules) state))))))
+          ((m-seq subrules) state)))))
 
 (set-test conc
   (is (= ((conc (lit "hi") (lit "THEN"))
@@ -458,14 +463,14 @@
   (is (nil? ((alt (lit "hi") (lit "THEN"))
              (mock-state ["bye" "boom"])))))
 
-; (defvar- number-rule (alt (lit \1) (lit \0)))
-; (declare left-recursive-rule)
-; (with-test
-;   (defvar- left-recursive-rule
-;     (alt (conc #'left-recursive-rule (lit \-) number-rule)
-;          number-rule))
-;   (is (= [[\1 \- \0] (make-state nil nil)]
-;          (left-recursive-rule (make-state "1-0" nil)))))
+(defvar- number-rule (lit \0))
+(declare left-recursive-rule)
+(with-test
+  (defvar- left-recursive-rule
+    (alt (conc #'left-recursive-rule (lit \-) number-rule)
+         number-rule))
+  (is (= [[\0 \- \0] (make-state nil nil)]
+         (left-recursive-rule (make-state "0-0" nil)))))
 
 (with-test
   (defn opt
