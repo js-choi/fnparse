@@ -100,16 +100,20 @@
   given rule given the seed parse in the
   given result."
   [rule state-0 memory h]
-  (println "Start grow>" rule state-0 memory)
+  (println "Start grow>" state-0 memory)
   (loop []
-    (println "Grow loop>" (@memory state-0))
-    (let [cur-result (rule state-0) ; Differs depending on memory
+    (println "Grow loop>" memory)
+    (let [cur-result (rule state-0) ; Both depends on and changes memory
           cur-memory-val (@memory state-0)]
-      (println "Grow loop rule call>" cur-result cur-memory-val)
-      (if (or (nil? cur-result) ) ; TODO Check if right
-        cur-memory-val
+      (println "Grow loop rule call>" cur-result memory)
+      (println "AAAAA META>" (-> cur-result second meta))
+      (if (or (nil? cur-result)
+              (<= (get-index (second cur-result))
+                  (get-index (second cur-memory-val))))
+        (do (println "Grow end>" cur-memory-val) cur-memory-val)
         (do
           (swap! memory assoc state-0 cur-result)
+          (println "Grow swap>" memory)
           (recur))))))
 
 (defvar- left-recursion-result?
@@ -121,23 +125,25 @@
     (println "REMEMBER>" subrule)
     (let [memory (atom {})]
       (fn [state]
-        (println "call>" state memory subrule)
+        (println "Remember call>" state memory)
         (let [current-memory @memory]
           (if (contains? current-memory state)
             (let [found-result (current-memory state)]
-              (println "result found>" found-result)
+              (println "Result found>" found-result)
               (if (left-recursion-result? found-result)
                 (do
-                  (swap! memory assoc state :left-recursion-found)
+                  (swap! memory assoc state :left-recursion-detected)
                   (println "LR found>" memory)
                   nil)
                 found-result))
             (do
               (swap! memory assoc state :left-recursion-possible)
-              (println "swap>" memory)
+              (println "possible LR swap>" memory)
               (let [new-result (subrule state) ; Modifies memory
                     new-memory (@memory state)] ; TODO Check if right
+                (println "subrule is called>" new-result new-memory)
                 (swap! memory assoc state new-result)
+                (println "post-subrule swap>" memory)
                 (if (and (= new-memory :left-recursion-detected)
                          new-result)
                   (grow-left-recursion subrule state memory nil)
@@ -469,8 +475,8 @@
   (defvar- left-recursive-rule
     (alt (conc #'left-recursive-rule (lit \-) number-rule)
          number-rule))
-  (is (= [[\0 \- \0] (make-state nil nil)]
-         (left-recursive-rule (make-state "0-0" nil)))))
+  (is (= [[[\0 \- \0] \- \0] (make-state nil nil)]
+         (left-recursive-rule (make-state "0-0-0" nil)))))
 
 (with-test
   (defn opt
