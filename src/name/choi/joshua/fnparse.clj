@@ -33,10 +33,15 @@
  
 (declare lit rep* rep+ except state-context std-template)
 
-(deftype ParseState [remainder info memory] [IPersistentMap])
+(deftype ParseState [remainder info] [IPersistentMap])
+
+(deftype ParseStateMeta [memory index] [IPersistentMap])
+
+(defn make-state [remainder info]
+  (ParseState remainder info (ParseStateMeta {} 0) nil))
 
 (defn- mock-state [remainder]
-  (ParseState remainder nil {}))
+  (make-state remainder nil))
 
 (defvar get-remainder :remainder)
 
@@ -51,16 +56,25 @@
   {:msg (str "FnParse error: " (apply format message-template template-args))
    :unhandled (throw-msg Exception)})
 
-(defn- get-memory [state rule]
-  (get-in state :memory rule (get-remainder state)))
+(defn- inc-index [state]
+  (vary-meta state assoc :index (inc (:index ^state))))
 
-(defn- assoc-memory [new-state rule old-state]
-  (assoc-in new-state :memory rule (get-remainder old-state)))
+(defn- get-index [state]
+  (:index ^state))
+
+(defn- get-in-memory [state rule]
+  (get-in ^state [:memory rule (get-index state)]))
+
+(defn- assoc-in-memory [new-state rule old-state]
+  (vary-meta new-state assoc-in
+    [:memory rule (get-index old-state)] new-state))
 
 (defn- anything* [state]
   (if-let [tokens (get-remainder state)]
     [(first tokens)
-     (assoc-remainder state (next tokens))]))
+     (-> state
+       (assoc-remainder (next tokens))
+       inc-index)]))
 
 (with-test
   (defn anything
@@ -69,35 +83,37 @@
     This rule's product is the first token it receives.
     It fails if there are no tokens left."
     [state]
-    (if-let [tokens (get-remainder state)]
-      [(first tokens)
-       (assoc-remainder state (next tokens))]))
-  (is (= (anything {:remainder '(A B C)})
-         ['A {:remainder '(B C)}]))
+    (anything* state))
   (is (= (anything (mock-state '(A B C)))
          ['A (mock-state '(B C))])
     "anything rule matches first token")
+  (is (= (meta (second (anything (mock-state '(A B C)))))
+         (ParseStateMeta {} 1)))
   (is (nil? (anything (mock-state nil)))
     "anything rule fails with no tokens left")
   (is (= ((rep* anything) (mock-state '(A B C)))
          ['(A B C) (mock-state nil)])
     "repeated anything rule does not create infinite loop"))
 
-; (with-test
-;   (defn- remember
-;     [subrule]
-;     (fn [state-0]
-;       (if-let [existing-memory (get-memory state-0 subrule)]
-;         existing-memory
-;         (let [[product state-1] (subrule state-0)
-;               processed-state-1 (assoc-memory state-1 rule state-0)]
-;           [product processed-state-1]))))
-;   (let [remembering-rule (remember anything*)
-;         remainder-0 '(a b c)
-;         remainder-1 (next remainder-0)
-;         state-0 (ParseState remainder-0 nil {})]
-;     (is (= ['a (ParseState remainder-1 nil
-;                  {base-rule {1 ['a (ParseState remainder-1 nil)]}})
+(with-test
+  (defn- remember
+    [subrule]
+    (fn [state-0]
+      (if-let [existing-memory (get-in-memory state-0 subrule)]
+        existing-memory
+        (let [[product state-1] (subrule state-0)
+              processed-state-1 (assoc-in-memory state-1 subrule state-0)]
+          [product processed-state-1]))))
+  (let [rule (remember anything*)
+        remainder-0 '(a b c)
+        remainder-1 (next remainder-0)
+        state-0 (make-state remainder-0 nil)
+        expected-state-1 (ParseState remainder-1 nil)
+        expected-results-1 ['a expected-state-1]
+        [_ calc-state-1 :as calc-results-1] (rule state-0)]
+    (is (= expected-results-1 calc-results-1))
+    (is (= (ParseStateMeta {anything* {0 expected-state-1}} 1)
+           (meta calc-state-1)))))
 
 (defvar parser-m
   (state-t maybe-m)
