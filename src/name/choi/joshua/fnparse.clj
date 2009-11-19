@@ -98,13 +98,17 @@
 (with-test
   (defn- remember
     [subrule]
+    (println "A>" subrule)
     (let [memory (atom {})]
       (fn [state]
         (if-let [existing-result (get memory state)]
           existing-result
-          (let [new-result (subrule state)]
-            (swap! memory assoc state new-result)
-            new-result)))))
+          (do
+            (swap! memory assoc state nil)
+            (println ">>" memory)
+            (let [new-result (subrule state)]
+              (swap! memory assoc state new-result)
+              new-result))))))
   ; In the following forms, the suffix "-0"
   ; means "initial". The suffix "-1" means "final".
   ; The suffix "a" and "b" indicate first pass
@@ -416,8 +420,9 @@
   unbound variables that are defined later."
   [& subrules]
   `(with-monad parser-m
-     (fn [state#]
-       ((~'m-plus ~@subrules) state#))))
+     (remember
+       (fn [state#]
+         ((~'m-plus ~@subrules) state#)))))
  
 (set-test alt
   (is (= ((alt (lit "hi") (lit "THEN"))
