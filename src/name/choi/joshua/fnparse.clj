@@ -133,21 +133,24 @@
               (if (left-recursion-result? found-result)
                 (do
                   (swap! memory assoc state :left-recursion-detected)
-                  (println "LR found>" memory)
+                  (println "LR found, return>" memory)
                   nil)
-                found-result))
+                (do (println "Non-LR return>" found-result)
+                  found-result)))
             (do
               (swap! memory assoc state :left-recursion-possible)
-              (println "possible LR swap>" memory)
+              (println "Possible LR swap>" memory)
               (let [new-result (subrule state) ; Modifies memory
                     new-memory (@memory state)] ; TODO Check if right
-                (println "subrule is called>" new-result new-memory)
+                (println "Subrule has been called>" new-result new-memory)
                 (swap! memory assoc state new-result)
-                (println "post-subrule swap>" memory)
+                (println "Post-subrule swap>" memory)
                 (if (and (= new-memory :left-recursion-detected)
                          new-result)
-                  (grow-left-recursion subrule state memory nil)
-                  new-result))))))))
+                  (do (println "A return grow")
+                    (grow-left-recursion subrule state memory nil))
+                  (do (println "B return>" new-result)
+                    new-result)))))))))
   ; In the following forms, the suffix "-0"
   ; means "initial". The suffix "-1" means "final".
   ; The suffix "a" and "b" indicate first pass
@@ -470,13 +473,30 @@
              (mock-state ["bye" "boom"])))))
 
 (defvar- number-rule (lit \0))
-(declare left-recursive-rule)
+(declare direct-left-recursive-rule lr-test-term lr-test-fact)
+
 (with-test
-  (defvar- left-recursive-rule
-    (alt (conc #'left-recursive-rule (lit \-) number-rule)
+  (defvar- direct-left-recursive-rule
+    (alt (conc #'direct-left-recursive-rule (lit \-) number-rule)
          number-rule))
   (is (= [[[\0 \- \0] \- \0] (make-state nil nil)]
-         (left-recursive-rule (make-state "0-0-0" nil)))))
+         (direct-left-recursive-rule (make-state "0-0-0" nil)))))
+
+(with-test
+  (defvar- lr-test-term
+    (alt (conc #'lr-test-term (lit \+) #'lr-test-fact)
+         (conc #'lr-test-term (lit \-) #'lr-test-fact)
+         #'lr-test-fact))
+  (is (= [\0 (make-state nil nil)] (lr-test-term (make-state "0" nil))))
+  (is (= [[\0 \* \0] (make-state nil nil)]
+         (lr-test-term (make-state "0*0" nil)))))
+;   (is (= [[[\0 \+ \0] [[\
+;          (lr-test-term "0*0+0-0/0
+
+(defvar- lr-test-fact
+  (alt (conc #'lr-test-fact (lit \*) number-rule)
+       (conc #'lr-test-fact (lit \/) number-rule)
+       number-rule))
 
 (with-test
   (defn opt
