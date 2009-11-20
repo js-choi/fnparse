@@ -35,10 +35,10 @@
 
 (deftype ParseState [remainder info] [IPersistentMap])
 
-(deftype ParseStateMeta [memory index] [IPersistentMap])
+(deftype ParseStateMeta [string-key memory index] [IPersistentMap])
 
 (defn make-state [remainder info]
-  (ParseState remainder info (ParseStateMeta {} 0) nil))
+  (ParseState remainder info (ParseStateMeta (gensym) {} 0) nil))
 
 (defn- mock-state [remainder]
   (make-state remainder nil))
@@ -59,15 +59,11 @@
 (defn- inc-index [state]
   (vary-meta state assoc :index (inc (:index ^state))))
 
+(defn get-string-key [state]
+  (:string-key ^state))
+
 (defn- get-index [state]
   (:index ^state))
-
-(defn- get-in-memory [state rule]
-  (get-in ^state [:memory rule (get-index state)]))
-
-(defn- assoc-in-memory [new-state rule old-state result]
-  (vary-meta new-state assoc-in
-    [:memory rule (get-index old-state)] result))
 
 (defn- anything* [state]
   (if-let [tokens (get-remainder state)]
@@ -95,6 +91,22 @@
          ['(A B C) (mock-state nil)])
     "repeated anything rule does not create infinite loop"))
 
+(defn- get-in-memory
+  [memory state]
+  (let [state-meta ^state]
+    (get-in @memory [(:string-key state-meta) (:index state-meta)])))
+
+(defn- assoc-in-memory
+  [memory state result]
+  (let [state-meta ^state]
+    (swap! memory assoc-in [(:string-key state-meta) (:index state-meta)]
+      result)))
+
+(defn- memory-contains?
+  [memory state]
+  (let [state-meta ^state]
+    (contains? (@memory (:string-key state-meta)) (:index state-meta))))
+
 (defn- grow-left-recursion
   "Tries to grow the parsing of the
   given rule given the seed parse in the
@@ -104,7 +116,7 @@
   (loop []
     (println "Grow loop>" memory)
     (let [cur-result (rule state-0) ; Both depends on and changes memory
-          cur-memory-val (@memory state-0)]
+          cur-memory-val (get-in-memory memory state-0)]
       (println "Grow loop rule call>" cur-result memory)
       (println "AAAAA META>" (-> cur-result second meta))
       (if (or (nil? cur-result)
@@ -112,7 +124,7 @@
                   (get-index (second cur-memory-val))))
         (do (println "Grow end>" cur-memory-val) cur-memory-val)
         (do
-          (swap! memory assoc state-0 cur-result)
+          (assoc-in-memory memory state-0 cur-result)
           (println "Grow swap>" memory)
           (recur))))))
 
@@ -126,31 +138,30 @@
     (let [memory (atom {})]
       (fn [state]
         (println "Remember call>" state memory)
-        (let [current-memory @memory]
-          (if (contains? current-memory state)
-            (let [found-result (current-memory state)]
-              (println "Result found>" found-result)
-              (if (left-recursion-result? found-result)
-                (do
-                  (swap! memory assoc state :left-recursion-detected)
-                  (println "LR found, return>" memory)
-                  nil)
-                (do (println "Non-LR return>" found-result)
-                  found-result)))
-            (do
-              (swap! memory assoc state :left-recursion-possible)
-              (println "Possible LR swap>" memory)
-              (let [new-result (subrule state) ; Modifies memory
-                    new-memory (@memory state)] ; TODO Check if right
-                (println "Subrule has been called>" new-result new-memory)
-                (swap! memory assoc state new-result)
-                (println "Post-subrule swap>" memory)
-                (if (and (= new-memory :left-recursion-detected)
-                         new-result)
-                  (do (println "A return grow")
-                    (grow-left-recursion subrule state memory nil))
-                  (do (println "B return>" new-result)
-                    new-result)))))))))
+        (if (memory-contains? memory state)
+          (let [found-result (get-in-memory memory state)]
+            (println "Result found>" found-result)
+            (if (left-recursion-result? found-result)
+              (do
+                (assoc-in-memory memory state :left-recursion-detected)
+                (println "LR found, return>" memory)
+                nil)
+              (do (println "Non-LR return>" found-result)
+                found-result)))
+          (do
+            (assoc-in-memory memory state :left-recursion-possible)
+            (println "Possible LR swap>" memory)
+            (let [new-result (subrule state) ; Modifies memory
+                  new-memory (get-in-memory memory state)]
+              (println "Subrule has been called>" new-result new-memory)
+              (assoc-in-memory memory state new-result)
+              (println "Post-subrule swap>" memory)
+              (if (and (= new-memory :left-recursion-detected)
+                       new-result)
+                (do (println "A return grow")
+                  (grow-left-recursion subrule state memory nil))
+                (do (println "B return>" new-result)
+                  new-result))))))))
   ; In the following forms, the suffix "-0"
   ; means "initial". The suffix "-1" means "final".
   ; The suffix "a" and "b" indicate first pass
