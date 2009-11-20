@@ -37,6 +37,8 @@
 
 (deftype ParseStateMeta [string-key memory index] [IPersistentMap])
 
+(deftype LRNode [detected?])
+
 (defn make-state [remainder info]
   (ParseState remainder info (ParseStateMeta (gensym) {} 0) nil))
 
@@ -128,9 +130,6 @@
           (println "Grow swap>" memory)
           (recur))))))
 
-(defvar- left-recursion-result?
-  #{:left-recursion-possible :left-recursion-detected})
-
 (with-test
   (defn- remember
     [subrule]
@@ -141,23 +140,22 @@
         (if (memory-contains? memory state)
           (let [found-result (get-in-memory memory state)]
             (println "Result found>" found-result)
-            (if (left-recursion-result? found-result)
+            (if (= ::LRNode (type found-result))
               (do
-                (assoc-in-memory memory state :left-recursion-detected)
+                (assoc-in-memory memory state (LRNode true))
                 (println "LR found, return>" memory)
                 nil)
               (do (println "Non-LR return>" found-result)
                 found-result)))
           (do
-            (assoc-in-memory memory state :left-recursion-possible)
+            (assoc-in-memory memory state (LRNode false))
             (println "Possible LR swap>" memory)
             (let [new-result (subrule state) ; Modifies memory
                   new-memory (get-in-memory memory state)]
               (println "Subrule has been called>" new-result new-memory)
               (assoc-in-memory memory state new-result)
               (println "Post-subrule swap>" memory)
-              (if (and (= new-memory :left-recursion-detected)
-                       new-result)
+              (if (and (:detected? new-memory) new-result)
                 (do (println "A return grow")
                   (grow-left-recursion subrule state memory nil))
                 (do (println "B return>" new-result)
