@@ -200,8 +200,8 @@
                     ((product-fn product) new-state))))))
    m-plus (fn m-plus-parser [& rules]
             (fn [state]
-              (println "M-PLUS>" state)
-              (first (drop-while failure? (map #(% state) rules)))))])
+              (or (first (drop-while failure? (map #(% state) rules)))
+                  (m-zero state))))])
 
 (with-test
   (defmacro complex
@@ -497,7 +497,7 @@
           (mock-state ["THEN" "bye"]))
          ["THEN" (mock-state (list "bye"))]))
   (is (failure? ((alt (lit "hi") (lit "THEN"))
-             (mock-state ["bye" "boom"])))))
+                 (mock-state ["bye" "boom"])))))
 
 ; (defvar- number-rule (lit \0))
 ; (declare direct-left-recursive-rule lr-test-term lr-test-fact)
