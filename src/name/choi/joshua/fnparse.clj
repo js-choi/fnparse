@@ -508,14 +508,13 @@
     semantic-value))
  
 (with-test
-  (defn remainder-peek
-    "Generates a rule whose product is the very next
+  (defrule remainder-peek
+    "A rule whose product is the very next
     token in the remainder of any given state.
     The new rule does not consume any tokens."
-    []
     (complex [remainder (fetch-remainder)]
       (first remainder)))
-  (is (= ((remainder-peek) (mock-state (seq "ABC")))
+  (is (= (remainder-peek (mock-state (seq "ABC")))
          [\A (mock-state (seq "ABC"))])))
  
 (with-test
