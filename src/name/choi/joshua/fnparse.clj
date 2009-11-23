@@ -248,9 +248,11 @@
     (is (= expected-result calc-results-a))
     (is (= expected-result calc-results-b))))
 
+(defvar- basic-failure (Failure nil))
+
 (m/defmonad parser-m
   "The monad that FnParse uses."
-  [m-zero (fn [state] (Failure))
+  [m-zero (fn [state] basic-failure)
    m-result (fn m-result-parser [product]
               (fn [state] [product state]))
    m-bind (fn m-bind-parser [rule product-fn]
@@ -264,6 +266,9 @@
             (fn [state]
               (or (first (drop-while failure? (map #(% state) rules)))
                   m-zero)))])
+
+(m/with-monad parser-m
+  (defvar nothing m-zero))
 
 (with-test
   (defmacro complex
@@ -298,6 +303,9 @@
   is the entire current state.
   [Equivalent to the result of fetch-state
   from clojure.contrib.monads.]")
+
+(defn- set-state [state]
+  (m/set-state state))
 
 (defn fetch-info
   "Creates a rule that consumes no tokens.
@@ -364,105 +372,105 @@
          [nil (mock-state '(A B C))])
       "emptiness rule matches emptiness"))
 
-; (with-test
-;   (defn validate
-;     "Creates a rule from attaching a product-validating function to the given
-;     subrule--that is, any products of the subrule must fulfill the validator
-;     function.
-;     (def a (validate b validator)) says that the rule a succeeds only when b
-;     succeeds and also when the evaluated value of (validator b-product) is true.
-;     The new rule's product would be b-product."
-;     [subrule validator]
-;     (complex [subproduct subrule, :when (validator subproduct)]
-;       subproduct))
-;   (is (= ((validate (lit "hi") (partial = "hi")) (mock-state ["hi" "THEN"]))
-;          ["hi" (mock-state (list "THEN"))])
-;       "created validator rule succeeds when given subrule and validator succeed")
-;   (is (failure? ((validate (lit "hi") (partial = "RST")) (mock-state ["RST"])))
-;       "created validator rule fails when given subrule fails")
-;   (is (failure? ((validate (lit "hi") (partial = "hi")) (mock-state "hi")))
-;       "created validator rule fails when given validator fails"))
-;  
-; (with-test
-;   (defn term
-;     "(term validator) is equivalent
-;     to (validate anything validator).
-;     Creates a rule that is a terminal rule of the given validator--that is, it
-;     accepts only tokens for whom (validator token) is true.
-;     (def a (term validator)) would be equivalent to the EBNF
-;       a = ? (validator %) evaluates to true ?;
-;     The new rule's product would be the first token, if it fulfills the
-;     validator."
-;     [validator]
-;     (validate anything validator))
-;   (let [rule (term (partial = 'A))]
-;     (is (= (rule (mock-state '[A B])) ['A (mock-state '[B])])
-;       "created terminal rule works when first token fulfills validator")
-;     (is (failure? (rule (mock-state '[B B])))
-;       "created terminal rule fails when first token fails validator")
-;     (is (= (rule (mock-state '[A])) ['A (mock-state nil)])
-;       "created terminal rule works when no remainder")))
-;  
-; (with-test
-;   (defvar lit
-;     (comp term (partial partial =))
-;     "Equivalent to (comp term (partial partial =)).
-;     Creates a rule that is the terminal
-;     rule of the given literal token--that is,
-;     it accepts only tokens that are equal to
-;     the given literal token.
-;     (def a (lit \"...\")) would be equivalent to the EBNF
-;       a = \"...\";
-;     The new rule's product would be the first
-;     token, if it equals the given literal token.")
-;   (is (= ((lit 'A) (mock-state '[A B]))
-;          ['A (mock-state '[B])])
-;       "created literal rule works when literal token present")
-;   (is (failure? ((lit 'A) (mock-state '[B])))
-;       "created literal rule fails when literal token not present"))
-;  
-; (with-test
-;   (defvar re-term
-;     (comp term (partial partial re-matches))
-;     "Equivalent to (comp term (partial partial re-matches)).
-;     Creates a rule that is the terminal rule of the given regex--that is, it
-;     accepts only tokens that match the given regex.
-;     (def a (re-term #\"...\")) would be equivalent to the EBNF
-;       a = ? (re-matches #\"...\" %) evaluates to true ?;
-;     The new rule's product would be the first token, if it matches the given
-;     regex.")
-;   (is (= ((re-term #"\s*true\s*") (mock-state ["  true" "THEN"]))
-;          ["  true" (mock-state ["THEN"])])
-;       "created re-term rule works when first token matches regex")
-;   (is (failure? ((re-term #"\s*true\s*") (mock-state ["false" "THEN"])))
-;       "created re-term rule fails when first token does not match regex")
-;   (is (failure? ((re-term #"\s*true\s*") (mock-state nil)))
-;       "created re-term rule fails when no tokens are left"))
-;  
-; (deftest complex-test
-;   (let [rule1 (complex [a (lit 'A)] (str a "!"))
-;         rule2 (complex [a (lit 'A), b (lit 'B)] (str a "!" b))]
-;     (is (= (rule1 (mock-state '[A B])) ["A!" (mock-state '[B])])
-;       "created complex rule applies semantic hook to valid subresult")
-;     (is (failure? (rule1 (mock-state '[B A])))
-;       "created complex rule fails when a given subrule fails")
-;     (is (= (rule2 (mock-state '[A B C])) ["A!B" (mock-state '[C])])
-;       "created complex rule succeeds when all subrules fulfilled in order")
-;     (is (failure? (rule2 (mock-state '[A C])))
-;       "created complex rule fails when one subrule fails")))
-;  
-; (with-test
-;   (defn followed-by
-;     "Creates a rule that does not consume any tokens, but fails when the given
-;     subrule fails.
-;     The new rule's product would be the subrule's product."
-;     [subrule]
-;     (complex [state get-state, subproduct subrule, _ (set-state state)]
-;       subproduct))
-;   (is (= ((followed-by (lit 'A)) (mock-state '[A B C]))
-;          ['A (mock-state '[A B C])]))
-;   (is (failure? ((followed-by (lit 'A)) (mock-state '[B C])))))
-;  
+(with-test
+  (defn validate
+    "Creates a rule from attaching a product-validating function to the given
+    subrule--that is, any products of the subrule must fulfill the validator
+    function.
+    (def a (validate b validator)) says that the rule a succeeds only when b
+    succeeds and also when the evaluated value of (validator b-product) is true.
+    The new rule's product would be b-product."
+    [subrule validator]
+    (complex [subproduct subrule, :when (validator subproduct)]
+      subproduct))
+  (is (= ((validate anything (partial = "hi")) (mock-state ["hi" "THEN"]))
+         ["hi" (mock-state (list "THEN"))])
+      "created validator rule succeeds when given subrule and validator succeed")
+  (is (failure? ((validate nothing (partial = "RST")) (mock-state ["RST"])))
+      "created validator rule fails when given subrule fails")
+  (is (failure? ((validate anything (partial = "hi")) (mock-state "hi")))
+      "created validator rule fails when given validator fails"))
+ 
+(with-test
+  (defn term
+    "(term validator) is equivalent
+    to (validate anything validator).
+    Creates a rule that is a terminal rule of the given validator--that is, it
+    accepts only tokens for whom (validator token) is true.
+    (def a (term validator)) would be equivalent to the EBNF
+      a = ? (validator %) evaluates to true ?;
+    The new rule's product would be the first token, if it fulfills the
+    validator."
+    [validator]
+    (validate anything validator))
+  (let [rule (term (partial = 'A))]
+    (is (= (rule (mock-state '[A B])) ['A (mock-state '[B])])
+      "created terminal rule works when first token fulfills validator")
+    (is (failure? (rule (mock-state '[B B])))
+      "created terminal rule fails when first token fails validator")
+    (is (= (rule (mock-state '[A])) ['A (mock-state nil)])
+      "created terminal rule works when no remainder")))
+ 
+(with-test
+  (defvar lit
+    (comp term (partial partial =))
+    "Equivalent to (comp term (partial partial =)).
+    Creates a rule that is the terminal
+    rule of the given literal token--that is,
+    it accepts only tokens that are equal to
+    the given literal token.
+    (def a (lit \"...\")) would be equivalent to the EBNF
+      a = \"...\";
+    The new rule's product would be the first
+    token, if it equals the given literal token.")
+  (is (= ((lit 'A) (mock-state '[A B]))
+         ['A (mock-state '[B])])
+      "created literal rule works when literal token present")
+  (is (failure? ((lit 'A) (mock-state '[B])))
+      "created literal rule fails when literal token not present"))
+ 
+(with-test
+  (defvar re-term
+    (comp term (partial partial re-matches))
+    "Equivalent to (comp term (partial partial re-matches)).
+    Creates a rule that is the terminal rule of the given regex--that is, it
+    accepts only tokens that match the given regex.
+    (def a (re-term #\"...\")) would be equivalent to the EBNF
+      a = ? (re-matches #\"...\" %) evaluates to true ?;
+    The new rule's product would be the first token, if it matches the given
+    regex.")
+  (is (= ((re-term #"\s*true\s*") (mock-state ["  true" "THEN"]))
+         ["  true" (mock-state ["THEN"])])
+      "created re-term rule works when first token matches regex")
+  (is (failure? ((re-term #"\s*true\s*") (mock-state ["false" "THEN"])))
+      "created re-term rule fails when first token does not match regex")
+  (is (failure? ((re-term #"\s*true\s*") (mock-state nil)))
+      "created re-term rule fails when no tokens are left"))
+ 
+(deftest complex-test
+  (let [rule1 (complex [a (lit 'A)] (str a "!"))
+        rule2 (complex [a (lit 'A), b (lit 'B)] (str a "!" b))]
+    (is (= (rule1 (mock-state '[A B])) ["A!" (mock-state '[B])])
+      "created complex rule applies semantic hook to valid subresult")
+    (is (failure? (rule1 (mock-state '[B A])))
+      "created complex rule fails when a given subrule fails")
+    (is (= (rule2 (mock-state '[A B C])) ["A!B" (mock-state '[C])])
+      "created complex rule succeeds when all subrules fulfilled in order")
+    (is (failure? (rule2 (mock-state '[A C])))
+      "created complex rule fails when one subrule fails")))
+ 
+(with-test
+  (defn followed-by
+    "Creates a rule that does not consume any tokens, but fails when the given
+    subrule fails.
+    The new rule's product would be the subrule's product."
+    [subrule]
+    (complex [state fetch-state, subproduct subrule, _ (set-state state)]
+      subproduct))
+  (is (= ((followed-by (lit 'A)) (mock-state '[A B C]))
+         ['A (mock-state '[A B C])]))
+  (is (failure? ((followed-by (lit 'A)) (mock-state '[B C])))))
+ 
 ; (with-test
 ;   (defn not-followed-by
 ;     "Creates a rule that does not consume any tokens, but fails when the given
