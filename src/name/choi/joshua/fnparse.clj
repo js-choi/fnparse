@@ -31,7 +31,7 @@
 ; - If the given token sequence is INVALID, then
 ;   the rule FAILS, meaning that it simply returns NIL.
  
-(declare lit rep* rep+ except)
+(declare lit rep* rep+)
 
 (defprotocol ABankable
   (get-bank [o])
@@ -559,11 +559,9 @@
     receives, so that it accepts expressions containing
     unbound variables that are defined later."
     [& subrules]
-    (remember
-      (m/with-monad parser-m
-        (remember
-          (fn [state]
-            ((apply m/m-plus subrules) state))))))
+    (m/with-monad parser-m
+        (fn [state]
+          ((apply m/m-plus subrules) state))))
   (is (= ((alt (lit "hi") (lit "THEN"))
           (mock-state ["THEN" "bye"]))
          ["THEN" (mock-state (list "bye"))]))
@@ -596,396 +594,396 @@
 ;        (conc #'lr-test-fact (lit \/) number-rule)
 ;        number-rule))
 ; 
-; (with-test
-;   (defn opt
-;     "Creates a rule that is the optional form
-;     of the subrule. It always succeeds. Its result
-;     is either the subrule's (if the subrule
-;     succeeds), or else its product is nil, and the
-;     rule acts as the emptiness rule.
-;     (def a (opt b)) would be equivalent to the EBNF:
-;       a = b?;"
-;     [subrule]
-;     (m/with-monad parser-m
-;       (m-plus subrule emptiness)))
-;   (let [opt-true (opt (lit "true"))]
-;     (is (= (opt-true (mock-state ["true" "THEN"]))
-;            ["true" (mock-state (list "THEN"))])
-;         "created option rule works when symbol present")
-;     (is (= (opt-true (mock-state (list "THEN")))
-;            [nil (mock-state (list "THEN"))])
-;         "created option rule works when symbol absent")))
-;  
-; (with-test
-;   (defmacro invisi-conc
-;     "Like conc, only that the product is the
-;     first subrule's product only, not a vector of
-;     all the products of the subrules--effectively
-;     hiding the products of the other subrules.
-;     The rest of the subrules consume tokens too;
-;     their products simply aren't accessible.
-;     This is useful for applying set-info and
-;     update-info to a rule, without having to deal
-;     with set-info or update-info's products."
-;     [first-subrule & rest-subrules]
-;     `(semantics (conc ~first-subrule ~@rest-subrules) first)))
-;  
-; (set-test invisi-conc
-;   (is (= ((invisi-conc (lit \a) (update-info :column inc))
-;            (-> "abc" mock-state (assoc :column 4)))
-;          [\a (-> "bc" seq mock-state (assoc :column 5))])))
-;  
-; (with-test
-;   (defn lit-conc-seq
-;     "A convenience function: it creates a rule
-;     that is the concatenation of the literals
-;     formed from the given sequence of literal tokens.
-;     (def a (lit-conc-seq [\"a\" \"b\" \"c\"]))
-;     would be equivalent to the EBNF:
-;       a = \"a\", \"b\", \"c\";
-;     The function has an optional argument: a
-;     rule-making function. By default it is the lit
-;     function. This is the function that is used
-;     to create the literal rules from each element
-;     in the given token sequence."
-;     ([token-seq]
-;      (lit-conc-seq token-seq lit))
-;     ([token-seq rule-maker]
-;      (m/with-monad parser-m
-;        (m-seq (map rule-maker token-seq)))))
-;   (is (= ((lit-conc-seq "THEN") (mock-state "THEN print 42;"))
-;          [(vec "THEN") (mock-state (seq " print 42;"))])
-;       "created literal-sequence rule is based on sequence of given token sequencible")
-;   (is (= ((lit-conc-seq "THEN"
-;             (fn [lit-token]
-;               (invisi-conc (lit lit-token)
-;                 (update-info :column inc))))
-;           (-> "THEN print 42;" mock-state (assoc :column 1)))
-;          [(vec "THEN") (-> (seq " print 42;") mock-state (assoc :column 5))])
-;       "created literal-sequence rule uses given rule-maker"))
-;  
-; (with-test
-;   (defn lit-alt-seq
-;     "A convenience function: it creates a rule
-;     that is the alternation of the literals
-;     formed from the given sequence of literal tokens.
-;     (def a (lit-alt-seq [\"a\" \"b\" \"c\"]))
-;     would be equivalent to the EBNF:
-;       a = \"a\" | \"b\" | \"c\";"
-;     ([token-seq]
-;      (lit-alt-seq token-seq lit))
-;     ([token-seq rule-maker]
-;      (m/with-monad parser-m
-;        (apply m-plus (map rule-maker token-seq)))))
-;   (is (= ((lit-alt-seq "ABCD") (mock-state (seq "B 2")))
-;          [\B (mock-state (seq " 2"))])
-;       (str "created literal-alternative-sequence rule "
-;            "works when literal symbol present in sequence"))
-;   (is (failure? ((lit-alt-seq "ABCD") (mock-state (seq "E 2"))))
-;       (str "created literal-alternative-sequence "
-;            "rule fails when literal symbol not "
-;            "present in sequence"))
-;   (is (= ((lit-alt-seq "ABCD"
-;             (fn [lit-token]
-;               (invisi-conc (lit lit-token)
-;                            (update-info :column inc))))
-;           (-> "B 2" mock-state (assoc :column 1)))
-;          [\B (-> (seq " 2") mock-state (assoc :column 2))])
-;       "created literal-alternative-sequence rule uses given rule-maker"))
-;  
-; (with-test
-;   (defn rep*
-;     "Creates a rule that is the zero-or-more
-;     greedy repetition of the given subrule. It
-;     always succeeds. It consumes tokens with
-;     its subrule until its subrule fails.
-;     Its result is the sequence of results from
-;     the subrule's repetitions, (or nil if the
-;     subrule fails immediately).
-;     (def a (rep* b)) is equivalent to the EBNF:
-;       a = {b};
-;     The new rule's products would be either the
-;     vector [b-product ...] for how many matches
-;     of b were found, or nil if there was no
-;     match. (Note that this means that, in the latter
-;     case, the result would be [nil given-state].)
-;     The new rule can never simply return nil."
-;     [subrule]
-;     (fn [state]
-;       (loop [cur-product [], cur-state state]
-;         (let [subresult (subrule cur-state)]
-;           (if (success? subresult)
-;             (let [[subproduct substate] subresult]
-;               (if (seq (get-remainder substate))
-;                 (recur (conj cur-product subproduct) substate)
-;                 [(conj cur-product subproduct) substate]))
-;             [(if (not= cur-product []) cur-product) cur-state])))))
-;     ; The following code was used until I found
-;     ; that the mutually recursive calls to rep+
-;     ; resulted in an easily inflated function call stack.
-;   ;  (opt (rep+ subrule)))
-;   (let [rep*-true (rep* (lit true))
-;         rep*-untrue (rep* (except anything (lit true)))]
-;     (is (= (rep*-true (-> [true "THEN"] mock-state (assoc :a 3)))
-;            [[true] (-> (list "THEN") mock-state (assoc :a 3))])
-;         "created zero-or-more-repetition rule works when symbol present singularly")
-;     (is (= (rep*-true (-> [true true true "THEN"] mock-state (assoc :a 3)))
-;            [[true true true] (-> (list "THEN") mock-state (assoc :a 3))])
-;         "created zero-or-more-repetition rule works when symbol present multiply")
-;     (is (= (rep*-true (-> ["THEN"] mock-state (assoc :a 3)))
-;            [nil (-> (list "THEN") mock-state (assoc :a 3))])
-;      "created zero-or-more-repetition rule works when symbol absent")
-;     (is (= (rep*-true (mock-state [true true true]))
-;            [[true true true] (mock-state nil)])
-;         "created zero-or-more-repetition rule works with no remainder after symbols")
-;     (is (= (rep*-true (mock-state nil))
-;            [nil (mock-state nil)])
-;         "created zero-or-more-repetition rule works with no remainder")
-;     (is (= (rep*-untrue (mock-state [false false]))
-;            [[false false] (mock-state nil)])
-;         "created zero-or-more-repetition negative rule works consuming up to end")
-;     (is (= (rep*-untrue (mock-state [false false true]))
-;            [[false false] (mock-state [true])])
-;         "created zero-or-more-repetition negative rule works consuming until exception")
-;     (is (= (rep*-untrue (mock-state nil))
-;            [nil (mock-state nil)])
-;         "created zero-or-more-repetition negative rule works with no remainder"))
-;   (is (= ((rep* anything) (mock-state '(A B C)))
-;          ['(A B C) (mock-state nil)])
-;     "repeated anything rule does not create infinite loop"))
-;  
-; ; (with-test
-; ;   (defn rep+
-; ;     "Creates a rule that is the zero-or-more
-; ;     greedy repetition of the given subrule. It
-; ;     fails only when its subrule fails immediately.
-; ;     It consumes tokens with its subrule until
-; ;     its subrule fails. Its result is the sequence
-; ;     of results from the subrule's repetitions.
-; ;     (def a (rep* b)) is equivalent to the EBNF:
-; ;       a = {b}-;
-; ;     The new rule's products would be the vector
-; ;     [b-product ...] for how many matches
-; ;     of b were found. If there was no match, then
-; ;     the rule fails."
-; ;     [subrule]
-; ;     (complex [first-product subrule, rest-products (rep* subrule)]
-; ;       (vec (cons first-product rest-products))))
-; ;     ; See note at rep*.
-; ;   ;  (complex [cur-remainder (fetch-remainder)
-; ;   ;            :when (seq cur-remainder)
-; ;   ;            first-subproduct subrule
-; ;   ;            rest-subproducts (rep* subrule)]
-; ;   ;    (cons first-subproduct rest-subproducts)))
-; ;   (let [rep+-true (rep+ (lit true))]
-; ;     (is (= (rep+-true (mock-state [true "THEN"]))
-; ;            [[true] (mock-state (list "THEN"))])
-; ;         "created one-or-more-repetition rule works when symbol present singularly")
-; ;     (is (= (rep+-true (mock-state [true true true "THEN"]))
-; ;            [[true true true] (mock-state (list "THEN"))])
-; ;         "created one-or-more-repetition rule works when symbol present multiply")
-; ;     (is (failure? (rep+-true (mock-state (list "THEN"))))
-; ;         "created one-or-more-repetition rule fails when symbol absent")))
-; ;  
-; (with-test
-;   (defn except
-;     "Creates a rule that is the exception from
-;     the first given subrules with the second given
-;     subrule--that is, it accepts only tokens that
-;     fulfill the first subrule but fails the
-;     second of the subrules.
-;     (def a (except b c)) would be equivalent to the EBNF
-;       a = b - c;
-;     The new rule's products would be b-product. If
-;     b fails or c succeeds, then nil is simply returned."
-;     [minuend subtrahend]
-;     (complex [state (fetch-state)
-;               minuend-product minuend
-;               :when (not (subtrahend state))]
-;       minuend-product))
-;   (let [except-rule (except (lit-alt-seq "ABC") (lit-alt-seq "BC"))]
-;     (is (= (-> "ABC" mock-state (assoc :a 1) except-rule)
-;             [\A (-> (seq "BC") mock-state (assoc :a 1))])
-;         "created exception rule works when symbol is not one of the syntatic exceptions")
-;     (is (failure? (except-rule (mock-state (seq "BAC"))))
-;         "created exception rule fails when symbol is one of the syntactic exceptions")
-;     (is (failure? (except-rule (mock-state (seq "DAB"))))
-;         "created exception rule fails when symbol does not fulfill subrule")))
-;  
-; ; (with-test
-; ;   (defn rep-predicate
-; ;     "Like the rep* function, only that the number
-; ;     of times that the subrule is fulfilled must
-; ;     fulfill the given factor-predicate function."
-; ;     [factor-predicate subrule]
-; ;     (validate (rep* subrule) (comp factor-predicate count)))
-; ;   (let [tested-rule-fn (rep-predicate (partial > 3) (lit "A"))
-; ;         infinity-rule (rep-predicate (partial > Double/POSITIVE_INFINITY)
-; ;                         (lit "A"))]
-; ;     (is (= (tested-rule-fn (mock-state (list "A" "A" "C")))
-; ;            [["A" "A"] (mock-state (list "C"))])
-; ;         "created rep rule works when predicate returns true")
-; ;     (is (failure? (tested-rule-fn (mock-state (list "A" "A" "A"))))
-; ;         "created rep rule fails when predicate returns false")
-; ;     (is (= (tested-rule-fn (mock-state (list "D" "A" "B")))
-; ;            [nil (mock-state (list "D" "A" "B"))])
-; ;         "created rep rule succeeds when symbol does not fulfill subrule at all")))
-; ;  
-; ; (defn rep=
-; ;   "Creates a rule that is the greedy repetition
-; ;   of the given subrule by the given factor (a
-; ;   positive integer)--that is, it eats up all the
-; ;   tokens that fulfill the subrule, and it then
-; ;   succeeds only if the number of times the subrule
-; ;   was fulfilled is equal to the given factor, no
-; ;   more and no less.
-; ;   (rep= 3 :a) would eat the first three tokens of [:a :a :a :b] and return:
-; ;     [[:a :a :a] (list :a :b)].
-; ;   (rep= 3 :a) would eat the first four tokens of [:a :a :a :a :b] and fail."
-; ;   [factor subrule]
-; ;   (rep-predicate (partial = factor) subrule))
-; ;  
-; ; (defn rep<
-; ;   "A similiar function to rep=, only that the
-; ;   instead the new rule succeeds if the number
-; ;   of times that the subrule is fulfilled is
-; ;   less than and not equal to the given factor."
-; ;   [factor subrule]
-; ;   (rep-predicate (partial > factor) subrule))
-; ;  
-; ; (defn rep<=
-; ;   "A similiar function to rep=, only that the
-; ;   instead the new rule succeeds if the number
-; ;   of times that the subrule is fulfilled is
-; ;   less than or equal to the given factor."
-; ;   [factor subrule]
-; ;   (rep-predicate (partial >= factor) subrule))
-; ;  
-; ; (with-test
-; ;   (defn factor=
-; ;     "Creates a rule that is the syntactic factor
-; ;     (that is, a non-greedy repetition) of the
-; ;     given subrule by a given integer--that is, it
-; ;     is equivalent to the subrule replicated by
-; ;     1, 2, etc. times and then concatenated.
-; ;     (def a (factor= n b)) would be equivalent to the EBNF
-; ;       a = n * b;
-; ;     The new rule's products would be b-product.
-; ;     If b fails below n times, then nil is simply
-; ;     returned.
-; ;     (factor= 3 :a) would eat the first three
-; ;     tokens [:a :a :a :a :b] and return:
-; ;       [[:a :a :a] (list :a :b)].
-; ;     (factor= 3 :a) would eat the first three
-; ;     tokens [:a :a :b] and fail."
-; ;     [factor subrule]
-; ;     (m/with-monad parser-m
-; ;       (m-seq (replicate factor subrule))))
-; ;   (let [tested-rule-3 (factor= 3 (lit "A"))
-; ;         tested-rule-0 (factor= 0 (lit "A"))]
-; ;     (is (= (tested-rule-3 (mock-state (list "A" "A" "A" "A" "C")))
-; ;            [["A" "A" "A"] (mock-state (list "A" "C"))])
-; ;         (str "created factor= rule works when symbol fulfills all subrule multiples and"
-; ;              "leaves strict remainder"))
-; ;     (is (= (tested-rule-3 (mock-state (list "A" "A" "A" "C")))
-; ;            [["A" "A" "A"] (mock-state (list "C"))])
-; ;         "created factor= rule works when symbol fulfills all subrule multiples only")
-; ;     (is (= (tested-rule-3 (mock-state (list "A" "A" "C"))) nil)
-; ;         "created factor= rule fails when symbol does not fulfill all subrule multiples")
-; ;     (is (= (tested-rule-3 (mock-state (list "D" "A" "B"))) nil)
-; ;         "created factor= rule fails when symbol does not fulfill subrule at all")
-; ;     (is (= (tested-rule-0 (mock-state (list "D" "A" "B")))
-; ;            [[] (mock-state (list "D" "A" "B"))])
-; ;         "created factor= rule works when symbol fulfils no multiples and factor is zero")))
-; ;  
-; ; (with-test
-; ;   (defn factor<
-; ;     "Same as the factor= function, except that the
-; ;     new rule eats up tokens only until the
-; ;     given subrule is fulfilled one less times than
-; ;     the factor. The new rule would never fail.
-; ;     (factor< 3 :a) would eat the first two tokens [:a :a :a :a :b] and return:
-; ;       [[:a :a] (list :a :a :b)].
-; ;     (factor< 3 :a) would eat the first three tokens [:b] and return:
-; ;       [nil (list :b)]"
-; ;     [factor subrule]
-; ;     (alt (factor= (dec factor) subrule) (rep< factor subrule)))
-; ;   (let [tested-rule (factor< 3 (lit \A))]
-; ;     (is (= (tested-rule (mock-state (seq "AAAAC")))
-; ;            [[\A \A] (mock-state (seq "AAC"))])
-; ;         (str "created factor< rule works when symbol fulfills all subrule multiples and"
-; ;              "leaves strict remainder"))
-; ;     (is (= (tested-rule (mock-state (seq "AAAC")))
-; ;            [[\A \A] (mock-state (seq "AC"))])
-; ;         "created factor< rule works when symbol fulfills all subrule multiples only")
-; ;     (is (= (tested-rule (mock-state (seq "AAC"))) [[\A \A] (mock-state (seq "C"))])
-; ;         "created factor< rule works when symbol does not fulfill all subrule multiples")
-; ;     (is (= (tested-rule (mock-state (seq "DAB"))
-; ;            [nil (mock-state (seq "DAB"))])
-; ;         "created factor< rule works when symbol does not fulfill subrule at all"))))
-; ;  
-; ; (defn factor<=
-; ;   "Same as the factor= function, except that
-; ;   the new rule always succeeds, consuming tokens
-; ;   until the subrule is fulfilled the same amount
-; ;   of times as the given factor. The new rule
-; ;   would never fail.
-; ;   (factor<= 3 :a) would eat the first two tokens [:a :a :a :a :b] and return:
-; ;     [[:a :a :a] (list :a :b)].
-; ;   (factor<= 3 :a) would eat the first three tokens [:b] and return:
-; ;     [nil (list :b)]"
-; ;   [factor subrule]
-; ;   (alt (factor= factor subrule) (rep< factor subrule)))
-; ;  
-; ; (with-test
-; ;   (defn failpoint
-; ;     "Creates a rule that applies a failpoint to
-; ;     a subrule. When the subrule fails—i.e., it
-; ;     returns nil—then the failure hook function
-; ;     is called with one argument, the state at time
-; ;     of failure."
-; ;     [subrule failure-hook]
-; ;     (fn [state]
-; ;       (let [result (subrule state)]
-; ;         (if (failure? result)
-; ;           result
-; ;           (failure-hook (get-remainder state) state)))))
-; ;   (let [exception-rule (failpoint (lit "A")
-; ;                           (fn [remainder state]
-; ;                             (throw-arg "ERROR %s at line %s"
-; ;                               (first remainder) (:line state))))]
-; ;     (is (= (exception-rule (-> ["A"] mock-state (assoc :line 3)))
-; ;            ["A" (-> nil mock-state (assoc :line 3))])
-; ;         "failing rules succeed when their subrules are fulfilled")
-; ;     (is (thrown-with-msg? IllegalArgumentException
-; ;           #"ERROR B at line 3"
-; ;           (exception-rule (-> ["B"] mock-state (assoc :line 3)))
-; ;         "failing rules fail with given exceptions when their subrules fail"))))
-; ;  
-; ; (with-test
-; ;   (defmacro effects
-; ;     "Creates a rule that calls the lists given
-; ;     in its body for side effects. It does not
-; ;     consume any tokens or modify the state in
-; ;     any other way."
-; ;     [& effect-body]
-; ;     `(fn [state#]
-; ;        [((fn [] ~@effect-body)) state#])))
-; ;  
-; ; (deftest effects-test
-; ;   (let [rule
-; ;          (complex [subproduct (lit "A")
-; ;                      line-number (get-info :line)
-; ;                      effects (effects (println "!" subproduct)
-; ;                                       (println "YES" line-number))]
-; ;            subproduct)]
-; ;     (is (= (with-out-str
-; ;              (is (= (rule (-> ["A" "B"] mock-state (assoc :line 3)))
-; ;                     ["A" (-> (list "B") mock-state (assoc :line 3))])
-; ;                  "pre-effect rules succeed when their subrules are fulfilled"))
-; ;            "! A\nYES 3\n")
-; ;         "effect rule should call their effect and return the same state")))
-; ;  
+(with-test
+  (defn opt
+    "Creates a rule that is the optional form
+    of the subrule. It always succeeds. Its result
+    is either the subrule's (if the subrule
+    succeeds), or else its product is nil, and the
+    rule acts as the emptiness rule.
+    (def a (opt b)) would be equivalent to the EBNF:
+      a = b?;"
+    [subrule]
+    (m/with-monad parser-m
+      (m-plus subrule emptiness)))
+  (let [opt-true (opt (lit "true"))]
+    (is (= (opt-true (mock-state ["true" "THEN"]))
+           ["true" (mock-state (list "THEN"))])
+        "created option rule works when symbol present")
+    (is (= (opt-true (mock-state (list "THEN")))
+           [nil (mock-state (list "THEN"))])
+        "created option rule works when symbol absent")))
+ 
+(with-test
+  (defmacro invisi-conc
+    "Like conc, only that the product is the
+    first subrule's product only, not a vector of
+    all the products of the subrules--effectively
+    hiding the products of the other subrules.
+    The rest of the subrules consume tokens too;
+    their products simply aren't accessible.
+    This is useful for applying set-info and
+    update-info to a rule, without having to deal
+    with set-info or update-info's products."
+    [first-subrule & rest-subrules]
+    `(semantics (conc ~first-subrule ~@rest-subrules) first)))
+ 
+(set-test invisi-conc
+  (is (= ((invisi-conc (lit \a) (update-info :column inc))
+           (-> "abc" mock-state (assoc :column 4)))
+         [\a (-> "bc" seq mock-state (assoc :column 5))])))
+
+(with-test
+  (defn lit-conc-seq
+    "A convenience function: it creates a rule
+    that is the concatenation of the literals
+    formed from the given sequence of literal tokens.
+    (def a (lit-conc-seq [\"a\" \"b\" \"c\"]))
+    would be equivalent to the EBNF:
+      a = \"a\", \"b\", \"c\";
+    The function has an optional argument: a
+    rule-making function. By default it is the lit
+    function. This is the function that is used
+    to create the literal rules from each element
+    in the given token sequence."
+    ([token-seq]
+     (lit-conc-seq token-seq lit))
+    ([token-seq rule-maker]
+     (m/with-monad parser-m
+       (m/m-seq (map rule-maker token-seq)))))
+  (is (= ((lit-conc-seq "THEN") (mock-state "THEN print 42;"))
+         [(vec "THEN") (mock-state (seq " print 42;"))])
+      "created literal-sequence rule is based on sequence of given token sequencible")
+  (is (= ((lit-conc-seq "THEN"
+            (fn [lit-token]
+              (invisi-conc (lit lit-token)
+                (update-info :column inc))))
+          (-> "THEN print 42;" mock-state (assoc :column 1)))
+         [(vec "THEN") (-> (seq " print 42;") mock-state (assoc :column 5))])
+      "created literal-sequence rule uses given rule-maker"))
+
+(with-test
+  (defn lit-alt-seq
+    "A convenience function: it creates a rule
+    that is the alternation of the literals
+    formed from the given sequence of literal tokens.
+    (def a (lit-alt-seq [\"a\" \"b\" \"c\"]))
+    would be equivalent to the EBNF:
+      a = \"a\" | \"b\" | \"c\";"
+    ([token-seq]
+     (lit-alt-seq token-seq lit))
+    ([token-seq rule-maker]
+     (m/with-monad parser-m
+       (apply m-plus (map rule-maker token-seq)))))
+  (is (= ((lit-alt-seq "ABCD") (mock-state (seq "B 2")))
+         [\B (mock-state (seq " 2"))])
+      (str "created literal-alternative-sequence rule "
+           "works when literal symbol present in sequence"))
+  (is (failure? ((lit-alt-seq "ABCD") (mock-state (seq "E 2"))))
+      (str "created literal-alternative-sequence "
+           "rule fails when literal symbol not "
+           "present in sequence"))
+  (is (= ((lit-alt-seq "ABCD"
+            (fn [lit-token]
+              (invisi-conc (lit lit-token)
+                           (update-info :column inc))))
+          (-> "B 2" mock-state (assoc :column 1)))
+         [\B (-> (seq " 2") mock-state (assoc :column 2))])
+      "created literal-alternative-sequence rule uses given rule-maker"))
+
+(with-test
+  (defn except
+    "Creates a rule that is the exception from
+    the first given subrules with the second given
+    subrule--that is, it accepts only tokens that
+    fulfill the first subrule but fails the
+    second of the subrules.
+    (def a (except b c)) would be equivalent to the EBNF
+      a = b - c;
+    The new rule's products would be b-product. If
+    b fails or c succeeds, then nil is simply returned."
+    [minuend subtrahend]
+    (complex [state fetch-state
+              minuend-product minuend
+              :when (failure? (subtrahend state))]
+      minuend-product))
+  (let [except-rule (except (lit-alt-seq "ABC") (lit-alt-seq "BC"))]
+    (is (= (-> "ABC" mock-state (assoc :a 1) except-rule)
+            [\A (-> (seq "BC") mock-state (assoc :a 1))])
+        "created exception rule works when symbol is not one of the syntatic exceptions")
+    (is (failure? (except-rule (mock-state (seq "BAC"))))
+        "created exception rule fails when symbol is one of the syntactic exceptions")
+    (is (failure? (except-rule (mock-state (seq "DAB"))))
+        "created exception rule fails when symbol does not fulfill subrule")))
+
+(with-test
+  (defn rep*
+    "Creates a rule that is the zero-or-more
+    greedy repetition of the given subrule. It
+    always succeeds. It consumes tokens with
+    its subrule until its subrule fails.
+    Its result is the sequence of results from
+    the subrule's repetitions, (or nil if the
+    subrule fails immediately).
+    (def a (rep* b)) is equivalent to the EBNF:
+      a = {b};
+    The new rule's products would be either the
+    vector [b-product ...] for how many matches
+    of b were found, or nil if there was no
+    match. (Note that this means that, in the latter
+    case, the result would be [nil given-state].)
+    The new rule can never simply return nil."
+    [subrule]
+    (fn [state]
+      (loop [cur-product [], cur-state state]
+        (let [subresult (subrule cur-state)]
+          (if (success? subresult)
+            (let [[subproduct substate] subresult]
+              (if (seq (get-remainder substate))
+                (recur (conj cur-product subproduct) substate)
+                [(conj cur-product subproduct) substate]))
+            [(if (not= cur-product []) cur-product) cur-state])))))
+    ; The following code was used until I found
+    ; that the mutually recursive calls to rep+
+    ; resulted in an easily inflated function call stack.
+  ;  (opt (rep+ subrule)))
+  (let [rep*-true (rep* (lit true))
+        rep*-untrue (rep* (except anything (lit true)))]
+    (is (= (rep*-true (-> [true "THEN"] mock-state (assoc :a 3)))
+           [[true] (-> (list "THEN") mock-state (assoc :a 3))])
+        "created zero-or-more-repetition rule works when symbol present singularly")
+    (is (= (rep*-true (-> [true true true "THEN"] mock-state (assoc :a 3)))
+           [[true true true] (-> (list "THEN") mock-state (assoc :a 3))])
+        "created zero-or-more-repetition rule works when symbol present multiply")
+    (is (= (rep*-true (-> ["THEN"] mock-state (assoc :a 3)))
+           [nil (-> (list "THEN") mock-state (assoc :a 3))])
+     "created zero-or-more-repetition rule works when symbol absent")
+    (is (= (rep*-true (mock-state [true true true]))
+           [[true true true] (mock-state nil)])
+        "created zero-or-more-repetition rule works with no remainder after symbols")
+    (is (= (rep*-true (mock-state nil))
+           [nil (mock-state nil)])
+        "created zero-or-more-repetition rule works with no remainder")
+    (is (= (rep*-untrue (mock-state [false false]))
+           [[false false] (mock-state nil)])
+        "created zero-or-more-repetition negative rule works consuming up to end")
+    (is (= (rep*-untrue (mock-state [false false true]))
+           [[false false] (mock-state [true])])
+        "created zero-or-more-repetition negative rule works consuming until exception")
+    (is (= (rep*-untrue (mock-state nil))
+           [nil (mock-state nil)])
+        "created zero-or-more-repetition negative rule works with no remainder"))
+  (is (= ((rep* anything) (mock-state '(A B C)))
+         ['(A B C) (mock-state nil)])
+    "repeated anything rule does not create infinite loop"))
+ 
+(with-test
+  (defn rep+
+    "Creates a rule that is the zero-or-more
+    greedy repetition of the given subrule. It
+    fails only when its subrule fails immediately.
+    It consumes tokens with its subrule until
+    its subrule fails. Its result is the sequence
+    of results from the subrule's repetitions.
+    (def a (rep* b)) is equivalent to the EBNF:
+      a = {b}-;
+    The new rule's products would be the vector
+    [b-product ...] for how many matches
+    of b were found. If there was no match, then
+    the rule fails."
+    [subrule]
+    (complex [first-product subrule, rest-products (rep* subrule)]
+      (vec (cons first-product rest-products))))
+    ; See note at rep*.
+  ;  (complex [cur-remainder (fetch-remainder)
+  ;            :when (seq cur-remainder)
+  ;            first-subproduct subrule
+  ;            rest-subproducts (rep* subrule)]
+  ;    (cons first-subproduct rest-subproducts)))
+  (let [rep+-true (rep+ (lit true))]
+    (is (= (rep+-true (mock-state [true "THEN"]))
+           [[true] (mock-state (list "THEN"))])
+        "created one-or-more-repetition rule works when symbol present singularly")
+    (is (= (rep+-true (mock-state [true true true "THEN"]))
+           [[true true true] (mock-state (list "THEN"))])
+        "created one-or-more-repetition rule works when symbol present multiply")
+    (is (failure? (rep+-true (mock-state (list "THEN"))))
+        "created one-or-more-repetition rule fails when symbol absent")))
+ 
+(with-test
+  (defn rep-predicate
+    "Like the rep* function, only that the number
+    of times that the subrule is fulfilled must
+    fulfill the given factor-predicate function."
+    [factor-predicate subrule]
+    (validate (rep* subrule) (comp factor-predicate count)))
+  (let [tested-rule-fn (rep-predicate (partial > 3) (lit "A"))
+        infinity-rule (rep-predicate (partial > Double/POSITIVE_INFINITY)
+                        (lit "A"))]
+    (is (= (tested-rule-fn (mock-state (list "A" "A" "C")))
+           [["A" "A"] (mock-state (list "C"))])
+        "created rep rule works when predicate returns true")
+    (is (failure? (tested-rule-fn (mock-state (list "A" "A" "A"))))
+        "created rep rule fails when predicate returns false")
+    (is (= (tested-rule-fn (mock-state (list "D" "A" "B")))
+           [nil (mock-state (list "D" "A" "B"))])
+        "created rep rule succeeds when symbol does not fulfill subrule at all")))
+ 
+(defn rep=
+  "Creates a rule that is the greedy repetition
+  of the given subrule by the given factor (a
+  positive integer)--that is, it eats up all the
+  tokens that fulfill the subrule, and it then
+  succeeds only if the number of times the subrule
+  was fulfilled is equal to the given factor, no
+  more and no less.
+  (rep= 3 :a) would eat the first three tokens of [:a :a :a :b] and return:
+    [[:a :a :a] (list :a :b)].
+  (rep= 3 :a) would eat the first four tokens of [:a :a :a :a :b] and fail."
+  [factor subrule]
+  (rep-predicate (partial = factor) subrule))
+ 
+(defn rep<
+  "A similiar function to rep=, only that the
+  instead the new rule succeeds if the number
+  of times that the subrule is fulfilled is
+  less than and not equal to the given factor."
+  [factor subrule]
+  (rep-predicate (partial > factor) subrule))
+ 
+(defn rep<=
+  "A similiar function to rep=, only that the
+  instead the new rule succeeds if the number
+  of times that the subrule is fulfilled is
+  less than or equal to the given factor."
+  [factor subrule]
+  (rep-predicate (partial >= factor) subrule))
+ 
+(with-test
+  (defn factor=
+    "Creates a rule that is the syntactic factor
+    (that is, a non-greedy repetition) of the
+    given subrule by a given integer--that is, it
+    is equivalent to the subrule replicated by
+    1, 2, etc. times and then concatenated.
+    (def a (factor= n b)) would be equivalent to the EBNF
+      a = n * b;
+    The new rule's products would be b-product.
+    If b fails below n times, then nil is simply
+    returned.
+    (factor= 3 :a) would eat the first three
+    tokens [:a :a :a :a :b] and return:
+      [[:a :a :a] (list :a :b)].
+    (factor= 3 :a) would eat the first three
+    tokens [:a :a :b] and fail."
+    [factor subrule]
+    (m/with-monad parser-m
+      (m/m-seq (replicate factor subrule))))
+  (let [tested-rule-3 (factor= 3 (lit "A"))
+        tested-rule-0 (factor= 0 (lit "A"))]
+    (is (= (tested-rule-3 (mock-state (list "A" "A" "A" "A" "C")))
+           [["A" "A" "A"] (mock-state (list "A" "C"))])
+        (str "created factor= rule works when symbol fulfills all subrule multiples and"
+             "leaves strict remainder"))
+    (is (= (tested-rule-3 (mock-state (list "A" "A" "A" "C")))
+           [["A" "A" "A"] (mock-state (list "C"))])
+        "created factor= rule works when symbol fulfills all subrule multiples only")
+    (is (failure? (tested-rule-3 (mock-state (list "A" "A" "C"))))
+        "created factor= rule fails when symbol does not fulfill all subrule multiples")
+    (is (failure? (tested-rule-3 (mock-state (list "D" "A" "B"))))
+        "created factor= rule fails when symbol does not fulfill subrule at all")
+    (is (= (tested-rule-0 (mock-state (list "D" "A" "B")))
+           [[] (mock-state (list "D" "A" "B"))])
+        "created factor= rule works when symbol fulfils no multiples and factor is zero")))
+ 
+(with-test
+  (defn factor<
+    "Same as the factor= function, except that the
+    new rule eats up tokens only until the
+    given subrule is fulfilled one less times than
+    the factor. The new rule would never fail.
+    (factor< 3 :a) would eat the first two tokens [:a :a :a :a :b] and return:
+      [[:a :a] (list :a :a :b)].
+    (factor< 3 :a) would eat the first three tokens [:b] and return:
+      [nil (list :b)]"
+    [factor subrule]
+    (alt (factor= (dec factor) subrule) (rep< factor subrule)))
+  (let [tested-rule (factor< 3 (lit \A))]
+    (is (= (tested-rule (mock-state (seq "AAAAC")))
+           [[\A \A] (mock-state (seq "AAC"))])
+        (str "created factor< rule works when symbol fulfills all subrule multiples and"
+             "leaves strict remainder"))
+    (is (= (tested-rule (mock-state (seq "AAAC")))
+           [[\A \A] (mock-state (seq "AC"))])
+        "created factor< rule works when symbol fulfills all subrule multiples only")
+    (is (= (tested-rule (mock-state (seq "AAC"))) [[\A \A] (mock-state (seq "C"))])
+        "created factor< rule works when symbol does not fulfill all subrule multiples")
+    (is (= (tested-rule (mock-state (seq "DAB")))
+           [nil (mock-state (seq "DAB"))])
+        "created factor< rule works when symbol does not fulfill subrule at all")))
+ 
+(defn factor<=
+  "Same as the factor= function, except that
+  the new rule always succeeds, consuming tokens
+  until the subrule is fulfilled the same amount
+  of times as the given factor. The new rule
+  would never fail.
+  (factor<= 3 :a) would eat the first two tokens [:a :a :a :a :b] and return:
+    [[:a :a :a] (list :a :b)].
+  (factor<= 3 :a) would eat the first three tokens [:b] and return:
+    [nil (list :b)]"
+  [factor subrule]
+  (alt (factor= factor subrule) (rep< factor subrule)))
+ 
+(with-test
+  (defn failpoint
+    "Creates a rule that applies a failpoint to
+    a subrule. When the subrule fails—i.e., it
+    returns nil—then the failure hook function
+    is called with one argument, the state at time
+    of failure."
+    [subrule failure-hook]
+    (fn [state]
+      (let [result (subrule state)]
+        (if (success? result)
+          result
+          (failure-hook (get-remainder state) state)))))
+  (let [exception-rule (failpoint (lit "A")
+                          (fn [remainder state]
+                            (throw-arg "ERROR %s at line %s"
+                              (first remainder) (:line state))))]
+    (is (= (exception-rule (-> ["A"] mock-state (assoc :line 3)))
+           ["A" (-> nil mock-state (assoc :line 3))])
+        "failing rules succeed when their subrules are fulfilled")
+    (is (thrown-with-msg? IllegalArgumentException
+          #"ERROR B at line 3"
+          (exception-rule (-> ["B"] mock-state (assoc :line 3)))
+        "failing rules fail with given exceptions when their subrules fail"))))
+ 
+(with-test
+  (defmacro effects
+    "Creates a rule that calls the lists given
+    in its body for side effects. It does not
+    consume any tokens or modify the state in
+    any other way."
+    [& effect-body]
+    `(fn [state#]
+       [((fn [] ~@effect-body)) state#])))
+ 
+(deftest effects-test
+  (let [rule
+         (complex [subproduct (lit "A")
+                   line-number (fetch-info :line)
+                   effects (effects (println "!" subproduct)
+                                    (println "YES" line-number))]
+           subproduct)]
+    (is (= (with-out-str
+             (is (= (rule (-> ["A" "B"] mock-state (assoc :line 3)))
+                    ["A" (-> (list "B") mock-state (assoc :line 3))])
+                 "pre-effect rules succeed when their subrules are fulfilled"))
+           "! A\nYES 3\n")
+        "effect rule should call their effect and return the same state")))
+ 
 ; ; (with-test
 ; ;   (defn intercept
 ; ;     "This rule is intended for intercepting
