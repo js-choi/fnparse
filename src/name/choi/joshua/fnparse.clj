@@ -265,7 +265,7 @@
    m-plus (fn m-plus-parser [& rules]
             (fn [state]
               (or (first (drop-while failure? (map #(% state) rules)))
-                  m-zero)))])
+                  (m-zero state))))])
 
 (m/with-monad parser-m
   (defvar nothing m-zero))
@@ -543,32 +543,32 @@
              (mock-state ["hi" "bye" "boom"])))
       "created concatenated rule fails when one subrule fails"))
 
-; (with-test
-;   (defn alt
-;     "Creates a rule that is the alternation
-;     of the given subrules. It succeeds when
-;     any of its subrules succeed, and fails
-;     when none do. Its result is that of the first
-;     subrule that succeeds, so the order of the
-;     subrules that this function receives matters.
-;     (def a (alt b c d)) would be equivalent to the EBNF:
-;      a = b | c | d;
-;     This macro is almost equivalent to m-plus for
-;     the parser-m monad. The difference is that
-;     it defers evaluation of whatever variables it
-;     receives, so that it accepts expressions containing
-;     unbound variables that are defined later."
-;     [& subrules]
-;     (m/with-monad parser-m
-;       (remember
-;         (fn [state]
-;           ((apply m-plus subrules) state)))))
-;   (is (= ((alt (lit "hi") (lit "THEN"))
-;           (mock-state ["THEN" "bye"]))
-;          ["THEN" (mock-state (list "bye"))]))
-;   (is (failure? ((alt (lit "hi") (lit "THEN"))
-;                  (mock-state ["bye" "boom"])))))
-; 
+(with-test
+  (defn alt
+    "Creates a rule that is the alternation
+    of the given subrules. It succeeds when
+    any of its subrules succeed, and fails
+    when none do. Its result is that of the first
+    subrule that succeeds, so the order of the
+    subrules that this function receives matters.
+    (def a (alt b c d)) would be equivalent to the EBNF:
+     a = b | c | d;
+    This macro is almost equivalent to m-plus for
+    the parser-m monad. The difference is that
+    it defers evaluation of whatever variables it
+    receives, so that it accepts expressions containing
+    unbound variables that are defined later."
+    [& subrules]
+    (m/with-monad parser-m
+      (remember
+        (fn [state]
+          ((apply m/m-plus subrules) state)))))
+  (is (= ((alt (lit "hi") (lit "THEN"))
+          (mock-state ["THEN" "bye"]))
+         ["THEN" (mock-state (list "bye"))]))
+  (is (failure? ((alt (lit "hi") (lit "THEN"))
+                 (mock-state ["bye" "boom"])))))
+
 ; (defvar- number-rule (lit \0))
 ; (declare direct-left-recursive-rule lr-test-term lr-test-fact)
 ; 
