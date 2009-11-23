@@ -211,11 +211,11 @@
         (if (memory-contains? memory state)
           (let [found-result (get-in-memory memory state)]
             (println "Result found>" found-result)
-            (if (= ::LRNode (type found-result))
+            (if (isa? (type found-result) ::LRNode)
               (do
                 (assoc-in-memory memory state (LRNode true))
                 (println "LR found, return>" memory)
-                [::failure state])
+                (Failure nil))
               (do (println "Non-LR return>" found-result)
                 found-result)))
           (do
@@ -560,40 +560,41 @@
     unbound variables that are defined later."
     [& subrules]
     (m/with-monad parser-m
+      (remember
         (fn [state]
-          ((apply m/m-plus subrules) state))))
+          ((apply m/m-plus subrules) state)))))
   (is (= ((alt (lit "hi") (lit "THEN"))
           (mock-state ["THEN" "bye"]))
          ["THEN" (mock-state (list "bye"))]))
   (is (failure? ((alt (lit "hi") (lit "THEN"))
                  (mock-state ["bye" "boom"])))))
 
-; (defvar- number-rule (lit \0))
-; (declare direct-left-recursive-rule lr-test-term lr-test-fact)
-; 
-; (with-test
-;   (defvar- direct-left-recursive-rule
-;     (alt (conc #'direct-left-recursive-rule (lit \-) number-rule)
-;          number-rule))
-;   (is (= [[[\0 \- \0] \- \0] (make-state nil nil)]
-;          (direct-left-recursive-rule (make-state "0-0-0" nil)))))
-; 
-; (with-test
-;   (defvar- lr-test-term
-;     (alt (conc #'lr-test-term (lit \+) #'lr-test-fact)
-;          (conc #'lr-test-term (lit \-) #'lr-test-fact)
-;          #'lr-test-fact))
-;   (is (= [\0 (make-state nil nil)] (lr-test-term (make-state "0" nil))))
-;   (is (= [[\0 \* \0] (make-state nil nil)]
-;          (lr-test-term (make-state "0*0" nil)))))
-; ;   (is (= [[[\0 \+ \0] [[\
-; ;          (lr-test-term "0*0+0-0/0
-; 
-; (defvar- lr-test-fact
-;   (alt (conc #'lr-test-fact (lit \*) number-rule)
-;        (conc #'lr-test-fact (lit \/) number-rule)
-;        number-rule))
-; 
+(defvar- number-rule (lit \0))
+(declare direct-left-recursive-rule lr-test-term lr-test-fact)
+
+(with-test
+  (defvar- direct-left-recursive-rule
+    (alt (conc #'direct-left-recursive-rule (lit \-) number-rule)
+         number-rule))
+  (is (= [[[\0 \- \0] \- \0] (mock-state nil)]
+         (direct-left-recursive-rule (mock-state "0-0-0")))))
+
+(with-test
+  (defvar- lr-test-term
+    (alt (conc #'lr-test-term (lit \+) #'lr-test-fact)
+         (conc #'lr-test-term (lit \-) #'lr-test-fact)
+         #'lr-test-fact))
+  (is (= [\0 (mock-state nil)] (lr-test-term (mock-state "0"))))
+  (is (= [[\0 \* \0] (mock-state nil)]
+         (lr-test-term (mock-state "0*0")))))
+;   (is (= [[[\0 \+ \0] [[\
+;          (lr-test-term "0*0+0-0/0
+
+(defvar- lr-test-fact
+  (alt (conc #'lr-test-fact (lit \*) number-rule)
+       (conc #'lr-test-fact (lit \/) number-rule)
+       number-rule))
+
 (with-test
   (defn opt
     "Creates a rule that is the optional form
@@ -970,7 +971,7 @@
     `(fn [state#]
        [((fn [] ~@effect-body)) state#])))
  
-(deftest effects-test
+(set-test effects
   (let [rule
          (complex [subproduct (lit "A")
                    line-number (fetch-info :line)
@@ -983,69 +984,69 @@
                  "pre-effect rules succeed when their subrules are fulfilled"))
            "! A\nYES 3\n")
         "effect rule should call their effect and return the same state")))
+
+(with-test
+  (defn intercept
+    "This rule is intended for intercepting
+    and continuing exceptions and errors.
+    It creates a rule that calls the intercept
+    hook. The intercept hook is a function that
+    receives only one argument: a function to be
+    called with no arguments that calls the
+    subrule with the current state. If you don't
+    call this argument in the intercept hook, the
+    subrule will not be called at all. The result
+    of the whole rule will be directly what the
+    product of the intercept-hook is. Here's an
+    example of intended usage:
+      (intercept subrule-that-can-throw-an-exception
+        (fn [rule-call]
+          (try (rule-call)
+            (catch Exception e (throw another-exception)))))"
+    [subrule intercept-hook]
+    (fn [state] (intercept-hook (partial subrule state))))
+  (let [parse-error-rule
+          (semantics (lit \A) (fn [_] (throw (Exception.))))
+        intercept-rule
+          (intercept parse-error-rule
+            (fn [rule-call]
+              (try (rule-call)
+                (catch Exception e :error))))]
+    (is (= (intercept-rule (mock-state "ABC")) :error))))
  
-; ; (with-test
-; ;   (defn intercept
-; ;     "This rule is intended for intercepting
-; ;     and continuing exceptions and errors.
-; ;     It creates a rule that calls the intercept
-; ;     hook. The intercept hook is a function that
-; ;     receives only one argument: a function to be
-; ;     called with no arguments that calls the
-; ;     subrule with the current state. If you don't
-; ;     call this argument in the intercept hook, the
-; ;     subrule will not be called at all. The result
-; ;     of the whole rule will be directly what the
-; ;     product of the intercept-hook is. Here's an
-; ;     example of intended usage:
-; ;       (intercept subrule-that-can-throw-an-exception
-; ;         (fn [rule-call]
-; ;           (try (rule-call)
-; ;             (catch Exception e (throw another-exception)))))"
-; ;     [subrule intercept-hook]
-; ;     (fn [state] (intercept-hook (partial subrule state))))
-; ;   (let [parse-error-rule
-; ;           (semantics (lit \A) (fn [_] (throw (Exception.))))
-; ;         intercept-rule
-; ;           (intercept parse-error-rule
-; ;             (fn [rule-call]
-; ;               (try (rule-call)
-; ;                 (catch Exception e :error))))]
-; ;     (is (= (intercept-rule (mock-state "ABC")) :error))))
-; ;  
-; ; (defn validate-state
-; ;   "Creates a rule from attaching a
-; ;   state-validating function to the given
-; ;   subrule--that
-; ;   is, any products of the subrule must fulfill
-; ;   the validator function.
-; ;   (def a (validate-state b validator)) says
-; ;   that the rule a succeeds only when b succeeds
-; ;   and also when the evaluated value of
-; ;   (validator b-state) is true. The new rule's
-; ;   product would be b-product."
-; ;   [subrule validator]
-; ;   (complex [subproduct subrule
-; ;             substate get-state
-; ;             :when (validator substate)]
-; ;     subproduct))
-; ;  
-; ; (defn validate-remainder
-; ;   "Creates a rule from attaching a
-; ;   remainder-validating function to the given
-; ;   subrule--that is, any products of the subrule
-; ;   must fulfill the validator function.
-; ;   (def a (validate-remainder b validator)) says
-; ;   that the rule a succeeds only when b succeeds
-; ;   and also when the evaluated value of
-; ;   (validator b-remainder) is true. The new rule's
-; ;   product would be b-product."
-; ;   [subrule validator]
-; ;   (complex [subproduct subrule
-; ;             subremainder (fetch-remainder)
-; ;             :when (validator subremainder)]
-; ;     subproduct))
-; ; 
+(defn validate-state
+  "Creates a rule from attaching a
+  state-validating function to the given
+  subrule--that
+  is, any products of the subrule must fulfill
+  the validator function.
+  (def a (validate-state b validator)) says
+  that the rule a succeeds only when b succeeds
+  and also when the evaluated value of
+  (validator b-state) is true. The new rule's
+  product would be b-product."
+  [subrule validator]
+  (complex [subproduct subrule
+            substate get-state
+            :when (validator substate)]
+    subproduct))
+ 
+(defn validate-remainder
+  "Creates a rule from attaching a
+  remainder-validating function to the given
+  subrule--that is, any products of the subrule
+  must fulfill the validator function.
+  (def a (validate-remainder b validator)) says
+  that the rule a succeeds only when b succeeds
+  and also when the evaluated value of
+  (validator b-remainder) is true. The new rule's
+  product would be b-product."
+  [subrule validator]
+  (complex [subproduct subrule
+            subremainder (fetch-remainder)
+            :when (validator subremainder)]
+    subproduct))
+
 ; ; (defvar- constantly-nil
 ; ;   (constantly nil))
 ; ; 

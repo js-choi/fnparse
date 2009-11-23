@@ -5,7 +5,7 @@
   (:require name.choi.joshua.fnparse))
             ; name.choi.joshua.fnparse.json))
 
-(time (run-tests 'name.choi.joshua.fnparse))
+;(time (run-tests 'name.choi.joshua.fnparse))
 ;(time (test #'name.choi.joshua.fnparse/direct-left-recursive-rule))
-;(time (test #'name.choi.joshua.fnparse/lr-test-term))
+(time (test #'name.choi.joshua.fnparse/lr-test-term))
 ;(time (run-tests 'name.choi.joshua.fnparse.json))
