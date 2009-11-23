@@ -35,65 +35,50 @@
 
 (defprotocol ABankable
   (get-bank [o])
-  (vary-bank [o f & args]))
-
-(deftype StateMeta [bank index rule-stack] [IPersistentMap])
+  (vary-bank [o f args]))
 
 (with-test
-  (deftype State [remainder info] [IPersistentMap])
+  (deftype StateMeta [bank index rule-stack] [IPersistentMap])
   (let [bank {:a 3}
-        state (State nil nil (StateMeta bank nil nil) nil)]
-    (is (= (get-bank state) bank))
-    (is (= (get-bank (vary-bank state assoc :b 2))
+        state-meta (StateMeta bank nil nil)]
+    (is (= (get-bank state-meta) bank))
+    (is (= (get-bank (vary-bank state-meta identity nil)) bank))
+    (is (= (get-bank (vary-bank state-meta assoc [:b 2]))
            (assoc bank :b 2)))))
 
-(deftest bankable-vectors
-  (let [bank {:a 3}
-        state (State nil nil (StateMeta bank nil nil) nil)
-        result [nil state]]
-    (is (= (get-bank result) bank))
-    (is (= (get-bank (vary-bank result assoc :b 2))
-           (assoc bank :b 2)))))
-
-(deftype BasicState [remainder] [IPersistentMap])
-(deftype StdState [remainder line column warnings] [IPersistentMap])
-
-(deftype Failure [note] [IPersistentMap])
+(deftype State [remainder info] [IPersistentMap])
+(deftype Failure [message] [IPersistentMap])
 (deftype LRNode [detected?] [IPersistentMap])
-
 (deftype Bank [memory] [IPersistentMap])
 
-(defn get-product [result]
-  (get result 0))
+(defn get-state [success]
+  (get success 1))
 
-(defn get-state [result]
-  (get result 1))
-
-(defn assoc-state [result new-state]
-  (assoc result 1 new-state))
-
-(defn vary-state [result f & args]
-  (assoc-state result (apply f (get-state result) args)))
+(defn vary-state [success f & args]
+  (assoc success 1 (apply f (get-state success) args)))
 
 (extend ::StateMeta ABankable
   {:get-bank :bank
-   :vary-bank #(apply update-in %1 [:bank] %2 %&)})
+   :vary-bank (fn vary-state-meta-bank [this f args]
+                (apply update-in this [:bank] f args))})
 
 (extend ::State ABankable
   {:get-bank (comp :bank meta)
-   :vary-bank #(apply vary-meta %1 vary-bank %2 %&)})
+   :vary-bank (fn vary-state-bank [this f args]
+                (vary-meta this vary-bank f args))})
 
 (extend IPersistentVector ABankable
   {:get-bank (comp :bank meta get-state)
-   :vary-bank #(apply vary-state %1 vary-bank %2 %&)})
+   :vary-bank (fn vary-vector-bank [this f args]
+                (vary-state this vary-bank f args))})
 
 (extend ::Failure ABankable
   {:get-bank meta
-   :vary-bank vary-meta})
+   :vary-bank (partial apply vary-meta)})
 
 (extend ::LRNode ABankable
   {:get-bank meta
-   :vary-bank vary-meta})
+   :vary-bank (partial apply vary-meta)})
 
 (defn failure? [result]
   (-> result type (isa? ::Failure)))
@@ -200,37 +185,94 @@
           (assoc-in-memory memory state-0 cur-result)
           (println "Grow swap>" memory)
           (recur))))))
+;   [rule state-0 memory h]
+;   (println "Start grow>" state-0 memory)
+;   (loop []
+;     (println "Grow loop>" memory)
+;     (let [cur-result (rule state-0) ; Both depends on and changes memory
+;           cur-memory-val (get-in-memory memory state-0)]
+;       (println "Grow loop rule call>" cur-result memory)
+;       (println "AAAAA META>" (-> cur-result second meta))
+;       (if (or (failure? cur-result)
+;               (<= (get-index (second cur-result))
+;                   (get-index (second cur-memory-val))))
+;         (do (println "Grow end>" cur-memory-val) cur-memory-val)
+;         (do
+;           (assoc-in-memory memory state-0 cur-result)
+;           (println "Grow swap>" memory)
+;           (recur))))))
+
+(defvar- basic-failure (Failure nil))
+(defvar- lr-remember-failure (Failure "LR found."))
 
 (with-test
   (defn- remember
     [subrule]
     (println "REMEMBER>" subrule)
-    (let [memory (atom {})]
-      (fn [state]
-        (println "Remember call>" state memory)
-        (if (memory-contains? memory state)
-          (let [found-result (get-in-memory memory state)]
-            (println "Result found>" found-result)
-            (if (isa? (type found-result) ::LRNode)
-              (do
-                (assoc-in-memory memory state (LRNode true))
-                (println "LR found, return>" memory)
-                (Failure nil))
-              (do (println "Non-LR return>" found-result)
-                found-result)))
+    (fn remembering-rule [state]
+      (println "Remember call>" state (get-bank state))
+      (let [bank (get-bank state)
+            state-index (get-index state)
+            found-memory-val (get-in (get-bank state)
+                               [:memory subrule state-index])]
+        (if found-memory-val
           (do
-            (assoc-in-memory memory state (LRNode false))
-            (println "Possible LR swap>" memory)
-            (let [new-result (subrule state) ; Modifies memory
-                  new-memory (get-in-memory memory state)]
-              (println "Subrule has been called>" new-result new-memory)
-              (assoc-in-memory memory state new-result)
-              (println "Post-subrule swap>" memory)
-              (if (and (:detected? new-memory) new-result)
+            (println "Memory val found>" found-memory-val)
+            (if (isa? (type found-memory-val) ::LRNode)
+              (let [new-failure (with-meta basic-failure
+                                  (assoc-in bank [:memory subrule state-index]
+                                    (LRNode true)))]
+                (println "LR found, return>" new-failure (get-bank new-failure))
+                new-failure)
+              (do (println "Non-LR return>" found-memory-val)
+                found-memory-val)))
+          (do
+            (let [state-0b (vary-bank state assoc-in
+                             [[:memory subrule state-index]
+                              (LRNode false)])
+                  _ (println "Possible LR swap>" (get-bank state-0b))
+                  new-result (subrule state-0b)
+                  new-memory (get-in (get-bank new-result)
+                               [:memory subrule state-index])
+                  _ (println "Subrule has been called>" new-result new-memory)
+                  result-to-store (vary-bank state-0b (constantly nil) nil)
+                  _ (println "Result to store>" result-to-store)
+                  result-1b (vary-bank new-result assoc-in
+                              [[:memory subrule state-index]
+                               result-to-store])
+                  _ (println "Post-subrule swap>" (get-bank result-1b))]
+              (if (and (isa? (type new-memory) ::LRNode)
+                       (:detected? new-memory)
+                       new-result)
                 (do (println "A return grow")
-                  (grow-left-recursion subrule state memory nil))
-                (do (println "B return>" new-result)
-                  new-result))))))))
+                    nil)
+                (do (println "B return>" result-1b)
+                    result-1b))))))))
+;       (fn [state]
+;         (println "Remember call>" state memory)
+;         (if (memory-contains? memory state)
+;           (let [found-result (get-in-memory memory state)]
+;             (println "Result found>" found-result)
+;             (if (isa? (type found-result) ::LRNode)
+;               (do
+;                 (assoc-in-memory memory state (LRNode true))
+;                 (println "LR found, return>" memory)
+;                 (Failure nil))
+;               (do (println "Non-LR return>" found-result)
+;                 found-result)))
+;           (do
+;             (assoc-in-memory memory state (LRNode false))
+;             (println "Possible LR swap>" memory)
+;             (let [new-result (subrule state) ; Modifies memory
+;                   new-memory (get-in-memory memory state)]
+;               (println "Subrule has been called>" new-result new-memory)
+;               (assoc-in-memory memory state new-result)
+;               (println "Post-subrule swap>" memory)
+;               (if (and (:detected? new-memory) new-result)
+;                 (do (println "A return grow")
+;                   (grow-left-recursion subrule state memory nil))
+;                 (do (println "B return>" new-result)
+;                   new-result)))))))
   ; In the following forms, the suffix "-0"
   ; means "initial". The suffix "-1" means "final".
   ; The suffix "a" and "b" indicate first pass
@@ -248,24 +290,34 @@
     (is (= expected-result calc-results-a))
     (is (= expected-result calc-results-b))))
 
-(defvar- basic-failure (Failure nil))
-
 (m/defmonad parser-m
   "The monad that FnParse uses."
-  [m-zero (fn [state] basic-failure)
-   m-result (fn m-result-parser [product]
-              (fn [state] [product state]))
-   m-bind (fn m-bind-parser [rule product-fn]
-            (fn [state]
-              (let [result (rule state)]
-                (if (failure? result)
-                  result
-                  (let [[product new-state] result]
-                    ((product-fn product) new-state))))))
-   m-plus (fn m-plus-parser [& rules]
-            (fn [state]
-              (or (first (drop-while failure? (map #(% state) rules)))
-                  (m-zero state))))])
+  [m-zero
+     (fn [state] basic-failure)
+   m-result
+     (fn m-result-parser [product]
+       (fn [state] [product state]))
+   m-bind
+     (fn m-bind-parser [rule product-fn]
+       (fn [state]
+         (let [result (rule state)]
+           (if (failure? result)
+             result
+             (let [[product new-state] result]
+               ((product-fn product) new-state))))))
+   m-plus
+    (fn m-plus-parser [& rules]
+      (fn summed-rule [state]
+        (loop [remaining-rules rules, cur-state state]
+          (let [cur-rule (first remaining-rules)
+                cur-result (cur-rule cur-state)]
+            (if (failure? cur-result)
+              (if (empty? remaining-rules)
+                :failure
+                (recur (next remaining-rules)
+                       (vary-bank cur-state
+                         (constantly (get-bank cur-result)) nil)))
+              cur-result)))))])
 
 (m/with-monad parser-m
   (defvar nothing m-zero))
@@ -1027,7 +1079,7 @@
   product would be b-product."
   [subrule validator]
   (complex [subproduct subrule
-            substate get-state
+            substate fetch-state
             :when (validator substate)]
     subproduct))
  
