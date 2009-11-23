@@ -1,7 +1,7 @@
 (ns name.choi.joshua.fnparse
-  [:use clojure.contrib.monads clojure.contrib.except
-        clojure.contrib.error-kit clojure.contrib.def
+  [:use clojure.contrib.except clojure.contrib.error-kit clojure.contrib.def
         clojure.test]
+  [:require [clojure.contrib.monads :as m]]
   [:import [clojure.lang Sequential IPersistentMap IPersistentVector]])
 
 ; A RULE is a a function that:
@@ -37,28 +37,34 @@
   (get-bank [o])
   (vary-bank [o f & args]))
 
-(deftype StateMeta [bank index] [IPersistentMap])
+(deftype StateMeta [bank index rule-stack] [IPersistentMap])
 
 (with-test
   (deftype State [remainder info] [IPersistentMap])
   (let [bank {:a 3}
-        state (State nil nil (StateMeta bank nil) nil)]
+        state (State nil nil (StateMeta bank nil nil) nil)]
     (is (= (get-bank state) bank))
     (is (= (get-bank (vary-bank state assoc :b 2))
+           (assoc bank :b 2)))))
+
+(deftest bankable-vectors
+  (let [bank {:a 3}
+        state (State nil nil (StateMeta bank nil nil) nil)
+        result [nil state]]
+    (is (= (get-bank result) bank))
+    (is (= (get-bank (vary-bank result assoc :b 2))
            (assoc bank :b 2)))))
 
 (deftype BasicState [remainder] [IPersistentMap])
 (deftype StdState [remainder line column warnings] [IPersistentMap])
 
-(deftype Failure [message] [IPersistentMap])
+(deftype Failure [note] [IPersistentMap])
 (deftype LRNode [detected?] [IPersistentMap])
 
 (deftype Bank [memory] [IPersistentMap])
 
 (defn get-product [result]
   (get result 0))
-
-(deftype StateMeta [bank index] [IPersistentMap])
 
 (defn get-state [result]
   (get result 1))
@@ -71,269 +77,293 @@
 
 (extend ::StateMeta ABankable
   {:get-bank :bank
-   :vary-bank #(assoc %1 :bank (apply %2 (get-bank %1) %&))})
+   :vary-bank #(apply update-in %1 [:bank] %2 %&)})
 
 (extend ::State ABankable
   {:get-bank (comp :bank meta)
    :vary-bank #(apply vary-meta %1 vary-bank %2 %&)})
 
 (extend IPersistentVector ABankable
-  {:get-bank (comp get-bank get-state)
+  {:get-bank (comp :bank meta get-state)
    :vary-bank #(apply vary-state %1 vary-bank %2 %&)})
 
-; (defn failure? [result]
-;   (-> result type (isa? ::Failure)))
-; 
-; (defvar success? (complement failure?))
-; 
-; (defn make-state [remainder info]
-;   (State remainder info (StateMeta (Bank {}) 0) nil))
-; 
-; (defn- mock-state [remainder]
-;   (make-state remainder nil))
-; 
-; (defvar get-remainder :remainder)
-; 
-; (defn assoc-remainder [state new-remainder]
-;   (assoc state :remainder new-remainder))
-; 
-; (deferror fnparse-error [] [message-template & template-args]
-;   {:msg (str "FnParse error: " (apply format message-template template-args))
-;    :unhandled (throw-msg Exception)})
-; 
-; (defn- inc-index [state]
-;   (vary-meta state assoc :index (inc (:index ^state))))
-; 
-; (defn get-string-key [state]
-;   (:string-key ^state))
-; 
-; (defn- get-index [state]
-;   (:index ^state))
-; 
-; (defn- anything* [state]
-;   (if-let [tokens (get-remainder state)]
-;     [(first tokens)
-;      (-> state
-;        (assoc-remainder (next tokens))
-;        inc-index)]
-;     [::failure state]))
-; 
-; (with-test
-;   (defn anything
-;     "A rule that matches anything--that is, it matches
-;     the first token of the tokens it is given.
-;     This rule's product is the first token it receives.
-;     It fails if there are no tokens left."
-;     [state]
-;     (anything* state))
-;   (is (= (anything (mock-state '(A B C)))
-;          ['A (mock-state '(B C))])
-;     "anything rule matches first token")
-;   (is (= (:index (meta (second (anything (mock-state '(A B C))))))
-;          1))
-;   (is (failure? (anything (mock-state nil)))
-;     "anything rule fails with no tokens left"))
-; 
-; (defn- get-in-memory
-;   [memory state]
-;   (let [state-meta ^state]
-;     (get-in @memory [(:string-key state-meta) (:index state-meta)])))
-; 
-; (defn- assoc-in-memory
-;   [memory state result]
-;   (let [state-meta ^state]
-;     (swap! memory assoc-in [(:string-key state-meta) (:index state-meta)]
-;       result)))
-; 
-; (defn- memory-contains?
-;   [memory state]
-;   (let [state-meta ^state]
-;     (contains? (@memory (:string-key state-meta)) (:index state-meta))))
-; 
-; (defn- grow-left-recursion
-;   "Tries to grow the parsing of the
-;   given rule given the seed parse in the
-;   given result."
-;   [rule state-0 memory h]
-;   (println "Start grow>" state-0 memory)
-;   (loop []
-;     (println "Grow loop>" memory)
-;     (let [cur-result (rule state-0) ; Both depends on and changes memory
-;           cur-memory-val (get-in-memory memory state-0)]
-;       (println "Grow loop rule call>" cur-result memory)
-;       (println "AAAAA META>" (-> cur-result second meta))
-;       (if (or (failure? cur-result)
-;               (<= (get-index (second cur-result))
-;                   (get-index (second cur-memory-val))))
-;         (do (println "Grow end>" cur-memory-val) cur-memory-val)
-;         (do
-;           (assoc-in-memory memory state-0 cur-result)
-;           (println "Grow swap>" memory)
-;           (recur))))))
-; 
-; (with-test
-;   (defn- remember
-;     [subrule]
-;     (println "REMEMBER>" subrule)
-;     (let [memory (atom {})]
-;       (fn [state]
-;         (println "Remember call>" state memory)
-;         (if (memory-contains? memory state)
-;           (let [found-result (get-in-memory memory state)]
-;             (println "Result found>" found-result)
-;             (if (= ::LRNode (type found-result))
-;               (do
-;                 (assoc-in-memory memory state (LRNode true))
-;                 (println "LR found, return>" memory)
-;                 [::failure state])
-;               (do (println "Non-LR return>" found-result)
-;                 found-result)))
-;           (do
-;             (assoc-in-memory memory state (LRNode false))
-;             (println "Possible LR swap>" memory)
-;             (let [new-result (subrule state) ; Modifies memory
-;                   new-memory (get-in-memory memory state)]
-;               (println "Subrule has been called>" new-result new-memory)
-;               (assoc-in-memory memory state new-result)
-;               (println "Post-subrule swap>" memory)
-;               (if (and (:detected? new-memory) new-result)
-;                 (do (println "A return grow")
-;                   (grow-left-recursion subrule state memory nil))
-;                 (do (println "B return>" new-result)
-;                   new-result))))))))
-;   ; In the following forms, the suffix "-0"
-;   ; means "initial". The suffix "-1" means "final".
-;   ; The suffix "a" and "b" indicate first pass
-;   ; and second pass respectively.
-;   (let [rule (remember anything*)
-;         remainder-0 '(a b c)
-;         remainder-1 (next remainder-0)
-;         expected-state-1 (make-state remainder-1 nil)
-;         expected-result ['a expected-state-1]
-;         state-0 (make-state remainder-0 nil)
-;         ; First pass
-;         [_ calc-state-1a :as calc-results-a] (rule state-0)
-;         ; Second pass
-;         [_ calc-state-1b :as calc-results-b] (rule state-0)]
-;     (is (= expected-result calc-results-a))
-;     (is (= expected-result calc-results-b))))
-; 
-; (defmonad parser-m
-;   "The monad that FnParse uses."
-;   [m-zero (fn [state] [::failure state])
-;    m-result (fn m-result-parser [product]
-;               (fn [state] [product state]))
-;    m-bind (fn m-bind-parser [rule product-fn]
-;             (fn [state]
-;               (let [result (rule state)]
-;                 (if (failure? result)
-;                   result
-;                   (let [[product new-state] result]
-;                     ((product-fn product) new-state))))))
-;    m-plus (fn m-plus-parser [& rules]
-;             (fn [state]
-;               (or (first (drop-while failure? (map #(% state) rules)))
-;                   (m-zero state))))])
-; 
-; (with-test
-;   (defmacro complex
-;     "Creates a complex rule in monadic
-;     form. It's a lot easier than it sounds.
-;     It's like a very useful combination of
-;     conc and semantics.
-;     The first argument is a vector
-;     containing binding forms à la the let and for
-;     forms. The keys are new, lexically scoped
-;     variables. Their corresponding vals
-;     are subrules. Each of these subrules are
-;     sequentially called as if they were
-;     concatinated together with conc. If any of
-;     them fails, the whole rule immediately fails.
-;     Meanwhile, each sequential subrule's product
-;     is bound to its corresponding variable.
-;     After all subrules match, all of the
-;     variables can be used in the body.
-;     The second argument of complex is a body
-;     that calculates the whole new rule's
-;     product, with access to any of the variables
-;     defined in the binding vector.
-;     It's basically like let, for, or any other
-;     monad. Very useful!"
-;     [steps & product-expr]
-;     `(domonad parser-m ~steps ~@product-expr)))
-;  
-; (defvar- get-state
-;   (fetch-state)
-;   "A rule that consumes no tokens. Its product
-;   is the entire current state.
-;   [Equivalent to the result of fetch-state
-;   from clojure.contrib.monads.]")
-;  
-; (defn get-info
-;   "Creates a rule that consumes no tokens.
-;   The new rule's product is the value
-;   of the given key in the current state.
-;   [Equivalent to fetch-val from clojure.contrib.monads.]"
-;   [key]
-;   (fetch-val key))
-;  
-; (with-test
-;   (defn fetch-remainder
-;     "Generates a rule whose product is the
-;     sequence of the remaining tokens of any states
-;     that it is given. It consumes no tokens.
-;     [(fetch-remainder) is equivalent to
-;     (fetch-val get-remainder) from
-;     clojure.contrib.monads.]"
-;     []
-;     (fetch-val get-remainder))
-;   (is (= ((complex [remainder (fetch-remainder)] remainder)
-;           (mock-state ["hi" "THEN"]))
-;          [["hi" "THEN"] (mock-state ["hi" "THEN"])])))
-;  
-; (defn set-info
-;   "Creates a rule that consumes no tokens.
-;   The new rule directly changes the
-;   current state by associating the given
-;   key with the given value. The product
-;   is the old value of the changed key.
-;   [Equivalent to set-val from
-;   clojure.contrib.monads.]"
-;   [key value]
-;   (set-val key value))
-;  
-; (with-test
-;   (defn update-info
-;     "Creates a rule that consumes no tokens.
-;     The new rule changes the current state
-;     by associating the given key with the
-;     evaluated result of applying the given
-;     updating function to the key's current
-;     value. The product is the old value of
-;     the changed key.
-;     [Equivalent to update-val from clojure.contrib.monads.]"
-;     [key val-update-fn & args]
-;     (update-val key #(apply val-update-fn % args)))
-;   (is (= (-> [\a] mock-state (assoc :column 3)
-;            ((update-info :column inc)))
-;          [3 (-> [\a] mock-state (assoc :column 4))])))
-;  
-; (with-test
-;   (with-monad parser-m
-;     (defvar emptiness
-;       (m-result nil)
-;       "A rule that matches emptiness--that
-;       is, it always matches with every given
-;       token sequence, and it always returns
-;       [nil given-state].
-;       (def a emptiness) would be equivalent
-;       to the EBNF a = ; This rule's product
-;       is always nil, and it therefore always
-;       returns [nil given-state]."))
-;   (is (= (emptiness (mock-state '(A B C)))
-;          [nil (mock-state '(A B C))])
-;       "emptiness rule matches emptiness"))
-; 
+(extend ::Failure ABankable
+  {:get-bank meta
+   :vary-bank vary-meta})
+
+(extend ::LRNode ABankable
+  {:get-bank meta
+   :vary-bank vary-meta})
+
+(defn failure? [result]
+  (-> result type (isa? ::Failure)))
+
+(defvar success? (complement failure?))
+
+(defn make-state [remainder info]
+  (State remainder info (StateMeta (Bank {}) 0 []) nil))
+
+(defn- mock-state [remainder]
+  (make-state remainder nil))
+
+(defvar get-remainder :remainder)
+
+(defn assoc-remainder [state new-remainder]
+  (assoc state :remainder new-remainder))
+
+(deferror fnparse-error [] [message-template & template-args]
+  {:msg (str "FnParse error: " (apply format message-template template-args))
+   :unhandled (throw-msg Exception)})
+
+(defn- inc-index [state]
+  (vary-meta state update-in [:index] inc))
+
+(defn- get-index [state]
+  (:index ^state))
+
+(defn- conj-to-rule-stack [state rule]
+  (vary-meta state update-in [:rule-stack] conj rule))
+
+(defn- name-rule
+  [rule var-name]
+  (fn [state]
+    (-> state (conj-to-rule-stack var-name) rule)))
+
+(defn- var-name [variable]
+  (symbol (str (.ns variable)) (name (.sym variable))))
+
+(defmacro defrule
+  ([var-name rule]
+   (defrule var-name nil rule))
+  ([var-name doc-string rule]
+   `(let [var# (def ~var-name ~rule)]
+      (alter-var-root var# name-rule (var-name var#))
+      var#)))
+
+(defn- anything* [state]
+  (if-let [tokens (get-remainder state)]
+    [(first tokens)
+     (-> state
+       (assoc-remainder (next tokens))
+       inc-index)]
+    (Failure nil)))
+
+(with-test
+  (defrule anything
+    "A rule that matches anything--that is, it matches
+    the first token of the tokens it is given.
+    This rule's product is the first token it receives.
+    It fails if there are no tokens left."
+    anything*)
+  (let [result (anything (mock-state '(A B C)))
+        new-state (second result)]
+    (is (= result ['A (mock-state '(B C))])
+      "anything rule matches first token")
+    (is (= (:index ^new-state) 1))
+    (is (= (:rule-stack ^new-state) [`anything])))
+  (is (failure? (anything (mock-state nil)))
+    "anything rule fails with no tokens left"))
+
+(defn- get-in-memory
+  [memory state]
+  (let [state-meta ^state]
+    (get-in @memory [(:string-key state-meta) (:index state-meta)])))
+
+(defn- assoc-in-memory
+  [memory state result]
+  (let [state-meta ^state]
+    (swap! memory assoc-in [(:string-key state-meta) (:index state-meta)]
+      result)))
+
+(defn- memory-contains?
+  [memory state]
+  (let [state-meta ^state]
+    (contains? (@memory (:string-key state-meta)) (:index state-meta))))
+
+(defn- grow-left-recursion
+  "Tries to grow the parsing of the
+  given rule given the seed parse in the
+  given result."
+  [rule state-0 memory h]
+  (println "Start grow>" state-0 memory)
+  (loop []
+    (println "Grow loop>" memory)
+    (let [cur-result (rule state-0) ; Both depends on and changes memory
+          cur-memory-val (get-in-memory memory state-0)]
+      (println "Grow loop rule call>" cur-result memory)
+      (println "AAAAA META>" (-> cur-result second meta))
+      (if (or (failure? cur-result)
+              (<= (get-index (second cur-result))
+                  (get-index (second cur-memory-val))))
+        (do (println "Grow end>" cur-memory-val) cur-memory-val)
+        (do
+          (assoc-in-memory memory state-0 cur-result)
+          (println "Grow swap>" memory)
+          (recur))))))
+
+(with-test
+  (defn- remember
+    [subrule]
+    (println "REMEMBER>" subrule)
+    (let [memory (atom {})]
+      (fn [state]
+        (println "Remember call>" state memory)
+        (if (memory-contains? memory state)
+          (let [found-result (get-in-memory memory state)]
+            (println "Result found>" found-result)
+            (if (= ::LRNode (type found-result))
+              (do
+                (assoc-in-memory memory state (LRNode true))
+                (println "LR found, return>" memory)
+                [::failure state])
+              (do (println "Non-LR return>" found-result)
+                found-result)))
+          (do
+            (assoc-in-memory memory state (LRNode false))
+            (println "Possible LR swap>" memory)
+            (let [new-result (subrule state) ; Modifies memory
+                  new-memory (get-in-memory memory state)]
+              (println "Subrule has been called>" new-result new-memory)
+              (assoc-in-memory memory state new-result)
+              (println "Post-subrule swap>" memory)
+              (if (and (:detected? new-memory) new-result)
+                (do (println "A return grow")
+                  (grow-left-recursion subrule state memory nil))
+                (do (println "B return>" new-result)
+                  new-result))))))))
+  ; In the following forms, the suffix "-0"
+  ; means "initial". The suffix "-1" means "final".
+  ; The suffix "a" and "b" indicate first pass
+  ; and second pass respectively.
+  (let [rule (remember anything*)
+        remainder-0 '(a b c)
+        remainder-1 (next remainder-0)
+        expected-state-1 (make-state remainder-1 nil)
+        expected-result ['a expected-state-1]
+        state-0 (make-state remainder-0 nil)
+        ; First pass
+        [_ calc-state-1a :as calc-results-a] (rule state-0)
+        ; Second pass
+        [_ calc-state-1b :as calc-results-b] (rule state-0)]
+    (is (= expected-result calc-results-a))
+    (is (= expected-result calc-results-b))))
+
+(m/defmonad parser-m
+  "The monad that FnParse uses."
+  [m-zero (fn [state] (Failure))
+   m-result (fn m-result-parser [product]
+              (fn [state] [product state]))
+   m-bind (fn m-bind-parser [rule product-fn]
+            (fn [state]
+              (let [result (rule state)]
+                (if (failure? result)
+                  result
+                  (let [[product new-state] result]
+                    ((product-fn product) new-state))))))
+   m-plus (fn m-plus-parser [& rules]
+            (fn [state]
+              (or (first (drop-while failure? (map #(% state) rules)))
+                  m-zero)))])
+
+(with-test
+  (defmacro complex
+    "Creates a complex rule in monadic
+    form. It's a lot easier than it sounds.
+    It's like a very useful combination of
+    conc and semantics.
+    The first argument is a vector
+    containing binding forms à la the let and for
+    forms. The keys are new, lexically scoped
+    variables. Their corresponding vals
+    are subrules. Each of these subrules are
+    sequentially called as if they were
+    concatinated together with conc. If any of
+    them fails, the whole rule immediately fails.
+    Meanwhile, each sequential subrule's product
+    is bound to its corresponding variable.
+    After all subrules match, all of the
+    variables can be used in the body.
+    The second argument of complex is a body
+    that calculates the whole new rule's
+    product, with access to any of the variables
+    defined in the binding vector.
+    It's basically like let, for, or any other
+    monad. Very useful!"
+    [steps & product-expr]
+    `(m/domonad parser-m ~steps ~@product-expr)))
+
+(defvar- fetch-state
+  (m/fetch-state)
+  "A rule that consumes no tokens. Its product
+  is the entire current state.
+  [Equivalent to the result of fetch-state
+  from clojure.contrib.monads.]")
+
+(defn fetch-info
+  "Creates a rule that consumes no tokens.
+  The new rule's product is the value
+  of the given key in the current state.
+  [Equivalent to fetch-val from clojure.contrib.monads.]"
+  [key]
+  (m/fetch-val key))
+
+(with-test
+  (defn fetch-remainder
+    "Generates a rule whose product is the
+    sequence of the remaining tokens of any states
+    that it is given. It consumes no tokens.
+    [(fetch-remainder) is equivalent to
+    (fetch-val get-remainder) from
+    clojure.contrib.monads.]"
+    []
+    (m/fetch-val get-remainder))
+  (is (= ((complex [remainder (fetch-remainder)] remainder)
+          (mock-state ["hi" "THEN"]))
+         [["hi" "THEN"] (mock-state ["hi" "THEN"])])))
+ 
+(defn set-info
+  "Creates a rule that consumes no tokens.
+  The new rule directly changes the
+  current state by associating the given
+  key with the given value. The product
+  is the old value of the changed key.
+  [Equivalent to set-val from
+  clojure.contrib.monads.]"
+  [key value]
+  (m/set-val key value))
+ 
+(with-test
+  (defn update-info
+    "Creates a rule that consumes no tokens.
+    The new rule changes the current state
+    by associating the given key with the
+    evaluated result of applying the given
+    updating function to the key's current
+    value. The product is the old value of
+    the changed key.
+    [Equivalent to update-val from clojure.contrib.monads.]"
+    [key val-update-fn & args]
+    (m/update-val key #(apply val-update-fn % args)))
+  (is (= (-> [\a] mock-state (assoc :column 3)
+           ((update-info :column inc)))
+         [3 (-> [\a] mock-state (assoc :column 4))])))
+ 
+(with-test
+  (m/with-monad parser-m
+    (defvar emptiness
+      (m-result nil)
+      "A rule that matches emptiness--that
+      is, it always matches with every given
+      token sequence, and it always returns
+      [nil given-state].
+      (def a emptiness) would be equivalent
+      to the EBNF a = ; This rule's product
+      is always nil, and it therefore always
+      returns [nil given-state]."))
+  (is (= (emptiness (mock-state '(A B C)))
+         [nil (mock-state '(A B C))])
+      "emptiness rule matches emptiness"))
+
 ; (with-test
 ;   (defn validate
 ;     "Creates a rule from attaching a product-validating function to the given
@@ -494,7 +524,7 @@
 ;     it receives, so that it accepts expressions
 ;     containing unbound variables that are defined later."
 ;     [& subrules]
-;     (with-monad parser-m
+;     (m/with-monad parser-m
 ;       (fn [state]
 ;         ((m-seq subrules) state))))
 ;   (is (= ((conc (lit "hi") (lit "THEN"))
@@ -521,7 +551,7 @@
 ;     receives, so that it accepts expressions containing
 ;     unbound variables that are defined later."
 ;     [& subrules]
-;     (with-monad parser-m
+;     (m/with-monad parser-m
 ;       (remember
 ;         (fn [state]
 ;           ((apply m-plus subrules) state)))))
@@ -567,7 +597,7 @@
 ;     (def a (opt b)) would be equivalent to the EBNF:
 ;       a = b?;"
 ;     [subrule]
-;     (with-monad parser-m
+;     (m/with-monad parser-m
 ;       (m-plus subrule emptiness)))
 ;   (let [opt-true (opt (lit "true"))]
 ;     (is (= (opt-true (mock-state ["true" "THEN"]))
@@ -612,7 +642,7 @@
 ;     ([token-seq]
 ;      (lit-conc-seq token-seq lit))
 ;     ([token-seq rule-maker]
-;      (with-monad parser-m
+;      (m/with-monad parser-m
 ;        (m-seq (map rule-maker token-seq)))))
 ;   (is (= ((lit-conc-seq "THEN") (mock-state "THEN print 42;"))
 ;          [(vec "THEN") (mock-state (seq " print 42;"))])
@@ -636,7 +666,7 @@
 ;     ([token-seq]
 ;      (lit-alt-seq token-seq lit))
 ;     ([token-seq rule-maker]
-;      (with-monad parser-m
+;      (m/with-monad parser-m
 ;        (apply m-plus (map rule-maker token-seq)))))
 ;   (is (= ((lit-alt-seq "ABCD") (mock-state (seq "B 2")))
 ;          [\B (mock-state (seq " 2"))])
@@ -840,7 +870,7 @@
 ; ;     (factor= 3 :a) would eat the first three
 ; ;     tokens [:a :a :b] and fail."
 ; ;     [factor subrule]
-; ;     (with-monad parser-m
+; ;     (m/with-monad parser-m
 ; ;       (m-seq (replicate factor subrule))))
 ; ;   (let [tested-rule-3 (factor= 3 (lit "A"))
 ; ;         tested-rule-0 (factor= 0 (lit "A"))]
