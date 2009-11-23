@@ -471,78 +471,78 @@
          ['A (mock-state '[A B C])]))
   (is (failure? ((followed-by (lit 'A)) (mock-state '[B C])))))
  
-; (with-test
-;   (defn not-followed-by
-;     "Creates a rule that does not consume any tokens, but fails when the given
-;     subrule succeeds. On success, the new rule's product is always true."
-;     [subrule]
-;     (fn [state]
-;       (if (failure? (subrule state))
-;         [true state]
-;         [::failure state])))
-;   (is (= ((not-followed-by (lit 'A)) (mock-state '[B C]))
-;          [true (mock-state '[B C])]))
-;   (is (failure? ((not-followed-by (lit 'A)) (mock-state '[A B C])))))
-;  
-; (with-test
-;   (defn semantics
-;     "Creates a rule with a semantic hook,
-;     basically a simple version of a complex
-;     rule. The semantic hook is a function
-;     that takes one argument: the product of
-;     the subrule."
-;     [subrule semantic-hook]
-;     (complex [subproduct subrule]
-;       (semantic-hook subproduct)))
-;   (is (= ((semantics (lit "hi") #(str % "!")) (mock-state ["hi" "THEN"]))
-;          ["hi!" (mock-state (list "THEN"))])
-;       "created simple semantic rule applies semantic hook to valid result of given rule"))
-;  
-; (defn constant-semantics
-;   "Creates a rule with a constant semantic
-;   hook. Its product is always the given
-;   constant."
-;   [subrule semantic-value]
-;   (complex [subproduct subrule]
-;     semantic-value))
-;  
-; (with-test
-;   (defn remainder-peek
-;     "Generates a rule whose product is the very next
-;     token in the remainder of any given state.
-;     The new rule does not consume any tokens."
-;     []
-;     (complex [remainder (fetch-remainder)]
-;       (first remainder)))
-;   (is (= ((remainder-peek) (mock-state (seq "ABC")))
-;          [\A (mock-state (seq "ABC"))])))
-;  
-; (with-test
-;   (defn conc
-;     "Creates a rule that is the concatenation
-;     of the given subrules. Basically a simple
-;     version of complex, each subrule consumes
-;     tokens in order, and if any fail, the entire
-;     rule fails.
-;     (def a (conc b c d)) would be equivalent to the EBNF:
-;       a = b, c, d;
-;     This macro is almost equivalent to m-seq for
-;     the parser-m monad. The difference is that
-;     it defers evaluation of whatever variables
-;     it receives, so that it accepts expressions
-;     containing unbound variables that are defined later."
-;     [& subrules]
-;     (m/with-monad parser-m
-;       (fn [state]
-;         ((m-seq subrules) state))))
-;   (is (= ((conc (lit "hi") (lit "THEN"))
-;           (mock-state ["hi" "THEN" "bye"]))
-;          [["hi" "THEN"] (mock-state (list "bye"))])
-;       "created concatenated rule succeeds when all subrules fulfilled in order")
-;   (is (failure? ((conc (lit "hi") (lit "THEN"))
-;              (mock-state ["hi" "bye" "boom"])))
-;       "created concatenated rule fails when one subrule fails"))
-; 
+(with-test
+  (defn not-followed-by
+    "Creates a rule that does not consume any tokens, but fails when the given
+    subrule succeeds. On success, the new rule's product is always true."
+    [subrule]
+    (fn [state]
+      (if (failure? (subrule state))
+        [true state]
+        basic-failure)))
+  (is (= ((not-followed-by (lit 'A)) (mock-state '[B C]))
+         [true (mock-state '[B C])]))
+  (is (failure? ((not-followed-by (lit 'A)) (mock-state '[A B C])))))
+ 
+(with-test
+  (defn semantics
+    "Creates a rule with a semantic hook,
+    basically a simple version of a complex
+    rule. The semantic hook is a function
+    that takes one argument: the product of
+    the subrule."
+    [subrule semantic-hook]
+    (complex [subproduct subrule]
+      (semantic-hook subproduct)))
+  (is (= ((semantics (lit "hi") #(str % "!")) (mock-state ["hi" "THEN"]))
+         ["hi!" (mock-state (list "THEN"))])
+      "created simple semantic rule applies semantic hook to valid result of given rule"))
+ 
+(defn constant-semantics
+  "Creates a rule with a constant semantic
+  hook. Its product is always the given
+  constant."
+  [subrule semantic-value]
+  (complex [subproduct subrule]
+    semantic-value))
+ 
+(with-test
+  (defn remainder-peek
+    "Generates a rule whose product is the very next
+    token in the remainder of any given state.
+    The new rule does not consume any tokens."
+    []
+    (complex [remainder (fetch-remainder)]
+      (first remainder)))
+  (is (= ((remainder-peek) (mock-state (seq "ABC")))
+         [\A (mock-state (seq "ABC"))])))
+ 
+(with-test
+  (defn conc
+    "Creates a rule that is the concatenation
+    of the given subrules. Basically a simple
+    version of complex, each subrule consumes
+    tokens in order, and if any fail, the entire
+    rule fails.
+    (def a (conc b c d)) would be equivalent to the EBNF:
+      a = b, c, d;
+    This macro is almost equivalent to m-seq for
+    the parser-m monad. The difference is that
+    it defers evaluation of whatever variables
+    it receives, so that it accepts expressions
+    containing unbound variables that are defined later."
+    [& subrules]
+    (m/with-monad parser-m
+      (fn [state]
+        ((m/m-seq subrules) state))))
+  (is (= ((conc (lit "hi") (lit "THEN"))
+          (mock-state ["hi" "THEN" "bye"]))
+         [["hi" "THEN"] (mock-state (list "bye"))])
+      "created concatenated rule succeeds when all subrules fulfilled in order")
+  (is (failure? ((conc (lit "hi") (lit "THEN"))
+             (mock-state ["hi" "bye" "boom"])))
+      "created concatenated rule fails when one subrule fails"))
+
 ; (with-test
 ;   (defn alt
 ;     "Creates a rule that is the alternation
