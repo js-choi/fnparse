@@ -472,14 +472,15 @@
   (is (failure? ((followed-by (lit 'A)) (mock-state '[B C])))))
  
 (with-test
-  (defn not-followed-by
-    "Creates a rule that does not consume any tokens, but fails when the given
-    subrule succeeds. On success, the new rule's product is always true."
-    [subrule]
-    (fn [state]
-      (if (failure? (subrule state))
-        [true state]
-        basic-failure)))
+  (m/with-monad parser-m
+    (defn not-followed-by
+      "Creates a rule that does not consume any tokens, but fails when the given
+      subrule succeeds. On success, the new rule's product is always true."
+      [subrule]
+      (fn [state]
+        (if (failure? (subrule state))
+          [true state]
+          (m/m-zero state)))))
   (is (= ((not-followed-by (lit 'A)) (mock-state '[B C]))
          [true (mock-state '[B C])]))
   (is (failure? ((not-followed-by (lit 'A)) (mock-state '[A B C])))))
