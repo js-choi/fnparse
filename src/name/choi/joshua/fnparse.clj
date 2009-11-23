@@ -559,10 +559,11 @@
     receives, so that it accepts expressions containing
     unbound variables that are defined later."
     [& subrules]
-    (m/with-monad parser-m
-      (remember
-        (fn [state]
-          ((apply m/m-plus subrules) state)))))
+    (remember
+      (m/with-monad parser-m
+        (remember
+          (fn [state]
+            ((apply m/m-plus subrules) state))))))
   (is (= ((alt (lit "hi") (lit "THEN"))
           (mock-state ["THEN" "bye"]))
          ["THEN" (mock-state (list "bye"))]))
