@@ -48,7 +48,7 @@
            (assoc bank :b 2)))))
 
 (deftype State [remainder info] [IPersistentMap])
-(deftype Failure [message] [IPersistentMap])
+(deftype Failure [] [IPersistentMap])
 (deftype LRNode [detected?] [IPersistentMap])
 (deftype Bank [memory] [IPersistentMap])
 
@@ -113,9 +113,9 @@
   (vary-meta state update-in [:rule-stack] conj rule))
 
 (defn- name-rule
-  [rule var-name]
+  [rule rule-rep]
   (fn [state]
-    (-> state (conj-to-rule-stack var-name) rule)))
+    (-> state (conj-to-rule-stack rule-rep) rule)))
 
 (defn- var-name [variable]
   (symbol (str (.ns variable)) (name (.sym variable))))
@@ -124,11 +124,18 @@
   ([var-name rule]
    (defrule var-name nil rule))
   ([var-name doc-string rule]
-   `(let [var# (def ~var-name ~rule)]
+   `(let [var# (defvar ~var-name ~rule ~doc-string)]
       (alter-var-root var# name-rule (var-name var#))
       var#)))
 
-(defvar- basic-failure (Failure nil))
+; (defmacro defrulemaker
+;   ([var-name args & body]
+;    (defrule var-name nil body))
+;   ([var-name doc-string args & body]
+;    `(defn ~var-name ~doc-string ~args
+;       (name-rule (do ~@body) (list ~var-name ~@args)))))
+          
+(defvar- basic-failure (Failure))
 
 (m/defmonad parser-m
   "The monad that FnParse uses."
@@ -339,7 +346,7 @@
     (is (= expected-result calc-results-b))))
 
 (m/with-monad parser-m
-  (defvar nothing m-zero))
+  (defvar nothing m/m-zero))
 
 (with-test
   (defmacro complex
