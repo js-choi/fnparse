@@ -6,6 +6,7 @@
             ; name.choi.joshua.fnparse.json))
 
 ;(time (run-tests 'name.choi.joshua.fnparse))
+;(time (test #'name.choi.joshua.fnparse/alt))
 (time (test #'name.choi.joshua.fnparse/direct-left-recursive-rule))
 ;(time (test #'name.choi.joshua.fnparse/lr-test-term))
 ;(time (run-tests 'name.choi.joshua.fnparse.json))
