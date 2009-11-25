@@ -210,6 +210,10 @@
   (let [state-meta ^state]
     (contains? (@memory (:string-key state-meta)) (:index state-meta))))
 
+(defn- store-memory [bank rule state-index result]
+  (assoc-in bank [:memory rule state-index]
+    (set-bank result nil)))
+
 (defn- grow-left-recursion
   "Tries to grow the parsing of the
   given rule given the seed parse in the
@@ -236,8 +240,8 @@
                 (<= cur-result-state-index cur-memory-val-state-index))
           (do (println "Grow end>" cur-memory-val) cur-memory-val)
           (do
-            (let [new-bank (assoc-in cur-result-bank
-                             [:memory rule state-0-index] cur-result)]
+            (let [new-bank (store-memory cur-result-bank
+                             rule state-0-index cur-result)]
               (println "Grow swap>" new-bank)
               (recur new-bank))))))))
 ;   [rule state-0 memory h]
@@ -287,10 +291,7 @@
                   subbank (get-bank subresult)
                   submemory (get-in subbank [:memory subrule state-index])
                   _ (println "---\nSubrule has been called>" subresult submemory subbank)
-                  result-to-store (set-bank subresult nil)
-                  _ (println "Result to store>" result-to-store (get-bank result-to-store))
-                  new-bank (assoc-in subbank [:memory subrule state-index]
-                             result-to-store)
+                  new-bank (store-memory subbank subrule state-index subresult)
                   new-state (set-bank state new-bank)
                   _ (println "Post-subrule swap>" new-state (get-bank new-state))]
               (if (and (isa? (type submemory) ::LRNode)
