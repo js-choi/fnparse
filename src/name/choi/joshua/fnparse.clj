@@ -35,16 +35,18 @@
 
 (defprotocol ABankable
   (get-bank [o])
-  (vary-bank [o f args])
   (set-bank [o new-bank]))
+
+(defn- vary-bank [bankable f & args]
+  (set-bank bankable (apply f (get-bank bankable) args)))
 
 (with-test
   (deftype StateMeta [bank index rule-stack] [IPersistentMap])
   (let [bank {:a 3}
         state-meta (StateMeta bank nil nil)]
     (is (= (get-bank state-meta) bank))
-    (is (= (get-bank (vary-bank state-meta identity nil)) bank))
-    (is (= (get-bank (vary-bank state-meta assoc [:b 2]))
+    (is (= (get-bank (vary-bank state-meta identity)) bank))
+    (is (= (get-bank (vary-bank state-meta assoc :b 2))
            (assoc bank :b 2)))))
 
 (deftype State [remainder info] [IPersistentMap])
@@ -60,27 +62,22 @@
 
 (extend ::StateMeta ABankable
   {:get-bank :bank
-   :vary-bank (fn [this f args] (apply update-in this [:bank] f args))
    :set-bank (fn [this new-bank] (assoc this :bank new-bank))})
 
 (extend ::State ABankable
   {:get-bank (comp :bank meta)
-   :vary-bank (fn [this f args] (vary-meta this vary-bank f args))
    :set-bank (fn [this new-bank] (vary-meta this set-bank new-bank))})
 
 (extend IPersistentVector ABankable
   {:get-bank (comp :bank meta get-state)
-   :vary-bank (fn [this f args] (vary-state this vary-bank f args))
    :set-bank (fn [this new-bank] (vary-state this set-bank new-bank))})
 
 (extend ::Failure ABankable
   {:get-bank meta
-   :vary-bank (partial apply vary-meta)
    :set-bank with-meta})
 
 (extend ::LRNode ABankable
   {:get-bank meta
-   :vary-bank (partial apply vary-meta)
    :set-bank with-meta})
 
 (defn failure? [result]
@@ -164,7 +161,7 @@
           (loop [remaining-rules rules, cur-state state]
             (println "M-PLUS CYCLE START>" remaining-rules (get-bank cur-state))
             (if (empty? remaining-rules)
-              (vary-bank basic-failure (constantly (get-bank cur-state)) nil)
+              (set-bank basic-failure (get-bank cur-state))
               (let [cur-rule (first remaining-rules)
                     cur-result (cur-rule cur-state)]
                 (println "M-PLUS RESULT>" cur-result (get-bank cur-result))
@@ -172,8 +169,7 @@
                   (do (println "M-PLUS SUCCESS RETURN\n...")
                       cur-result)
                   (recur (next remaining-rules)
-                         (vary-bank cur-state (constantly (get-bank cur-result))
-                           nil)))))))))])
+                         (set-bank cur-state (get-bank cur-result))))))))))])
 
 (with-test
   (defrule anything
@@ -218,9 +214,10 @@
   "Tries to grow the parsing of the
   given rule given the seed parse in the
   given result."
-  [rule state-0 h]
-  (println "Start grow>" state-0 (get-bank state-0))
-  (let [state-0-index (get-index state-0)]
+  [rule state head]
+  (let [state-0 state
+        state-0-index (get-index state-0)]
+    (println "Start grow>" state-0 (get-bank state-0) head)
     (loop [cur-bank (get-bank state-0)]
       (println "Grow loop>" cur-bank)
       (let [cur-state (set-bank state-0 cur-bank)
@@ -283,14 +280,14 @@
                 (set-bank found-memory-val bank))))
           (do
             (let [state-0b (vary-bank state assoc-in
-                             [[:memory subrule state-index]
-                              (LRNode false)])
+                             [:memory subrule state-index]
+                             (LRNode false))
                   _ (println "Possible-LR swap>" (get-bank state-0b))
                   subresult (subrule state-0b)
                   subbank (get-bank subresult)
                   submemory (get-in subbank [:memory subrule state-index])
                   _ (println "---\nSubrule has been called>" subresult submemory subbank)
-                  result-to-store (vary-bank subresult (constantly nil) nil)
+                  result-to-store (set-bank subresult nil)
                   _ (println "Result to store>" result-to-store (get-bank result-to-store))
                   new-bank (assoc-in subbank [:memory subrule state-index]
                              result-to-store)
