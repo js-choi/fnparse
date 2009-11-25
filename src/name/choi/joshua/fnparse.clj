@@ -175,28 +175,28 @@
   [rule state-0 h]
   (println "Start grow>" state-0 (get-bank state-0))
   (let [state-0-index (get-index state-0)]
-    (loop [cur-state state-0]
-      (println "Grow loop>" cur-state (get-bank cur-state))
-      (let [cur-result (rule state-0) ; Both depends on and changes memory
+    (loop [cur-bank (get-bank state-0)]
+      (println "Grow loop>" cur-bank)
+      (let [cur-state (set-bank state-0 cur-bank)
+            _ (println "Current state>" cur-state)
+            cur-result (rule cur-state)
             _ (println "Grow loop rule call>" cur-result)
             cur-result-state (get-state cur-result)
-            _ (println "Grow bank>" (get-bank cur-result-state))
-            cur-memory-val (get-in (get-bank cur-result-state)
-                             [:memory rule state-0-index])
+            cur-result-bank (get-bank cur-result-state)
+            _ (println "Grow bank>" cur-result-bank)
+            cur-memory-val (get-in cur-result-bank [:memory rule state-0-index])
             _ (println "Grow memory val>" cur-memory-val)
             cur-result-state-index (get-index cur-result-state)
             cur-memory-val-state-index (-> cur-memory-val get-state get-index)]
         (println "Post grow loop rule call>" (get-bank cur-result) cur-result-state-index cur-memory-val-state-index)
-        (println "AAAAA META>" (-> cur-result second meta))
         (if (or (failure? cur-result)
                 (<= cur-result-state-index cur-memory-val-state-index))
           (do (println "Grow end>" cur-memory-val) cur-memory-val)
           (do
-            (let [new-state (vary-bank cur-state assoc-in
-                              [[:memory rule state-0-index]
-                               cur-result])]
-              (println "Grow swap>" new-state (get-bank new-state))
-              (recur new-state))))))))
+            (let [new-bank (assoc-in cur-result-bank
+                             [:memory rule state-0-index] cur-result)]
+              (println "Grow swap>" new-bank)
+              (recur new-bank))))))))
 ;   [rule state-0 memory h]
 ;   (println "Start grow>" state-0 memory)
 ;   (loop []
