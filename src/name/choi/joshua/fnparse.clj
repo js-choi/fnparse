@@ -124,7 +124,9 @@
   ([var-name rule]
    (defrule var-name nil rule))
   ([var-name doc-string rule]
-   `(let [var# (defvar ~var-name ~rule ~doc-string)]
+   `(let [var# (defvar ~var-name
+                 (fn ~var-name [state#] (~rule state#))
+                 ~doc-string)]
       (alter-var-root var# name-rule (var-name var#))
       var#)))
 
@@ -173,22 +175,20 @@
                          (vary-bank cur-state (constantly (get-bank cur-result))
                            nil)))))))))])
 
-(defn- anything* [state]
-  (m/with-monad parser-m
-    (if-let [tokens (get-remainder state)]
-      [(first tokens)
-       (-> state
-         (assoc-remainder (next tokens))
-         inc-index)]
-      (m/m-zero state))))
-
 (with-test
   (defrule anything
     "A rule that matches anything--that is, it matches
     the first token of the tokens it is given.
     This rule's product is the first token it receives.
     It fails if there are no tokens left."
-    anything*)
+    (fn [state]
+      (m/with-monad parser-m
+        (if-let [tokens (get-remainder state)]
+          [(first tokens)
+           (-> state
+             (assoc-remainder (next tokens))
+             inc-index)]
+          (m/m-zero state)))))
   (let [result (anything (mock-state '(A B C)))
         new-state (second result)]
     (is (= result ['A (mock-state '(B C))])
@@ -332,7 +332,7 @@
   ; means "initial". The suffix "-1" means "final".
   ; The suffix "a" and "b" indicate first pass
   ; and second pass respectively.
-  (let [rule (remember anything*)
+  (let [rule (remember anything)
         remainder-0 '(a b c)
         remainder-1 (next remainder-0)
         expected-state-1 (make-state remainder-1 nil)
