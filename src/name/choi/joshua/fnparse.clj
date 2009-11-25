@@ -31,7 +31,7 @@
 ; - If the given token sequence is INVALID, then
 ;   the rule FAILS, meaning that it simply returns NIL.
  
-(declare lit rep* rep+)
+(declare remember lit rep* rep+)
 
 (defprotocol ABankable
   (get-bank [o])
@@ -128,13 +128,52 @@
       (alter-var-root var# name-rule (var-name var#))
       var#)))
 
+(defvar- basic-failure (Failure nil))
+
+(m/defmonad parser-m
+  "The monad that FnParse uses."
+  [m-zero
+     (fn [state] (set-bank basic-failure (get-bank state)))
+   m-result
+     (fn m-result-parser [product]
+       (fn [state] [product state]))
+   m-bind
+     (fn m-bind-parser [rule product-fn]
+       (fn [state]
+         (println "STARTING BIND>" state (get-bank state))
+         (let [result (rule state)]
+           (if (failure? result)
+             (do (println "BIND FAIL>" result (get-bank result)) result)
+             (let [[product new-state] result]
+               (println "BIND SUCCESS>" ((product-fn product) new-state))
+               ((product-fn product) new-state))))))
+   m-plus
+    (fn m-plus-parser [& rules]
+      (remember
+        (fn summed-rule [state]
+          (println "---\nM-PLUS ENTIRE START>" state ^state)
+          (loop [remaining-rules rules, cur-state state]
+            (println "M-PLUS CYCLE START>" remaining-rules (get-bank cur-state))
+            (if (empty? remaining-rules)
+              (vary-bank basic-failure (constantly (get-bank cur-state)) nil)
+              (let [cur-rule (first remaining-rules)
+                    cur-result (cur-rule cur-state)]
+                (println "M-PLUS RESULT>" cur-result (get-bank cur-result))
+                (if (success? cur-result)
+                  (do (println "M-PLUS SUCCESS RETURN\n...")
+                      cur-result)
+                  (recur (next remaining-rules)
+                         (vary-bank cur-state (constantly (get-bank cur-result))
+                           nil)))))))))])
+
 (defn- anything* [state]
-  (if-let [tokens (get-remainder state)]
-    [(first tokens)
-     (-> state
-       (assoc-remainder (next tokens))
-       inc-index)]
-    (Failure nil)))
+  (m/with-monad parser-m
+    (if-let [tokens (get-remainder state)]
+      [(first tokens)
+       (-> state
+         (assoc-remainder (next tokens))
+         inc-index)]
+      (m/m-zero state))))
 
 (with-test
   (defrule anything
@@ -214,9 +253,6 @@
 ;           (println "Grow swap>" memory)
 ;           (recur))))))
 
-(defvar- basic-failure (Failure nil))
-(defvar- lr-remember-failure (Failure "LR found."))
-
 (with-test
   (defn- remember
     [subrule]
@@ -236,7 +272,7 @@
                                     (LRNode true)))]
                 (println "LR found, return>" new-failure (get-bank new-failure))
                 new-failure)
-              (do (println "Non-LR return>" found-memory-val)
+              (do (println "Non-LR return>" found-memory-val bank)
                 (set-bank found-memory-val bank))))
           (do
             (let [state-0b (vary-bank state assoc-in
@@ -301,40 +337,6 @@
         [_ calc-state-1b :as calc-results-b] (rule state-0)]
     (is (= expected-result calc-results-a))
     (is (= expected-result calc-results-b))))
-
-(m/defmonad parser-m
-  "The monad that FnParse uses."
-  [m-zero
-     (fn [state] basic-failure)
-   m-result
-     (fn m-result-parser [product]
-       (fn [state] [product state]))
-   m-bind
-     (fn m-bind-parser [rule product-fn]
-       (fn [state]
-         (let [result (rule state)]
-           (if (failure? result)
-             result
-             (let [[product new-state] result]
-               ((product-fn product) new-state))))))
-   m-plus
-    (fn m-plus-parser [& rules]
-      (remember
-        (fn summed-rule [state]
-          (println "---\nM-PLUS ENTIRE START>" state ^state)
-          (loop [remaining-rules rules, cur-state state]
-            (println "M-PLUS CYCLE START>" remaining-rules (get-bank cur-state))
-            (if (empty? remaining-rules)
-              (vary-bank basic-failure (constantly (get-bank cur-state)) nil)
-              (let [cur-rule (first remaining-rules)
-                    cur-result (cur-rule cur-state)]
-                (println "M-PLUS RESULT>" cur-result (get-bank cur-result))
-                (if (success? cur-result)
-                  (do (println "M-PLUS SUCCESS RETURN\n...")
-                      cur-result)
-                  (recur (next remaining-rules)
-                         (vary-bank cur-state (constantly (get-bank cur-result))
-                           nil)))))))))])
 
 (m/with-monad parser-m
   (defvar nothing m-zero))
