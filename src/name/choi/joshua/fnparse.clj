@@ -194,25 +194,14 @@
   (is (failure? (anything (mock-state nil)))
     "anything rule fails with no tokens left"))
 
-(defn- get-in-memory
-  [memory state]
-  (let [state-meta ^state]
-    (get-in @memory [(:string-key state-meta) (:index state-meta)])))
-
-(defn- assoc-in-memory
-  [memory state result]
-  (let [state-meta ^state]
-    (swap! memory assoc-in [(:string-key state-meta) (:index state-meta)]
-      result)))
-
-(defn- memory-contains?
-  [memory state]
-  (let [state-meta ^state]
-    (contains? (@memory (:string-key state-meta)) (:index state-meta))))
+(defn- find-memory [bank rule state-index]
+  (get-in bank [:memory rule state-index]))
 
 (defn- store-memory [bank rule state-index result]
-  (assoc-in bank [:memory rule state-index]
-    (set-bank result nil)))
+  (assoc-in bank [:memory rule state-index] result))
+
+(defn- store-and-wipe-memory [bank rule state-index result]
+  (store-memory bank rule state-index (set-bank result nil)))
 
 (defn- grow-left-recursion
   "Tries to grow the parsing of the
@@ -231,7 +220,7 @@
             cur-result-state (get-state cur-result)
             cur-result-bank (get-bank cur-result-state)
             _ (println "Grow bank>" cur-result-bank)
-            cur-memory-val (get-in cur-result-bank [:memory rule state-0-index])
+            cur-memory-val (find-memory cur-result-bank rule state-0-index)
             _ (println "Grow memory val>" cur-memory-val)
             cur-result-state-index (get-index cur-result-state)
             cur-memory-val-state-index (-> cur-memory-val get-state get-index)]
@@ -240,26 +229,10 @@
                 (<= cur-result-state-index cur-memory-val-state-index))
           (do (println "Grow end>" cur-memory-val) cur-memory-val)
           (do
-            (let [new-bank (store-memory cur-result-bank
+            (let [new-bank (store-and-wipe-memory cur-result-bank
                              rule state-0-index cur-result)]
               (println "Grow swap>" new-bank)
               (recur new-bank))))))))
-;   [rule state-0 memory h]
-;   (println "Start grow>" state-0 memory)
-;   (loop []
-;     (println "Grow loop>" memory)
-;     (let [cur-result (rule state-0) ; Both depends on and changes memory
-;           cur-memory-val (get-in-memory memory state-0)]
-;       (println "Grow loop rule call>" cur-result memory)
-;       (println "AAAAA META>" (-> cur-result second meta))
-;       (if (or (failure? cur-result)
-;               (<= (get-index (second cur-result))
-;                   (get-index (second cur-memory-val))))
-;         (do (println "Grow end>" cur-memory-val) cur-memory-val)
-;         (do
-;           (assoc-in-memory memory state-0 cur-result)
-;           (println "Grow swap>" memory)
-;           (recur))))))
 
 (with-test
   (defn- remember
@@ -269,16 +242,16 @@
       (println "Remember call>" state (get-bank state))
       (let [bank (get-bank state)
             state-index (get-index state)
-            found-memory-val (get-in (get-bank state)
-                               [:memory subrule state-index])]
+            found-memory-val (get-in bank [:memory subrule state-index])]
         (if found-memory-val
           (do
             (println "Memory val found>" found-memory-val)
             (if (isa? (type found-memory-val) ::LRNode)
-              (let [new-failure (with-meta basic-failure
-                                  (assoc-in bank [:memory subrule state-index]
-                                    (LRNode true)))]
-                (println "LR found, return>" new-failure (get-bank new-failure))
+              (let [new-bank (store-memory bank subrule state-index
+                               (LRNode true))
+                    new-failure (with-meta basic-failure new-bank)]
+                (println "LR found, return>" new-failure
+                  (get-bank new-failure))
                 new-failure)
               (do (println "Non-LR return>" found-memory-val bank)
                 (set-bank found-memory-val bank))))
@@ -290,8 +263,10 @@
                   subresult (subrule state-0b)
                   subbank (get-bank subresult)
                   submemory (get-in subbank [:memory subrule state-index])
-                  _ (println "---\nSubrule has been called>" subresult submemory subbank)
-                  new-bank (store-memory subbank subrule state-index subresult)
+                  _ (println "---\nSubrule has been called>"
+                      subresult submemory subbank)
+                  new-bank (store-and-wipe-memory subbank
+                             subrule state-index subresult)
                   new-state (set-bank state new-bank)
                   _ (println "Post-subrule swap>" new-state (get-bank new-state))]
               (if (and (isa? (type submemory) ::LRNode)
@@ -301,31 +276,6 @@
                     (grow-left-recursion subrule new-state nil))
                 (do (println "B return>" (set-bank subresult new-bank))
                     (set-bank subresult new-bank)))))))))
-;       (fn [state]
-;         (println "Remember call>" state memory)
-;         (if (memory-contains? memory state)
-;           (let [found-result (get-in-memory memory state)]
-;             (println "Result found>" found-result)
-;             (if (isa? (type found-result) ::LRNode)
-;               (do
-;                 (assoc-in-memory memory state (LRNode true))
-;                 (println "LR found, return>" memory)
-;                 (Failure nil))
-;               (do (println "Non-LR return>" found-result)
-;                 found-result)))
-;           (do
-;             (assoc-in-memory memory state (LRNode false))
-;             (println "Possible LR swap>" memory)
-;             (let [new-result (subrule state) ; Modifies memory
-;                   new-memory (get-in-memory memory state)]
-;               (println "Subrule has been called>" new-result new-memory)
-;               (assoc-in-memory memory state new-result)
-;               (println "Post-subrule swap>" memory)
-;               (if (and (:detected? new-memory) new-result)
-;                 (do (println "A return grow")
-;                   (grow-left-recursion subrule state memory nil))
-;                 (do (println "B return>" new-result)
-;                   new-result)))))))
   ; In the following forms, the suffix "-0"
   ; means "initial". The suffix "-1" means "final".
   ; The suffix "a" and "b" indicate first pass
@@ -550,8 +500,10 @@
 (with-test
   (m/with-monad parser-m
     (defn not-followed-by
-      "Creates a rule that does not consume any tokens, but fails when the given
-      subrule succeeds. On success, the new rule's product is always true."
+      "Creates a rule that does not consume
+      any tokens, but fails when the given
+      subrule succeeds. On success, the new
+      rule's product is always true."
       [subrule]
       (fn [state]
         (if (failure? (subrule state))
