@@ -49,7 +49,7 @@
     (is (= (get-bank (vary-bank state-meta assoc :b 2))
            (assoc bank :b 2)))))
 
-(deftype State [input index info] IPersistentMap)
+(deftype State [tokens index info] IPersistentMap)
 (deftype Failure [] IPersistentMap)
 (deftype LRNode [detected?] IPersistentMap)
 (deftype Bank [memory] IPersistentMap)
@@ -91,7 +91,7 @@
 (defn- make-cf-state [input index]
   (make-state input index nil))
 
-(defvar get-input :input)
+(defvar get-tokens :tokens)
 
 (defvar get-index :index)
 
@@ -175,7 +175,7 @@
     It fails if there are no tokens left."
     (fn [state]
       (m/with-monad parser-m
-        (let [token (nth (get-input state) (get-index state) ::nothing)]
+        (let [token (nth (get-tokens state) (get-index state) ::nothing)]
           (if (not= token ::nothing)
             [token (inc-index state)]
             (m/m-zero state))))))
