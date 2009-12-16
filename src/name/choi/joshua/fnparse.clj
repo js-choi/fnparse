@@ -40,14 +40,7 @@
 (defn- vary-bank [bankable f & args]
   (set-bank bankable (apply f (get-bank bankable) args)))
 
-(with-test
-  (deftype StateMeta [bank index rule-stack] IPersistentMap)
-  (let [bank {:a 3}
-        state-meta (StateMeta bank nil nil)]
-    (is (= (get-bank state-meta) bank))
-    (is (= (get-bank (vary-bank state-meta identity)) bank))
-    (is (= (get-bank (vary-bank state-meta assoc :b 2))
-           (assoc bank :b 2)))))
+(deftype StateMeta [bank rule-stack] IPersistentMap)
 
 (deftype State [tokens index info] IPersistentMap)
 (deftype Failure [] IPersistentMap)
@@ -86,7 +79,7 @@
 (defvar success? (complement failure?))
 
 (defn make-state [input index info]
-  (State input index info (StateMeta (Bank {}) 0 []) nil))
+  (State input index info (StateMeta (Bank {}) []) nil))
 
 (defn- make-cf-state [input index]
   (make-state input index nil))
@@ -416,193 +409,147 @@
     (is (failure? (rule-b (mock-state 0))))
     (is (failure? (rule-a (mock-state 1))))))
  
-; (with-test
-;   (defn term
-;     "(term validator) is equivalent
-;     to (validate anything validator).
-;     Creates a rule that is a terminal rule of the given validator--that is, it
-;     accepts only tokens for whom (validator token) is true.
-;     (def a (term validator)) would be equivalent to the EBNF
-;       a = ? (validator %) evaluates to true ?;
-;     The new rule's product would be the first token, if it fulfills the
-;     validator."
-;     [validator]
-;     (validate anything validator))
-;   (let [rule (term (partial = 'A))]
-;     (is (= (rule (make-cf-state '[A B])) ['A (make-cf-state '[B])])
-;       "created terminal rule works when first token fulfills validator")
-;     (is (failure? (rule (make-cf-state '[B B])))
-;       "created terminal rule fails when first token fails validator")
-;     (is (= (rule (make-cf-state '[A])) ['A (make-cf-state nil)])
-;       "created terminal rule works when no remainder")))
-;  
-; (with-test
-;   (defvar lit
-;     (comp term (partial partial =))
-;     "Equivalent to (comp term (partial partial =)).
-;     Creates a rule that is the terminal
-;     rule of the given literal token--that is,
-;     it accepts only tokens that are equal to
-;     the given literal token.
-;     (def a (lit \"...\")) would be equivalent to the EBNF
-;       a = \"...\";
-;     The new rule's product would be the first
-;     token, if it equals the given literal token.")
-;   (is (= ((lit 'A) (make-cf-state '[A B]))
-;          ['A (make-cf-state '[B])])
-;       "created literal rule works when literal token present")
-;   (is (failure? ((lit 'A) (make-cf-state '[B])))
-;       "created literal rule fails when literal token not present"))
-;  
-; (with-test
-;   (defvar re-term
-;     (comp term (partial partial re-matches))
-;     "Equivalent to (comp term (partial partial re-matches)).
-;     Creates a rule that is the terminal rule of the given regex--that is, it
-;     accepts only tokens that match the given regex.
-;     (def a (re-term #\"...\")) would be equivalent to the EBNF
-;       a = ? (re-matches #\"...\" %) evaluates to true ?;
-;     The new rule's product would be the first token, if it matches the given
-;     regex.")
-;   (is (= ((re-term #"\s*true\s*") (make-cf-state ["  true" "THEN"]))
-;          ["  true" (make-cf-state ["THEN"])])
-;       "created re-term rule works when first token matches regex")
-;   (is (failure? ((re-term #"\s*true\s*") (make-cf-state ["false" "THEN"])))
-;       "created re-term rule fails when first token does not match regex")
-;   (is (failure? ((re-term #"\s*true\s*") (make-cf-state nil)))
-;       "created re-term rule fails when no tokens are left"))
-;  
-; (deftest complex-test
-;   (let [rule1 (complex [a (lit 'A)] (str a "!"))
-;         rule2 (complex [a (lit 'A), b (lit 'B)] (str a "!" b))]
-;     (is (= (rule1 (make-cf-state '[A B])) ["A!" (make-cf-state '[B])])
-;       "created complex rule applies semantic hook to valid subresult")
-;     (is (failure? (rule1 (make-cf-state '[B A])))
-;       "created complex rule fails when a given subrule fails")
-;     (is (= (rule2 (make-cf-state '[A B C])) ["A!B" (make-cf-state '[C])])
-;       "created complex rule succeeds when all subrules fulfilled in order")
-;     (is (failure? (rule2 (make-cf-state '[A C])))
-;       "created complex rule fails when one subrule fails")))
-;  
-; (with-test
-;   (defn followed-by
-;     "Creates a rule that does not consume any tokens, but fails when the given
-;     subrule fails.
-;     The new rule's product would be the subrule's product."
-;     [subrule]
-;     (complex [state fetch-state, subproduct subrule, _ (set-state state)]
-;       subproduct))
-;   (is (= ((followed-by (lit 'A)) (make-cf-state '[A B C]))
-;          ['A (make-cf-state '[A B C])]))
-;   (is (failure? ((followed-by (lit 'A)) (make-cf-state '[B C])))))
-;  
-; (with-test
-;   (m/with-monad parser-m
-;     (defn not-followed-by
-;       "Creates a rule that does not consume
-;       any tokens, but fails when the given
-;       subrule succeeds. On success, the new
-;       rule's product is always true."
-;       [subrule]
-;       (fn [state]
-;         (if (failure? (subrule state))
-;           [true state]
-;           (m/m-zero state)))))
-;   (is (= ((not-followed-by (lit 'A)) (make-cf-state '[B C]))
-;          [true (make-cf-state '[B C])]))
-;   (is (failure? ((not-followed-by (lit 'A)) (make-cf-state '[A B C])))))
-;  
-; (with-test
-;   (defn semantics
-;     "Creates a rule with a semantic hook,
-;     basically a simple version of a complex
-;     rule. The semantic hook is a function
-;     that takes one argument: the product of
-;     the subrule."
-;     [subrule semantic-hook]
-;     (complex [subproduct subrule]
-;       (semantic-hook subproduct)))
-;   (is (= ((semantics (lit "hi") #(str % "!")) (make-cf-state ["hi" "THEN"]))
-;          ["hi!" (make-cf-state (list "THEN"))])
-;       "created simple semantic rule applies semantic hook to valid result of given rule"))
-;  
-; (defn constant-semantics
-;   "Creates a rule with a constant semantic
-;   hook. Its product is always the given
-;   constant."
-;   [subrule semantic-value]
-;   (complex [subproduct subrule]
-;     semantic-value))
-;  
-; ; (with-test
-; ;   (defrule remainder-peek
-; ;     "A rule whose product is the very next
-; ;     token in the remainder of any given state.
-; ;     The new rule does not consume any tokens."
-; ;     (complex [remainder (fetch-remainder)]
-; ;       (first remainder)))
-; ;   (is (= (remainder-peek (make-cf-state (seq "ABC")))
-; ;          [\A (make-cf-state (seq "ABC"))])))
-;  
-; (with-test
-;   (defn conc
-;     "Creates a rule that is the concatenation
-;     of the given subrules. Basically a simple
-;     version of complex, each subrule consumes
-;     tokens in order, and if any fail, the entire
-;     rule fails.
-;     (def a (conc b c d)) would be equivalent to the EBNF:
-;       a = b, c, d;
-;     This macro is almost equivalent to m-seq for
-;     the parser-m monad. The difference is that
-;     it defers evaluation of whatever variables
-;     it receives, so that it accepts expressions
-;     containing unbound variables that are defined later."
-;     [& subrules]
-;     (m/with-monad parser-m
-;       (fn [state]
-;         ((m/m-seq subrules) state))))
-;   (is (= ((conc (lit "hi") (lit "THEN"))
-;           (make-cf-state ["hi" "THEN" "bye"]))
-;          [["hi" "THEN"] (make-cf-state (list "bye"))])
-;       "created concatenated rule succeeds when all subrules fulfilled in order")
-;   (is (failure? ((conc (lit "hi") (lit "THEN"))
-;              (make-cf-state ["hi" "bye" "boom"])))
-;       "created concatenated rule fails when one subrule fails"))
-; 
-; (with-test
-;   (defn alt
-;     "Creates a rule that is the alternation
-;     of the given subrules. It succeeds when
-;     any of its subrules succeed, and fails
-;     when none do. Its result is that of the first
-;     subrule that succeeds, so the order of the
-;     subrules that this function receives matters.
-;     (def a (alt b c d)) would be equivalent to the EBNF:
-;      a = b | c | d;
-;     This macro is almost equivalent to m-plus for
-;     the parser-m monad. The difference is that
-;     it defers evaluation of whatever variables it
-;     receives, so that it accepts expressions containing
-;     unbound variables that are defined later."
-;     [& subrules]
-;     (m/with-monad parser-m (apply m/m-plus subrules)))
-;   (is (= ((alt (lit "hi") (lit "THEN"))
-;           (make-cf-state ["THEN" "bye"]))
-;          ["THEN" (make-cf-state (list "bye"))]))
-;   (is (failure? ((alt (lit "hi") (lit "THEN"))
-;                  (make-cf-state ["bye" "boom"])))))
-; 
-; (defvar- number-rule (lit \0))
-; (declare direct-left-recursive-rule lr-test-term lr-test-fact)
-; 
-; (with-test
-;   (defvar- direct-left-recursive-rule
-;     (alt (conc #'direct-left-recursive-rule (lit \-) number-rule)
-;          number-rule))
-;   (is (= [[[\0 \- \0] \- \0] (make-cf-state nil)]
-;          (direct-left-recursive-rule (make-cf-state "0-0-0")))))
-; 
+  (defn term
+    "(term validator) is equivalent
+    to (validate anything validator).
+    Creates a rule that is a terminal rule of the given validator--that is, it
+    accepts only tokens for whom (validator token) is true.
+    (def a (term validator)) would be equivalent to the EBNF
+      a = ? (validator %) evaluates to true ?;
+    The new rule's product would be the first token, if it fulfills the
+    validator."
+    [validator]
+    (validate anything validator))
+ 
+(with-test
+  (defvar lit
+    (comp term (partial partial =))
+    "Equivalent to (comp term (partial partial =)).
+    Creates a rule that is the terminal
+    rule of the given literal token--that is,
+    it accepts only tokens that are equal to
+    the given literal token.
+    (def a (lit \"...\")) would be equivalent to the EBNF
+      a = \"...\";
+    The new rule's product would be the first
+    token, if it equals the given literal token.")
+  (let [rule (lit 'A)
+        mock-state (partial make-cf-state '[A B])]
+    (is (= (rule (mock-state 0)) ['A (mock-state 1)]))
+    (is (failure? (rule (mock-state 1))))))
+
+(defvar re-term
+  (comp term (partial partial re-matches))
+  "Equivalent to (comp term (partial partial re-matches)).
+  Creates a rule that is the terminal rule of the given regex--that is, it
+  accepts only tokens that match the given regex.
+  (def a (re-term #\"...\")) would be equivalent to the EBNF
+    a = ? (re-matches #\"...\" %) evaluates to true ?;
+  The new rule's product would be the first token, if it matches the given
+  regex.")
+
+(set-test complex
+  (let [mock-state (partial make-cf-state '[A B C])
+        rule (complex [a (lit 'A), b (lit 'B)] (str a "!" b))]
+    (is (= (rule (mock-state 0)) ["A!B" (mock-state 2)]))
+    (is (failure? (rule (mock-state 1))))))
+
+(defn followed-by
+  "Creates a rule that does not consume any tokens, but fails when the given
+  subrule fails.
+  The new rule's product would be the subrule's product."
+  [subrule]
+  (complex [state fetch-state, subproduct subrule, _ (set-state state)]
+    subproduct))
+
+(m/with-monad parser-m
+  (defn not-followed-by
+    "Creates a rule that does not consume
+    any tokens, but fails when the given
+    subrule succeeds. On success, the new
+    rule's product is always true."
+    [subrule]
+    (fn [state]
+      (if (failure? (subrule state))
+        [true state]
+        (m/m-zero state)))))
+
+(defn semantics
+  "Creates a rule with a semantic hook,
+  basically a simple version of a complex
+  rule. The semantic hook is a function
+  that takes one argument: the product of
+  the subrule."
+  [subrule semantic-hook]
+  (complex [subproduct subrule]
+    (semantic-hook subproduct)))
+
+(defn constant-semantics
+  "Creates a rule with a constant semantic
+  hook. Its product is always the given
+  constant."
+  [subrule semantic-value]
+  (complex [subproduct subrule]
+    semantic-value))
+ 
+; (defrule remainder-peek
+;   "A rule whose product is the very next
+;   token in the remainder of any given state.
+;   The new rule does not consume any tokens."
+;   (complex [remainder (fetch-remainder)]
+;     (first remainder)))
+
+(defn conc
+  "Creates a rule that is the concatenation
+  of the given subrules. Basically a simple
+  version of complex, each subrule consumes
+  tokens in order, and if any fail, the entire
+  rule fails.
+  (def a (conc b c d)) would be equivalent to the EBNF:
+    a = b, c, d;
+  This macro is almost equivalent to m-seq for
+  the parser-m monad. The difference is that
+  it defers evaluation of whatever variables
+  it receives, so that it accepts expressions
+  containing unbound variables that are defined later."
+  [& subrules]
+  (m/with-monad parser-m
+    (fn [state]
+      ((m/m-seq subrules) state))))
+
+(with-test
+  (defn alt
+    "Creates a rule that is the alternation
+    of the given subrules. It succeeds when
+    any of its subrules succeed, and fails
+    when none do. Its result is that of the first
+    subrule that succeeds, so the order of the
+    subrules that this function receives matters.
+    (def a (alt b c d)) would be equivalent to the EBNF:
+     a = b | c | d;
+    This macro is almost equivalent to m-plus for
+    the parser-m monad. The difference is that
+    it defers evaluation of whatever variables it
+    receives, so that it accepts expressions containing
+    unbound variables that are defined later."
+    [& subrules]
+    (m/with-monad parser-m (apply m/m-plus subrules)))
+  (let [rule (alt (lit "hi") (lit "THEN"))
+        mock-state (partial make-cf-state ["THEN" "bye"])]
+    (is (= (rule (mock-state 0)) ["THEN" (mock-state 1)]))
+    (is (failure? (rule (mock-state 1))))))
+
+(defvar- number-rule (lit \0))
+(declare direct-left-recursive-rule lr-test-term lr-test-fact)
+
+(with-test
+  (defvar- direct-left-recursive-rule
+    (alt (conc #'direct-left-recursive-rule (lit \-) number-rule)
+         number-rule))
+  (let [mock-state (partial make-cf-state "0-0-0")]
+    (is (= [[[\0 \- \0] \- \0] (mock-state 5)]
+           (direct-left-recursive-rule (mock-state 0))))))
+
 ; (with-test
 ;   (defvar- lr-test-term
 ;     (alt (conc #'lr-test-term (lit \+) #'lr-test-fact)
