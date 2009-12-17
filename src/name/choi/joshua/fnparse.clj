@@ -598,33 +598,34 @@
     (is (= (rule (mock-state 0)) ["THEN" (mock-state 1)]))
     (is (failure? (rule (mock-state 1))))))
 
-(defvar- number-rule (lit \0))
+(defvar- number-rule (lit '0))
 (declare direct-left-recursive-rule lr-test-term lr-test-fact)
 
 (with-test
-  (defvar- direct-left-recursive-rule
-    (alt (conc #'direct-left-recursive-rule (lit \-) number-rule)
+  (defvar- direct-lr-rule
+    (alt (conc #'direct-left-recursive-rule (lit '-) number-rule)
          number-rule))
-  (let [mock-state (partial make-cf-state "0-0-0")]
-    (is (= [[[\0 \- \0] \- \0] (mock-state 5)]
-           (direct-left-recursive-rule (mock-state 0))))))
+  (let [mock-state (partial make-cf-state '[0 - 0 - 0])]
+    (is (= ['[[0 - 0] - 0] (mock-state 5)] (direct-lr-rule (mock-state 0))))))
 
-; (with-test
-;   (defvar- lr-test-term
-;     (alt (conc #'lr-test-term (lit \+) #'lr-test-fact)
-;          (conc #'lr-test-term (lit \-) #'lr-test-fact)
-;          #'lr-test-fact))
-;   (is (= [\0 (make-cf-state nil)] (lr-test-term (make-cf-state "0"))))
-;   (is (= [[\0 \* \0] (make-cf-state nil)]
-;          (lr-test-term (make-cf-state "0*0")))))
-; ;   (is (= [[[\0 \+ \0] [[\
-; ;          (lr-test-term "0*0+0-0/0
-; 
-; (defvar- lr-test-fact
-;   (alt (conc #'lr-test-fact (lit \*) number-rule)
-;        (conc #'lr-test-fact (lit \/) number-rule)
-;        number-rule))
-; 
+(defvar- lr-test-term
+  (alt (conc #'lr-test-term (lit '+) #'lr-test-fact)
+       (conc #'lr-test-term (lit '-) #'lr-test-fact)
+       #'lr-test-fact))
+
+(defvar- lr-test-fact
+  (alt (conc #'lr-test-fact (lit '*) number-rule)
+       (conc #'lr-test-fact (lit '/) number-rule)
+       number-rule))
+
+(set-test lr-test-term
+  (let [mock-state (partial make-cf-state '[0])]
+    (is (= ['0 (mock-state 1)] (lr-test-term (mock-state 0)))))
+  (let [mock (partial make-cf-state '[0 * 0])]
+    (is (= ['[0 * 0] (mock 3)] (lr-test-term (mock 0)))))
+  (let [mock (partial make-cf-state '[0 + 0 * 0 - 0 / 0])]
+    (is (= ['[[0 + [0 * 0]] - [0 / 0]] (mock 9)] (lr-test-term (mock 0))))))
+
 ; (with-test
 ;   (defn opt
 ;     "Creates a rule that is the optional form
