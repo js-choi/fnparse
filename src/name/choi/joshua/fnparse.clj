@@ -1,8 +1,7 @@
 (ns name.choi.joshua.fnparse
-  [:use clojure.contrib.except clojure.contrib.error-kit clojure.contrib.def
-        clojure.test]
+  [:use clojure.contrib.except clojure.contrib.def clojure.test]
   [:require [clojure.contrib.monads :as m]]
-  [:import [clojure.lang Sequential IPersistentMap IPersistentVector]])
+  [:import [clojure.lang Sequential IPersistentMap IPersistentVector Var]])
 
 ; A RULE is a a function that:
 ; - Takes a state and returns either nil
@@ -45,7 +44,7 @@
 (deftype State [tokens index info] IPersistentMap)
 (deftype Failure [] IPersistentMap)
 
-(deftype Bank [memory lr-stack] IPersistentMap)
+(deftype Bank [memory lr-stack position-heads] IPersistentMap)
   ; memory: a nested map with function keys and map vals
     ; The keys are rules
     ; The vals are maps with integer keys and result vals
@@ -53,8 +52,11 @@
       ; The vals can be successes, failures, or the
       ; keyword :lr-stack-peek.
   ; lr-stack: a vector of LRNodes
+  ; position-heads: a map with position keys and index vals
+    ; The keys correspond to token positions
+    ; The vals correspond to LRNodes' indexes in the lr-stack
 
-(deftype LRNode [head] IPersistentMap)
+(deftype LRNode [seed rule head] IPersistentMap)
 
 (deftype Head [involved-rules rules-to-be-evaluated] IPersistentMap)
 
@@ -90,7 +92,7 @@
 (defvar success? (complement failure?))
 
 (defn make-state [input index info]
-  (State input index info (StateMeta (Bank {} []) []) nil))
+  (State input index info (StateMeta (Bank {} [] {}) []) nil))
 
 (defn- make-cf-state [input index]
   (make-state input index nil))
@@ -102,10 +104,6 @@
 (defn inc-index [state]
   (update-in state [:index] inc))
 
-(deferror fnparse-error [] [message-template & template-args]
-  {:msg (str "FnParse error: " (apply format message-template template-args))
-   :unhandled (throw-msg Exception)})
-
 (defn- conj-to-rule-stack [state rule]
   (vary-meta state update-in [:rule-stack] conj rule))
 
@@ -114,7 +112,7 @@
   (fn [state]
     (-> state (conj-to-rule-stack rule-rep) rule)))
 
-(defn- var-name [variable]
+(defn- var-name [#^Var variable]
   (symbol (str (.ns variable)) (name (.sym variable))))
 
 (defmacro defrule
@@ -187,104 +185,148 @@
     (is (= ['A (make-cf-state input 1)] (anything (make-cf-state input 0))))
     (is (failure? (anything (State input 3 nil))))))
 
-(defn- find-memory [bank rule state-index]
-  (get-in bank [:memory rule state-index]))
-
-(defn- store-memory [bank rule state-index result]
-  (assoc-in bank [:memory rule state-index] result))
-
-(defn- store-and-wipe-memory [bank rule state-index result]
-  (store-memory bank rule state-index (set-bank result nil)))
-
-; (defn setup-left-recursion [rule bank]
-;   (let [heads-0 (:heads bank)
-;         lr-stack-0 (:lr-stack bank)
-;         lr-stack
-;         lr-stack-f (->> lr-stack-0
-;                      (take-while condition-true?)
-;                      (map #()))
-;         heads-0 (update heads-0 [0] #(or % (Head rule #{} #{})))
-;         ]
-
-; (defn left-recursion-answer [rule state memory-result]
-;   (let 
-
-(defn- grow-left-recursion
-  "Tries to grow the parsing of the
-  given rule given the seed parse in the
-  given result."
-  [rule state head]
-  (let [state-0 state
-        state-0-index (get-index state-0)
-        state-0-bank (get-bank state-0)
-        _ (println "Start grow>" state-0 state-0-bank head)]
-    (loop [cur-bank state-0-bank]
-      (let [_ (println "Grow loop>" cur-bank)
-            cur-result (rule (set-bank state-0 cur-bank))
-            cur-result-state (get-state cur-result)
-            cur-result-bank (get-bank cur-result-state)
-            _ (println "Grow bank>" cur-result-bank)
-            cur-memory-val (find-memory cur-result-bank rule state-0-index)
-            _ (println "Grow memory val>" cur-memory-val)
-            cur-result-state-index (get-index cur-result-state)
-            cur-memory-val-state-index
-              (-> cur-memory-val get-state get-index)]
-        (println "Post grow loop rule call>" (get-bank cur-result) cur-result-state-index cur-memory-val-state-index)
-        (if (or (failure? cur-result)
-                (<= cur-result-state-index cur-memory-val-state-index))
-          (do (println "Grow end>" cur-memory-val) cur-memory-val)
-          (let [new-bank (store-and-wipe-memory cur-result-bank
-                           rule state-0-index cur-result)]
-            (println "Grow swap>" new-bank)
-            (recur new-bank)))))))
-
-(with-test
-  (defn- remember
-    [subrule]
+(letfn [(get-memory [bank subrule state-index]
+          (-> bank :memory (get-in [subrule state-index])))
+        (store-memory [bank subrule state-index result]
+          (assoc-in bank [:memory subrule state-index] result))
+        (clear-bank [bankable]
+          (set-bank bankable nil))
+        (get-lr-node [bank index]
+          (-> bank :lr-stack (get index)))
+        (grow-lr [subrule state node-index]
+          (let [state-0 state
+                state-0-index (get-index state-0)
+                state-0-bank (get-bank state-0)
+                state-0-bank (assoc-in state-0-bank
+                               [:position-heads state-0-index]
+                               node-index)
+                _ (println "Start grow>" state-0 state-0-bank node-index)]
+            (loop [cur-bank state-0-bank]
+              (let [_ (println "Grow loop>" cur-bank)
+                    cur-bank (update-in cur-bank [:lr-stack node-index]
+                               #(assoc % :rules-to-be-evaluated
+                                  (:involved-rules %)))
+                    _ (println "Reset evaled rules>" (:lr-stack cur-bank))
+                    cur-result (subrule (set-bank state-0 cur-bank))
+                    cur-result-state (get-state cur-result)
+                    cur-result-bank (get-bank cur-result-state)
+                    _ (println "Grow bank>" cur-result-bank)
+                    cur-memory-val
+                      (get-memory cur-result-bank subrule state-0-index)
+                    _ (println "Grow memory val>" cur-memory-val)
+                    cur-result-state-index (get-index cur-result-state)
+                    cur-memory-val-state-index
+                      (-> cur-memory-val get-state get-index)]
+                (println "Post grow loop subrule call>"
+                         (get-bank cur-result)
+                         cur-result-state-index cur-memory-val-state-index)
+                (if (or (failure? cur-result)
+                        (<= cur-result-state-index
+                            cur-memory-val-state-index))
+                  (let [cur-result-bank
+                          (update-in cur-result-bank [:position-heads]
+                            dissoc node-index)]
+                    (do (println "Grow end>" cur-memory-val)
+                        (set-bank cur-memory-val cur-result-bank)))
+                  (let [new-bank (store-memory cur-result-bank subrule
+                                   state-0-index (clear-bank cur-result))]
+                    (println "Grow swap>" new-bank)
+                    (recur new-bank)))))))
+        (add-head-if-not-already-there [head involved-rules]
+          (update-in (or head (Head #{} #{})) [:involved-rules]
+            into involved-rules))
+        (setup-lr [lr-stack stack-index]
+          (let [indexes (range (inc stack-index) (count lr-stack))
+                involved-rules
+                  (map :rule (subvec lr-stack (inc stack-index)))
+                lr-stack (update-in lr-stack [stack-index :head]
+                           add-head-if-not-already-there involved-rules)
+                lr-stack (reduce #(assoc-in %1 [%2 :head] stack-index)
+                           lr-stack indexes)]
+            lr-stack))
+        (lr-answer [subrule state node-index seed-result]
+          (let [bank (get-bank state)
+                bank (assoc-in bank [:lr-stack node-index :seed] seed-result)
+                lr-node (get-lr-node bank node-index)
+                node-seed (:seed lr-node)]
+            (println "START LR ANSWER>" lr-node)
+            (if (-> lr-node :rule (not= subrule))
+              (do (println "DEFERRING TO HEAD RULE>" node-seed)
+                  node-seed)
+              (let [bank (store-memory bank subrule (:index state) node-seed)
+                    _ (println "Storing node-seed>" (:memory bank))]
+                (if (failure? node-seed)
+                  (do (println "Seed is a failure, returning>" node-seed)
+                      (set-bank node-seed bank))
+                  (do (println "GROWING!")
+                      (grow-lr subrule (set-bank state bank) node-index)))))))
+        (recall [bank subrule state]
+          (let [position (get-index state)
+                memory (get-memory bank subrule position)
+                node-index (-> bank :position-heads (get position))
+                lr-node (get-lr-node bank node-index)]
+            (if (nil? lr-node)
+              memory
+              (let [head (:head lr-node)]
+                (if-not (or memory (-> lr-node :rule (= subrule))
+                            (-> head :involved-rules (contains? subrule)))
+                  (with-meta basic-failure bank)
+                  (if (-> head :rules-to-be-evaluated (contains? subrule))
+                    (let [bank (update-in [:lr-stack node-index          
+                                           :rules-to-be-evalated]
+                                 disj subrule)
+                          result (-> state (set-bank bank) subrule)]
+                      (vary-bank result store-memory subrule position result))
+                    memory))))))]
+  (defn- remember [subrule]
     (println "REMEMBER>" subrule)
-    (fn remembering-rule [state]
-      (println "Remember call>" state (get-bank state))
-      (let [bank (get-bank state)
-            state-index (get-index state)
-            found-memory-val (get-in bank [:memory subrule state-index])]
-        (if found-memory-val
-          (do
-            (println "Memory val found>" found-memory-val bank)
-            (if (= found-memory-val :lr-node-peek)
-              (let [lr-stack (:lr-stack bank)
-                    lr-node (-> lr-stack peek (assoc :head (Head #{} #{})))
-                    lr-stack (-> lr-stack pop (conj lr-node))
-                    bank (assoc bank :lr-stack lr-stack)
-                    new-failure (with-meta basic-failure bank)]
-                (println "LR found, return>" new-failure
-                  (get-bank new-failure))
-                new-failure)
-              (do (println "Non-LR return>" found-memory-val bank)
-                (set-bank found-memory-val bank))))
-          (do
-            (let [bank (assoc-in bank [:memory subrule state-index]
-                         :lr-node-peek)
-                  bank (update-in bank [:lr-stack] conj (LRNode nil))
-                  state-0b (set-bank state bank)
-                  _ (println "Possible-LR swap>" (get-bank state-0b))
-                  subresult (subrule state-0b)
-                  bank (get-bank subresult)
-                  submemory (get-in bank [:memory subrule state-index])
-                  _ (println "---\nSubrule has been called>"
-                      subresult submemory bank)
-                  current-lr-node (-> bank :lr-stack peek)
-                  bank (update-in bank [:lr-stack] pop)
-                  bank (store-and-wipe-memory bank
-                         subrule state-index subresult)
-                  new-state (set-bank state bank)
-                  _ (println "Post-subrule swap>" new-state (get-bank new-state))]
-              (if (and (= submemory :lr-node-peek)
-                       (:head current-lr-node)
-                       (not (failure? subresult)))
-                (do (println "A return grow")
-                    (grow-left-recursion subrule new-state nil))
-                (do (println "B return>" (set-bank subresult bank))
-                    (set-bank subresult bank)))))))))
+     (fn remembering-rule [state]
+       (println "Remember call>" state (get-bank state))
+       (let [bank (get-bank state)
+             state-index (get-index state)
+             found-memory-val (recall bank subrule state)]
+         (if found-memory-val
+           (do
+             (println "Memory val found>" found-memory-val bank)
+             (if (integer? found-memory-val)
+               (let [bank (update-in bank [:lr-stack]
+                            setup-lr found-memory-val)
+                     new-failure (with-meta basic-failure bank)]
+                 (println "LR found, return>" new-failure
+                   (get-bank new-failure))
+                 new-failure)
+               (do (println "Non-LR return>" found-memory-val bank)
+                 (set-bank found-memory-val bank))))
+           (do
+             (let [bank (store-memory bank subrule state-index
+                          (-> bank :lr-stack count))
+                   bank (update-in bank [:lr-stack] conj
+                          (LRNode nil subrule nil))
+                   state-0b (set-bank state bank)
+                   _ (println "Possible-LR swap>" (get-bank state-0b))
+                   subresult (subrule state-0b)
+                   bank (get-bank subresult)
+                   submemory (get-memory bank subrule state-index)
+                   _ (println "---\nSubrule has been called>"
+                       subresult submemory bank)
+                   current-lr-node (-> bank :lr-stack peek)
+                   ; bank (update-in bank [:lr-stack] pop)
+                   bank (store-memory bank subrule state-index
+                          (clear-bank subresult))
+                   new-state (set-bank state bank)
+                   _ (println "Post-subrule swap>" new-state (get-bank new-state))
+                   result
+                     (if (and (integer? submemory) (:head current-lr-node))
+                       (do (println "A return LR answer")
+                           (lr-answer subrule new-state submemory subresult))
+                       (do (println "B return>" (set-bank subresult bank))
+                           (set-bank subresult bank)))
+                   _ (println "Result>" result (get-bank result))
+                   result (vary-bank result update-in [:lr-stack] pop)
+                   _ (println "Pop LR stack>" (get-bank result))]
+               result)))))))
+
+(set-test remember
   ; In the following forms, the suffix "-0"
   ; means "initial". The suffix "-1" means "final".
   ; The suffix "a" and "b" indicate first pass
