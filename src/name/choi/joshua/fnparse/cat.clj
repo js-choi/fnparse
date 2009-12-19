@@ -9,7 +9,7 @@
 ;   or a vector pair.
 ;   - A STATE is a struct map that contains
 ;     a remainder and maybe info.
-;     You create states using the make-cf-state function.
+;     You create states using the make-state function.
 ;   - A REMAINDER is a sequence or
 ;     seqable collection of tokens.
 ;     It is contained in the
@@ -42,7 +42,7 @@
 
 (deftype StateMeta [bank rule-stack] IPersistentMap)
 
-(deftype State [tokens position info] IPersistentMap)
+(deftype State [tokens context position] IPersistentMap)
 (deftype Failure [] IPersistentMap)
 
 (deftype Bank [memory lr-stack position-heads] IPersistentMap)
@@ -92,8 +92,8 @@
 
 (defvar success? (complement failure?))
 
-(defn make-state [input info position]
-  (State input position info (StateMeta (Bank {} [] {}) []) nil))
+(defn make-state [input context position]
+  (State input context position (StateMeta (Bank {} [] {}) []) nil))
 
 (defn inc-position [state]
   (update-in state [:position] inc))
@@ -101,12 +101,12 @@
 (defn- conj-to-rule-stack [state rule]
   (vary-meta state update-in [:rule-stack] conj rule))
 
-(defn- name-rule
+(defn name-rule
   [rule rule-rep]
   (fn [state]
     (-> state (conj-to-rule-stack rule-rep) rule)))
 
-(defn- var-name [#^Var variable]
+(defn get-var-name [#^Var variable]
   (symbol (str (.ns variable)) (name (.sym variable))))
 
 (defmacro defrule
@@ -116,7 +116,7 @@
    `(let [var# (defvar ~var-name
                  (fn ~var-name [state#] (~rule state#))
                  ~doc-string)]
-      (alter-var-root var# name-rule (var-name var#))
+      (alter-var-root var# name-rule (get-var-name var#))
       var#)))
 
 ; (defmacro defrulemaker
@@ -125,12 +125,12 @@
 ;   ([var-name doc-string args & body]
 ;    `(defn ~var-name ~doc-string ~args
 ;       (name-rule (do ~@body) (list ~var-name ~@args)))))
-          
+
 (defvar- basic-failure (Failure))
 
 (defn mock-state
   ([tokens] (mock-state tokens nil))
-  ([tokens info] (partial make-state tokens info)))
+  ([tokens context] (partial make-state tokens context)))
 
 (defn =result [result-to-test expected-result]
   (= result-to-test expected-result))
@@ -165,8 +165,9 @@
     the first token of the tokens it is given.
     This rule's product is the first token it receives.
     It fails if there are no tokens left."
-    (fn [state]
-      (m/with-monad parser-m
+    (m/with-monad parser-m
+      (fn [state]
+        (println ">>>" (:position state))
         (let [token (nth (:tokens state) (:position state) ::nothing)]
           (if (not= token ::nothing)
             [token (inc-position state)]
@@ -343,13 +344,13 @@
 (defn- set-state [state]
   (m/set-state state))
 
-(defn fetch-info
-  "Creates a rule that consumes no tokens.
-  The new rule's product is the value
-  of the given key in the current state.
-  [Equivalent to fetch-val from clojure.contrib.monads.]"
-  [key]
-  (m/fetch-val key))
+; (defn fetch-info
+;   "Creates a rule that consumes no tokens.
+;   The new rule's product is the value
+;   of the given key in the current state.
+;   [Equivalent to fetch-val from clojure.contrib.monads.]"
+;   [key]
+;   (m/fetch-val key))
 
 ; (with-test
 ;   (defn fetch-remainder
@@ -467,6 +468,20 @@
   The new rule's product would be the first token, if it matches the given
   regex.")
 
+(defmacro deflits
+  "Intended for defining many literal rules at once."
+  [map-name name-token-map]
+  (letfn [(make-rule-def-form [name-token-entry]
+            (let [[rule-name token] name-token-entry]
+              `(defrule ~rule-name (lit ~token))))
+          (make-keyword-rule-entry [name]
+            [(keyword name) (first `(~name))])]
+    (let [rule-def-forms (map make-rule-def-form name-token-map)
+          keyword-rule-pairs (->> name-token-map keys
+                               (mapcat make-keyword-rule-entry))
+          rule-map-form `(def ~map-name (array-map ~@keyword-rule-pairs))]
+      `(do ~@rule-def-forms ~rule-map-form))))
+
 (set-test complex
   (let [mock (mock-state '[A B C])
         rule (complex [a (lit 'A), b (lit 'B)] (str a "!" b))]
@@ -481,13 +496,13 @@
   (complex [state fetch-state, subproduct subrule, _ (set-state state)]
     subproduct))
 
-(m/with-monad parser-m
-  (defn not-followed-by
-    "Creates a rule that does not consume
-    any tokens, but fails when the given
-    subrule succeeds. On success, the new
-    rule's product is always true."
-    [subrule]
+(defn not-followed-by
+  "Creates a rule that does not consume
+  any tokens, but fails when the given
+  subrule succeeds. On success, the new
+  rule's product is always true."
+  [subrule]
+  (m/with-monad parser-m
     (fn [state]
       (if (failure? (subrule state))
         [true state]
