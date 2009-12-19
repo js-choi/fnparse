@@ -24,8 +24,8 @@
 (def terminal-level-expr
   (alt number-level-expr name-level-expr))
 
-(defn infix-op-rule [expr-a operator expr-b]
-  (complex [content-a expr-a, op operator, content-b expr-b]
+(defn infix-expr* [arg-a operator arg-b]
+  (complex [content-a arg-a, op operator, content-b arg-b]
     [op content-a content-b]))
 
 (declare expr)
@@ -40,25 +40,21 @@
   (alt parenthesized-expr terminal-level-expr))
 
 (def function-level-expr
-  (alt (complex [operator name-level-expr, content parenthesized-expr]
-         [operator content])
-    parenthesized-level-expr))
+  (alt (conc name-level-expr parenthesized-expr) parenthesized-level-expr))
 
 (def pos-neg-level-expr
-  (alt (complex [operator (alt positive-sign negative-sign)
-                 content function-level-expr]
-         [operator content])
-    function-level-expr))
+  (alt (conc (alt positive-sign negative-sign) function-level-expr)
+       function-level-expr))
 
 (def multiplication-level-expr
-  (alt (infix-op-rule
+  (alt (infix-expr*
          #'multiplication-level-expr
          (alt multiplication-sign division-sign)
          pos-neg-level-expr)
        pos-neg-level-expr))
 
 (def addition-level-expr
-  (alt (infix-op-rule
+  (alt (infix-expr*
          #'addition-level-expr
          (alt addition-sign minus-sign)
          multiplication-level-expr)
