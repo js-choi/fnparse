@@ -167,7 +167,6 @@
     It fails if there are no tokens left."
     (m/with-monad parser-m
       (fn [state]
-        (println ">>>" (:position state))
         (let [token (nth (:tokens state) (:position state) ::nothing)]
           (if (not= token ::nothing)
             [token (inc-position state)]
@@ -574,24 +573,27 @@
     (is (failure? (rule (mock 1))))))
 
 (defvar- number-rule (lit '0))
-(declare direct-left-recursive-rule lr-test-term lr-test-fact)
 
-; (with-test
-;   (defvar- direct-lr-rule
-;     (alt (conc #'direct-left-recursive-rule (lit '-) number-rule)
-;          number-rule))
-;   (let [mock (mock-state '[0 - 0 - 0])]
-;     (is (= ['[[0 - 0] - 0] (mock 5)] (direct-lr-rule (mock 0))))))
+(declare lr-test-rule)
 
-(defvar- lr-test-term
-  (alt (conc #'lr-test-term (lit '+) #'lr-test-fact)
-       (conc #'lr-test-term (lit '-) #'lr-test-fact)
-       #'lr-test-fact))
+(with-test
+  (defvar- direct-lr-rule
+    (alt (conc #'direct-lr-rule (lit '-) number-rule)
+         number-rule))
+  (let [mock (mock-state '[0 - 0 - 0])]
+    (is (= ['[[0 - 0] - 0] (mock 5)] (direct-lr-rule (mock 0))))))
 
 (defvar- lr-test-fact
   (alt (conc #'lr-test-fact (lit '*) number-rule)
        (conc #'lr-test-fact (lit '/) number-rule)
        number-rule))
+
+(defvar- lr-test-term
+  (alt (conc #'lr-test-rule (lit '+) #'lr-test-fact)
+       (conc #'lr-test-rule (lit '-) #'lr-test-fact)
+       #'lr-test-fact))
+
+(defvar- lr-test-rule #'lr-test-term)
 
 (set-test lr-test-term
   (let [mock (mock-state '[0])]
