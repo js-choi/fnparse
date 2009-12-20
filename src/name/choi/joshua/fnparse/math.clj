@@ -24,10 +24,6 @@
 (def terminal-level-expr
   (alt number-level-expr name-level-expr))
 
-(defn infix-expr* [arg-a operator arg-b]
-  (complex [content-a arg-a, op operator, content-b arg-b]
-    [op content-a content-b]))
-
 (declare expr)
 
 (def parenthesized-expr
@@ -47,14 +43,14 @@
        function-level-expr))
 
 (def multiplication-level-expr
-  (alt (infix-expr*
+  (alt (conc
          #'multiplication-level-expr
          (alt multiplication-sign division-sign)
          pos-neg-level-expr)
        pos-neg-level-expr))
 
 (def addition-level-expr
-  (alt (infix-expr*
+  (alt (conc
          #'addition-level-expr
          (alt addition-sign minus-sign)
          multiplication-level-expr)
@@ -62,6 +58,6 @@
 
 (def expr addition-level-expr)
 
-(println (expr (make-state "3+1*(-(-5)+sin(2))" {} 0)))
+(println (expr (make-state "3+1*cos(-(-5)+sin(2))" {} 0)))
 ;(println (expr (make-state "1+3*2+2" {} 0)))
 ;(println (expr (make-state "2+3-2" {} 0)))

@@ -550,6 +550,9 @@
     (fn [state]
       ((m/m-seq subrules) state))))
 
+(defn vconc [& subrules]
+  (semantics (apply conc subrules) vec))
+
 (with-test
   (defn alt
     "Creates a rule that is the alternation
