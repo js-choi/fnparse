@@ -4,33 +4,6 @@
   [:require [clojure.contrib.monads :as m]]
   [:import [clojure.lang Sequential IPersistentMap IPersistentVector Var]])
 
-; A RULE is a a function that:
-; - Takes a state and returns either nil
-;   or a vector pair.
-;   - A STATE is a struct map that contains
-;     a remainder and maybe info.
-;     You create states using the make-state function.
-;   - A REMAINDER is a sequence or
-;     seqable collection of tokens.
-;     It is contained in the
-;     :name.choi.joshua.fnparse/remainder key.
-;   - A state can also contain INFO, which are
-;     any other attributes in the state. Common
-;     examples include current line and column numbers
-;     and a set of current warnings.
-; - If the remainder is VALID under the rule,
-;   it CONSUMES any valid tokens and returns a RESULT.
-;   - A RESULT is a vector pair containing
-;     a product and a new state.
-;   - The PRODUCT is the semantic data generated
-;     by the rule that corresponds to the
-;     information represented by the consumed tokens.
-;     It can be any object.
-;   - The new state is what the old state now looks like,
-;     after its first few tokens are consumed.
-; - If the given token sequence is INVALID, then
-;   the rule FAILS, meaning that it simply returns NIL.
- 
 (declare remember lit rep* rep+)
 
 (defprotocol ABankable

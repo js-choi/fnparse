@@ -36,21 +36,21 @@
   (alt parenthesized-expr terminal-level-expr))
 
 (def function-level-expr
-  (alt (conc name-level-expr parenthesized-expr) parenthesized-level-expr))
+  (alt (vconc name-level-expr parenthesized-expr) parenthesized-level-expr))
 
 (def pos-neg-level-expr
-  (alt (conc (alt positive-sign negative-sign) function-level-expr)
+  (alt (vconc (alt positive-sign negative-sign) function-level-expr)
        function-level-expr))
 
 (def multiplication-level-expr
-  (alt (conc
+  (alt (vconc
          #'multiplication-level-expr
          (alt multiplication-sign division-sign)
          pos-neg-level-expr)
        pos-neg-level-expr))
 
 (def addition-level-expr
-  (alt (conc
+  (alt (vconc
          #'addition-level-expr
          (alt addition-sign minus-sign)
          multiplication-level-expr)
