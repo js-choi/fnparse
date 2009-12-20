@@ -82,19 +82,9 @@
 (defn get-var-name [#^Var variable]
   (symbol (str (.ns variable)) (name (.sym variable))))
 
-(defmacro defrule
-  ([var-name rule]
-   (defrule var-name nil rule))
-  ([var-name doc-string rule]
-   `(let [var# (defvar ~var-name
-                 (fn ~var-name [state#] (~rule state#))
-                 ~doc-string)]
-      (alter-var-root var# name-rule (get-var-name var#))
-      var#)))
-
-; (defmacro defrulemaker
+; (defmacro defmaker
 ;   ([var-name args & body]
-;    (defrule var-name nil body))
+;    (def var-name nil body))
 ;   ([var-name doc-string args & body]
 ;    `(defn ~var-name ~doc-string ~args
 ;       (name-rule (do ~@body) (list ~var-name ~@args)))))
@@ -133,17 +123,17 @@
                 (set-bank basic-failure (get-bank (last results))))))))])
 
 (with-test
-  (defrule anything
-    "A rule that matches anything--that is, it matches
-    the first token of the tokens it is given.
-    This rule's product is the first token it receives.
-    It fails if there are no tokens left."
+  (defvar anything
     (m/with-monad parser-m
       (fn [state]
         (let [token (nth (:tokens state) (:position state) ::nothing)]
           (if (not= token ::nothing)
             [token (inc-position state)]
-            (m/m-zero state))))))
+            (m/m-zero state)))))
+    "A rule that matches anything--that is, it matches
+    the first token of the tokens it is given.
+    This rule's product is the first token it receives.
+    It fails if there are no tokens left.")
   (let [mock (mock-state '(A B C))]
     (is (= ['A (mock 1)] (anything (mock 0))))
     (is (failure? (anything (mock 3))))))
@@ -445,7 +435,7 @@
   [map-name name-token-map]
   (letfn [(make-rule-def-form [name-token-entry]
             (let [[rule-name token] name-token-entry]
-              `(defrule ~rule-name (lit ~token))))
+              `(def ~rule-name (lit ~token))))
           (make-keyword-rule-entry [name]
             [(keyword name) (first `(~name))])]
     (let [rule-def-forms (map make-rule-def-form name-token-map)
@@ -498,7 +488,7 @@
   (complex [subproduct subrule]
     semantic-value))
  
-; (defrule remainder-peek
+; (def remainder-peek
 ;   "A rule whose product is the very next
 ;   token in the remainder of any given state.
 ;   The new rule does not consume any tokens."

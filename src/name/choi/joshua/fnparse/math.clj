@@ -3,14 +3,14 @@
 
 (set! *warn-on-reflection* true)
 
-(defrule digit (term #(Character/isDigit (char %))))
+(def digit (term #(Character/isDigit (char %))))
 
 (deflits indicators
   {positive-sign \+, negative-sign \-, addition-sign \+, minus-sign \-,
    multiplication-sign \*, division-sign \/, opening-parenthesis \(,
    closing-parenthesis \)})
 
-(defrule indicator
+(def indicator
   (apply alt (vals indicators)))
 
 (def number-level-expr
