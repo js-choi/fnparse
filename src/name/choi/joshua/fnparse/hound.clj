@@ -1,5 +1,5 @@
 (ns name.choi.joshua.fnparse
-  [:use clojure.contrib.except clojure.contrib.def clojure.test]
+  [:use clojure.contrib.seq-utils clojure.contrib.def clojure.test]
   [:require [clojure.contrib.monads :as m]]
   [:import [clojure.lang Sequential IPersistentMap IPersistentVector Var]])
 
@@ -49,10 +49,10 @@
   [m-zero
      (fn [state] (Reply false basic-failure))
    m-result
-     (fn m-result-parser [product]
+     (fn [product]
        (fn [state] (Reply false [product state])))
    m-bind
-     (fn m-bind-parser [rule product-fn]
+     (fn [rule product-fn]
        (letfn [(apply-product-fn [result]
                  (let [[product state] result]
                    ((product-fn product) state)))]
@@ -69,30 +69,16 @@
                  (if (failure? result)
                    (Reply false result)
                    (apply-product-fn result))))))))
-;    m-plus
-;     (fn m-plus-parser [& rules]
-;       (remember
-;         (fn summed-rule [state]
-;           (loop [remaining-rules rules, cur-state state]
-;             (if (empty? remaining-rules)
-;               (set-bank basic-failure (get-bank cur-state))
-;               (let [cur-rule (first remaining-rules)
-;                     cur-result (cur-rule cur-state)]
-;                 (if (success? cur-result)
-;                   cur-result
-;                   (recur (next remaining-rules)
-;                          (set-bank cur-state (get-bank cur-result))))))))))])
-  ])
-
-(defn anything [state]
-  (m/with-monad parser-m
-    (if-let [remainder (-> state :remainder seq)]
-      (Reply true
-        (delay [(first remainder) (assoc state :remainder (next remainder))]))
-      (Reply false basic-failure))))
-
-(defvar emptiness
-  (m/with-monad parser-m (m-result nil)))
+   m-plus
+     (letfn [(result-failure? [reply]
+               (-> reply :result force failure?))]
+       (fn [& rules]
+         (fn [state]
+           (let [[consuming-replies empty-replies]
+                   (->> rules (map #(% state)) (separate :tokens-consumed?))]
+             (or (first (drop-while result-failure? consuming-replies))
+                 (first (drop-while result-failure? empty-replies))
+                 (m-zero state))))))])
 
 (defmacro complex
   "Creates a complex rule in monadic
@@ -120,12 +106,36 @@
   [steps & product-expr]
   `(m/domonad parser-m ~steps ~@product-expr))
 
+(defn anything [state]
+  (m/with-monad parser-m
+    (if-let [remainder (-> state :remainder seq)]
+      (Reply true
+        (delay [(first remainder) (assoc state :remainder (next remainder))]))
+      (Reply false basic-failure))))
+
+(defvar emptiness
+  (m/with-monad parser-m (m/m-result nil)))
+
+(defvar nothing
+  (m/with-monad parser-m m/m-zero))
+
 (defn validate [subrule predicate]
   (complex [product subrule, :when (predicate product)]
     product))
 
-(def rule (complex [a anything, b anything] [a b]))
+(defn term [predicate]
+  (validate anything predicate))
+
+(defn lit [token]
+  (term (partial = token)))
+
+(defn alt [& subrules]
+  (m/with-monad parser-m
+    (apply m/m-plus subrules)))
+
+;(def rule (complex [a anything, b anything] [a b]))
 ;(def rule (validate anything (partial = 'a)))
+(def rule (alt emptiness (lit 'b) (lit 'a)))
 
 (-> '[a b c] make-state rule println)
 
