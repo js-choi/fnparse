@@ -82,12 +82,12 @@
 (defn get-var-name [#^Var variable]
   (symbol (str (.ns variable)) (name (.sym variable))))
 
-; (defmacro defmaker
-;   ([var-name args & body]
-;    (def var-name nil body))
-;   ([var-name doc-string args & body]
+; (defmacro defrulemaker
+;   ([var-name args body]
+;    (defrulemaker var-name nil body))
+;   ([var-name doc-string args body]
 ;    `(defn ~var-name ~doc-string ~args
-;       (name-rule (do ~@body) (list ~var-name ~@args)))))
+;       ~body)))
 
 (defvar- basic-failure (Failure))
 
