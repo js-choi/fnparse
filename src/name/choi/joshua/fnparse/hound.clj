@@ -1,5 +1,5 @@
 (ns name.choi.joshua.fnparse
-  [:use clojure.contrib.seq-utils clojure.contrib.def clojure.test]
+  [:use clojure.contrib.seq-utils clojure.contrib.def clojure.test clojure.set]
   [:require [clojure.contrib.monads :as m]]
   [:import [clojure.lang Sequential IPersistentMap IPersistentVector Var]])
 
@@ -29,16 +29,19 @@
 ;     after its first few tokens are consumed.
 ; - If the given token sequence is INVALID, then
 ;   the rule FAILS, meaning that it simply returns NIL.
- 
+
 (deftype State [remainder position] IPersistentMap)
-
-(deftype Failure [] IPersistentMap)
-
-(deftype Success [product state] IPersistentMap)
 
 (deftype Reply [tokens-consumed? result] IPersistentMap)
 
-(defvar- basic-failure (Failure))
+(deftype Expectation [position unexpected-token expected-rules] IPersistentMap)
+
+(deftype Failure [expectation] IPersistentMap)
+
+(deftype Success [product state expectation]
+  ; The expectation is that of the error that would have
+  ; occurred if this successful alternative wasn't taken.
+  IPersistentMap)
 
 (defn make-state [remainder]
   (State remainder 0))
@@ -46,13 +49,27 @@
 (defn failure? [result]
   (isa? (type result) ::Failure))
 
+(defn merge-expectations [merger mergee]
+  (update-in merger [:expected-rules]
+    union (:expected-rules mergee)))
+
+(defn merge-results [merger mergee]
+  (update-in merger [:expectation]
+    merge-expectations (:expectation mergee)))
+
 (m/defmonad parser-m
   "The monad that FnParse uses."
   [m-zero
-     (fn [state] (Reply false basic-failure))
+     (fn [state]
+       (Reply false (Failure (Expectation (:position state)
+                                          (first (:remainder state))
+                                          nil))))
    m-result
      (fn [product]
-       (fn [state] (Reply false (Success product state))))
+       (fn [state]
+         (Reply false
+           (Success product state
+             (Expectation (:position state) nil nil)))))
    m-bind
      (fn [rule product-fn]
        (letfn [(apply-product-fn [result]
@@ -111,11 +128,14 @@
 
 (defn anything [state]
   (m/with-monad parser-m
-    (if-let [remainder (-> state :remainder seq)]
-      (Reply true (delay (Success (first remainder)
-                                  (assoc state :remainder
-                                    (next remainder)))))
-      (Reply false basic-failure))))
+    (let [position (:position state)]
+      (if-let [remainder (-> state :remainder seq)]
+        (Reply true (delay (Success (first remainder)
+                                    (assoc state
+                                      :remainder (next remainder)
+                                      :position (inc position))
+                                    (Expectation position nil nil))))
+      (Reply false (Failure (Expectation position :more-tokens nil)))))))
 
 (defvar emptiness
   (m/with-monad parser-m (m/m-result nil)))
