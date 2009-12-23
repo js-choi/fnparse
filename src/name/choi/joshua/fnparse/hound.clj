@@ -133,9 +133,17 @@
   (m/with-monad parser-m
     (apply m/m-plus subrules)))
 
+(defn conc [& subrules]
+  (m/with-monad parser-m
+    (m/m-seq subrules)))
+
+(defn map-conc
+  ([tokens] (map-conc lit tokens))
+  ([rule-maker tokens] (apply conc (map rule-maker tokens))))
+
 ;(def rule (complex [a anything, b anything] [a b]))
 ;(def rule (validate anything (partial = 'a)))
-(def rule (alt emptiness (lit 'b) (lit 'a)))
+(def rule (map-conc '[a b]))
 
 (-> '[a b c] make-state rule println)
 
