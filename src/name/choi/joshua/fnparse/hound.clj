@@ -30,19 +30,21 @@
 ; - If the given token sequence is INVALID, then
 ;   the rule FAILS, meaning that it simply returns NIL.
  
-(deftype State [remainder] IPersistentMap)
+(deftype State [remainder position] IPersistentMap)
 
 (deftype Failure [] IPersistentMap)
 
-(defn make-state [remainder]
-  (State remainder))
-
-(defn failure? [result]
-  (isa? (type result) ::Failure))
+(deftype Success [product state] IPersistentMap)
 
 (deftype Reply [tokens-consumed? result] IPersistentMap)
 
 (defvar- basic-failure (Failure))
+
+(defn make-state [remainder]
+  (State remainder 0))
+
+(defn failure? [result]
+  (isa? (type result) ::Failure))
 
 (m/defmonad parser-m
   "The monad that FnParse uses."
@@ -50,12 +52,11 @@
      (fn [state] (Reply false basic-failure))
    m-result
      (fn [product]
-       (fn [state] (Reply false [product state])))
+       (fn [state] (Reply false (Success product state))))
    m-bind
      (fn [rule product-fn]
        (letfn [(apply-product-fn [result]
-                 (let [[product state] result]
-                   ((product-fn product) state)))]
+                 ((product-fn (:product result)) (:state result)))]
          (fn [state]
            (let [reply (rule state)]
              (if (:tokens-consumed? reply)
@@ -111,8 +112,9 @@
 (defn anything [state]
   (m/with-monad parser-m
     (if-let [remainder (-> state :remainder seq)]
-      (Reply true
-        (delay [(first remainder) (assoc state :remainder (next remainder))]))
+      (Reply true (delay (Success (first remainder)
+                                  (assoc state :remainder
+                                    (next remainder)))))
       (Reply false basic-failure))))
 
 (defvar emptiness
