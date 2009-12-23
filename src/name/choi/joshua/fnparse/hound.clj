@@ -76,9 +76,12 @@
          (fn [state]
            (let [[consuming-replies empty-replies]
                    (->> rules (map #(% state)) (separate :tokens-consumed?))]
-             (or (first (drop-while result-failure? consuming-replies))
-                 (first (drop-while result-failure? empty-replies))
-                 (m-zero state))))))])
+             (println consuming-replies)
+             (if (empty? consuming-replies)
+               (or (first (drop-while #(-> % :result force failure?)
+                            empty-replies))
+                   (m-zero state))
+               (first consuming-replies))))))])
 
 (defmacro complex
   "Creates a complex rule in monadic
@@ -143,9 +146,10 @@
 
 ;(def rule (complex [a anything, b anything] [a b]))
 ;(def rule (validate anything (partial = 'a)))
-(def rule (map-conc '[a b]))
+;(def rule (map-conc '[a b]))
+(def rule (alt (map-conc "let 3") (lit \3)))
 
-(-> '[a b c] make-state rule println)
+(-> "3" make-state rule println)
 
 ; (with-test
 ;   (defrule anything
