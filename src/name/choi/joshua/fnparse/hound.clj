@@ -76,7 +76,6 @@
          (fn [state]
            (let [[consuming-replies empty-replies]
                    (->> rules (map #(% state)) (separate :tokens-consumed?))]
-             (println consuming-replies)
              (if (empty? consuming-replies)
                (or (first (drop-while #(-> % :result force failure?)
                             empty-replies))
@@ -144,10 +143,14 @@
   ([tokens] (map-conc lit tokens))
   ([rule-maker tokens] (apply conc (map rule-maker tokens))))
 
+(defn lex [subrule]
+  (fn [state]
+    (-> state subrule (assoc :tokens-consumed? false))))
+
 ;(def rule (complex [a anything, b anything] [a b]))
 ;(def rule (validate anything (partial = 'a)))
 ;(def rule (map-conc '[a b]))
-(def rule (alt (map-conc "let 3") (lit \3)))
+(def rule (alt (lex (map-conc "let 3")) (lit \3)))
 
 (-> "3" make-state rule println)
 
