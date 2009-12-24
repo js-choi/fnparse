@@ -3,6 +3,8 @@
   [:require [clojure.contrib.monads :as m]]
   [:import [clojure.lang Sequential IPersistentMap IPersistentVector Var]])
 
+(set! *warn-on-reflection* true)
+
 ; A RULE is a a function that:
 ; - Takes a state and returns either nil
 ;   or a vector pair.
@@ -57,9 +59,13 @@
   (update-in merger [:expectation]
     merge-expectations (:expectation mergee)))
 
-(defn merge-replies [merger mergee]
-  (update-in merger [:replies]
-    merge-results (:replies mergee)))
+(letfn [(reply-expected-rules [reply]
+          (-> reply :result :expectation :expected-rules))]
+  (defn merge-replies [merger mergee]
+    (let [merger-set (reply-expected-rules merger)
+          mergee-set (reply-expected-rules mergee)]
+      (assoc-in merger [:result :expectation :expected-rules]
+        (union merger-set mergee-set)))))
 
 (m/defmonad parser-m
   "The monad that FnParse uses."
@@ -87,7 +93,7 @@
                      (if (failure? result)
                        result
                        (-> result apply-product-fn :result force)))))
-               (let [result (-> reply :result force)]
+               (let [result (-> reply :result)]
                  (if (failure? result)
                    (Reply false result)
                    (apply-product-fn result))))))))
@@ -98,14 +104,13 @@
          (fn [state]
            (let [[consuming-replies empty-replies]
                    (->> rules (map #(% state)) (separate :tokens-consumed?))]
-             ;(println ">>>" consuming-replies empty-replies)
-             (println ">>>" (->> rules (map #(% state))))
              (if (empty? consuming-replies)
-               (or (->> empty-replies
-                     (reductions merge-replies)
-                     (drop-while #(-> % :result force failure?))
-                     first)
-                   (m-zero state))
+               (if (empty? empty-replies)
+                 (m-zero state)
+                 (let [empty-replies (reductions merge-replies empty-replies)]
+                   (or (first (drop-while #(-> % :result failure?)
+                         empty-replies))
+                       (last empty-replies))))
                (first consuming-replies))))))])
 
 (defmacro complex
@@ -134,16 +139,23 @@
   [steps & product-expr]
   `(m/domonad parser-m ~steps ~@product-expr))
 
-(defn anything [state]
+(defn term [predicate]
   (m/with-monad parser-m
-    (let [position (:position state)]
-      (if-let [remainder (-> state :remainder seq)]
-        (Reply true (delay (Success (first remainder)
-                                    (assoc state
-                                      :remainder (next remainder)
-                                      :position (inc position))
-                                    (Expectation position nil nil))))
-      (Reply false (Failure (Expectation position :more-tokens nil)))))))
+    (fn [state]
+      (let [position (:position state)]
+        (if-let [remainder (-> state :remainder seq)]
+          (let [first-token (first remainder)]
+            (if (predicate first-token)
+              (Reply true (delay (Success first-token
+                                          (assoc state
+                                            :remainder (next remainder)
+                                            :position (inc position))
+                                          (Expectation position nil nil))))
+              (Reply false (Failure (Expectation position first-token nil)))))
+          (Reply false (Failure (Expectation position :nothing nil))))))))
+
+(defvar anything
+  (term (constantly true)))
 
 (defvar emptiness
   (m/with-monad parser-m (m/m-result nil)))
@@ -151,15 +163,19 @@
 (defvar nothing
   (m/with-monad parser-m m/m-zero))
 
-(defn validate [subrule predicate]
-  (complex [product subrule, :when (predicate product)]
-    product))
+(defn with-label [label rule]
+  (fn [state]
+    (let [reply (rule state)]
+      (if (:tokens-consumed? reply)
+        reply
+        (assoc-in reply [:result :expectation :expected-rules]
+          #{label})))))
 
-(defn term [predicate]
-  (validate anything predicate))
+(defn lit* [token]
+  (term (partial = token)))
 
 (defn lit [token]
-  (term (partial = token)))
+  (with-label token (lit* token)))
 
 (defn alt [& subrules]
   (m/with-monad parser-m
@@ -173,27 +189,44 @@
   ([tokens] (map-conc lit tokens))
   ([rule-maker tokens] (apply conc (map rule-maker tokens))))
 
+(defn map-alt
+  ([tokens] (map-alt lit tokens))
+  ([rule-maker tokens] (apply alt (map rule-maker tokens))))
+
 (defn lex [subrule]
   (fn [state]
     (-> state subrule (assoc :tokens-consumed? false))))
 
-(defn with-label [label rule]
-  (fn [state]
-    (let [reply (rule state)]
-      (if (:tokens-consumed? reply)
-        reply
-        (-> reply :result force (assoc-in [:expectation :expectation-rules]
-                                  #{label}))))))
+(defvar decimal-digit
+  (with-label "decimal digit" (map-alt lit* "1234567890")))
+
+(defvar hexadecimal-digit
+  (with-label "hexadecimal digit"
+    (map-alt lit* "1234567890ABCDEFabcdef")))
+
+(defvar uppercase-ascii-letter
+  (with-label "uppercase ASCII letter"
+    (map-alt lit* "ABCDEFGHIJKLMNOPQRSTUVWXYZ")))
+
+(defvar lowercase-ascii-letter
+  (with-label "lowercase ASCII letter"
+    (map-alt lit* "abcdefghijklmnopqrstuvwxyz")))
+
+(defvar ascii-letter
+  (with-label "ASCII letter"
+    (alt uppercase-ascii-letter lowercase-ascii-letter)))
 
 ; (def rule (complex [a anything, b anything] [a b]))
 ; (def rule (validate anything (partial = 'a)))
 ; (def rule (map-conc '[a b]))
-(def rule (lit \3))
+; (def rule (lit \3))
 ; (def rule (alt (lex (map-conc "let 3")) (lit \3)))
+; (def rule (lex (with-label "let expr" (map-conc "let 3"))))
 ; (def rule (alt (lex (with-label "let expr" (map-conc "let 3")))
-;                (with-label "3" (lit \3))))
+;                (lit \3)))
+(def rule decimal-digit)
 
-(-> "a3" make-state rule println)
+(-> "153" make-state rule println)
 
 ; (with-test
 ;   (defrule anything
