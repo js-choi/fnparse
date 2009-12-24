@@ -216,6 +216,10 @@
   (with-label "ASCII letter"
     (alt uppercase-ascii-letter lowercase-ascii-letter)))
 
+(defn rep* [rule]
+  ; TODO: change so that the stack doesn't blow up
+  
+
 ; (def rule (complex [a anything, b anything] [a b]))
 ; (def rule (validate anything (partial = 'a)))
 ; (def rule (map-conc '[a b]))
@@ -224,7 +228,7 @@
 ; (def rule (lex (with-label "let expr" (map-conc "let 3"))))
 ; (def rule (alt (lex (with-label "let expr" (map-conc "let 3")))
 ;                (lit \3)))
-(def rule decimal-digit)
+(def rule (rep* decimal-digit))
 
 (-> "153" make-state rule println)
 
