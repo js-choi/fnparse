@@ -57,6 +57,10 @@
   (update-in merger [:expectation]
     merge-expectations (:expectation mergee)))
 
+(defn merge-replies [merger mergee]
+  (update-in merger [:replies]
+    merge-results (:replies mergee)))
+
 (m/defmonad parser-m
   "The monad that FnParse uses."
   [m-zero
@@ -94,9 +98,13 @@
          (fn [state]
            (let [[consuming-replies empty-replies]
                    (->> rules (map #(% state)) (separate :tokens-consumed?))]
+             ;(println ">>>" consuming-replies empty-replies)
+             (println ">>>" (->> rules (map #(% state))))
              (if (empty? consuming-replies)
-               (or (first (drop-while #(-> % :result force failure?)
-                            empty-replies))
+               (or (->> empty-replies
+                     (reductions merge-replies)
+                     (drop-while #(-> % :result force failure?))
+                     first)
                    (m-zero state))
                (first consuming-replies))))))])
 
@@ -169,12 +177,23 @@
   (fn [state]
     (-> state subrule (assoc :tokens-consumed? false))))
 
-;(def rule (complex [a anything, b anything] [a b]))
-;(def rule (validate anything (partial = 'a)))
-;(def rule (map-conc '[a b]))
-(def rule (alt (lex (map-conc "let 3")) (lit \3)))
+(defn with-label [label rule]
+  (fn [state]
+    (let [reply (rule state)]
+      (if (:tokens-consumed? reply)
+        reply
+        (-> reply :result force (assoc-in [:expectation :expectation-rules]
+                                  #{label}))))))
 
-(-> "3" make-state rule println)
+; (def rule (complex [a anything, b anything] [a b]))
+; (def rule (validate anything (partial = 'a)))
+; (def rule (map-conc '[a b]))
+(def rule (lit \3))
+; (def rule (alt (lex (map-conc "let 3")) (lit \3)))
+; (def rule (alt (lex (with-label "let expr" (map-conc "let 3")))
+;                (with-label "3" (lit \3))))
+
+(-> "a3" make-state rule println)
 
 ; (with-test
 ;   (defrule anything
