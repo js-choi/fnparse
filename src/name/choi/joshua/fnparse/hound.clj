@@ -1,6 +1,6 @@
 (ns name.choi.joshua.fnparse
-  [:use clojure.contrib.seq-utils clojure.contrib.def clojure.test clojure.set]
-  [:require [clojure.contrib.monads :as m]]
+  [:use clojure.contrib.seq-utils clojure.contrib.def clojure.test
+        clojure.set clojure.contrib.monads]
   [:import [clojure.lang Sequential IPersistentMap IPersistentVector Var]])
 
 (set! *warn-on-reflection* true)
@@ -51,23 +51,15 @@
 (defn failure? [result]
   (isa? (type result) ::Failure))
 
-(defn merge-expectations [merger mergee]
-  (update-in merger [:expected-rules]
-    union (:expected-rules mergee)))
-
-(defn merge-results [merger mergee]
-  (update-in merger [:expectation]
-    merge-expectations (:expectation mergee)))
-
 (letfn [(reply-expected-rules [reply]
           (-> reply :result :expectation :expected-rules))]
-  (defn merge-replies [merger mergee]
+  (defn merge-replies [mergee merger]
     (let [merger-set (reply-expected-rules merger)
           mergee-set (reply-expected-rules mergee)]
       (assoc-in merger [:result :expectation :expected-rules]
         (union merger-set mergee-set)))))
 
-(m/defmonad parser-m
+(defmonad parser-m
   "The monad that FnParse uses."
   [m-zero
      (fn [state]
@@ -109,7 +101,7 @@
                  (m-zero state)
                  (let [empty-replies (reductions merge-replies empty-replies)]
                    (or (first (drop-while #(-> % :result failure?)
-                         empty-replies))
+                                empty-replies))
                        (last empty-replies))))
                (first consuming-replies))))))])
 
@@ -137,10 +129,10 @@
   It's basically like let, for, or any other
   monad. Very useful!"
   [steps & product-expr]
-  `(m/domonad parser-m ~steps ~@product-expr))
+  `(domonad parser-m ~steps ~@product-expr))
 
 (defn term [predicate]
-  (m/with-monad parser-m
+  (with-monad parser-m
     (fn [state]
       (let [position (:position state)]
         (if-let [remainder (-> state :remainder seq)]
@@ -157,11 +149,14 @@
 (defvar anything
   (term (constantly true)))
 
+(defn with-result [product]
+  (with-monad parser-m (m-result product)))
+
 (defvar emptiness
-  (m/with-monad parser-m (m/m-result nil)))
+  (with-result nil))
 
 (defvar nothing
-  (m/with-monad parser-m m/m-zero))
+  (with-monad parser-m m-zero))
 
 (defn with-label [label rule]
   (fn [state]
@@ -178,12 +173,15 @@
   (with-label token (lit* token)))
 
 (defn alt [& subrules]
-  (m/with-monad parser-m
-    (apply m/m-plus subrules)))
+  (with-monad parser-m
+    (apply m-plus subrules)))
 
 (defn conc [& subrules]
-  (m/with-monad parser-m
-    (m/m-seq subrules)))
+  (with-monad parser-m
+    (m-seq subrules)))
+
+(defn opt [rule]
+  (alt rule emptiness))
 
 (defn map-conc
   ([tokens] (map-conc lit tokens))
@@ -216,9 +214,16 @@
   (with-label "ASCII letter"
     (alt uppercase-ascii-letter lowercase-ascii-letter)))
 
+(defn debug [x] (println ">" x) x)
+
 (defn rep* [rule]
-  ; TODO: change so that the stack doesn't blow up
-  
+  (complex [first-token rule
+            rest-tokens (opt (rep* rule))]
+    (cons first-token rest-tokens)))
+
+; (defn rep* [rule]
+;   (with-monad parser-m
+;     (m-seq-while (complement failure?) (repeat 10 rule))))
 
 ; (def rule (complex [a anything, b anything] [a b]))
 ; (def rule (validate anything (partial = 'a)))
@@ -228,9 +233,11 @@
 ; (def rule (lex (with-label "let expr" (map-conc "let 3"))))
 ; (def rule (alt (lex (with-label "let expr" (map-conc "let 3")))
 ;                (lit \3)))
-(def rule (rep* decimal-digit))
+;(def rule emptiness)
+(def rule (opt (lit \3)))
+;(def rule (rep* decimal-digit))
 
-(-> "153" make-state rule println)
+(-> "" make-state rule println)
 
 ; (with-test
 ;   (defrule anything
@@ -239,17 +246,17 @@
 ;     This rule's product is the first token it receives.
 ;     It fails if there are no tokens left."
 ;     (fn [state]
-;       (m/with-monad parser-m
+;       (with-monad parser-m
 ;         (let [token (nth (get-tokens state) (get-index state) ::nothing)]
 ;           (if (not= token ::nothing)
 ;             [token (inc-index state)]
-;             (m/m-zero state))))))
+;             (m-zero state))))))
 ;   (let [input '(A B C)]
 ;     (is (= ['A (make-cf-state input 1)] (anything (make-cf-state input 0))))
 ;     (is (failure? (anything (State input 3 nil))))))
 ; 
-; (m/with-monad parser-m
-;   (defvar nothing m/m-zero))
+; (with-monad parser-m
+;   (defvar nothing m-zero))
 ; 
 ; (with-test
 ;   (defmacro complex
@@ -276,17 +283,17 @@
 ;     It's basically like let, for, or any other
 ;     monad. Very useful!"
 ;     [steps & product-expr]
-;     `(m/domonad parser-m ~steps ~@product-expr)))
+;     `(domonad parser-m ~steps ~@product-expr)))
 ; 
 ; (defvar- fetch-state
-;   (m/fetch-state)
+;   (fetch-state)
 ;   "A rule that consumes no tokens. Its product
 ;   is the entire current state.
 ;   [Equivalent to the result of fetch-state
 ;   from clojure.contrib.monads.]")
 ; 
 ; (defn- set-state [state]
-;   (m/set-state state))
+;   (set-state state))
 ; 
 ; (defn fetch-info
 ;   "Creates a rule that consumes no tokens.
@@ -294,7 +301,7 @@
 ;   of the given key in the current state.
 ;   [Equivalent to fetch-val from clojure.contrib.monads.]"
 ;   [key]
-;   (m/fetch-val key))
+;   (fetch-val key))
 ; 
 ; ; (with-test
 ; ;   (defn fetch-remainder
@@ -305,7 +312,7 @@
 ; ;     (fetch-val get-remainder) from
 ; ;     clojure.contrib.monads.]"
 ; ;     []
-; ;     (m/fetch-val get-remainder))
+; ;     (fetch-val get-remainder))
 ; ;   (is (= ((complex [remainder (fetch-remainder)] remainder)
 ; ;           (make-cf-state ["hi" "THEN"]))
 ; ;          [["hi" "THEN"] (make-cf-state ["hi" "THEN"])])))
@@ -319,7 +326,7 @@
 ; ;   [Equivalent to set-val from
 ; ;   clojure.contrib.monads.]"
 ; ;   [key value]
-; ;   (m/set-val key value))
+; ;   (set-val key value))
 ; ;  
 ; ; (with-test
 ; ;   (defn update-info
@@ -332,14 +339,14 @@
 ; ;     the changed key.
 ; ;     [Equivalent to update-val from clojure.contrib.monads.]"
 ; ;     [key val-update-fn & args]
-; ;     (m/update-val key #(apply val-update-fn % args)))
+; ;     (update-val key #(apply val-update-fn % args)))
 ; ;   (let [mock-state (partial make-state '(A))]
 ; ;     (is (= [#{} (mock-state 1 {:variables #{'foo}})]
 ; ;             ((update-info :variables conj 'foo)
 ; ;              (mock-state 0 {:variables #{}}))))))
 ;  
 ; (with-test
-;   (m/with-monad parser-m
+;   (with-monad parser-m
 ;     (defvar emptiness
 ;       (m-result nil)
 ;       "A rule that matches emptiness--that
@@ -426,7 +433,7 @@
 ;   (complex [state fetch-state, subproduct subrule, _ (set-state state)]
 ;     subproduct))
 ; 
-; (m/with-monad parser-m
+; (with-monad parser-m
 ;   (defn not-followed-by
 ;     "Creates a rule that does not consume
 ;     any tokens, but fails when the given
@@ -436,7 +443,7 @@
 ;     (fn [state]
 ;       (if (failure? (subrule state))
 ;         [true state]
-;         (m/m-zero state)))))
+;         (m-zero state)))))
 ; 
 ; (defn semantics
 ;   "Creates a rule with a semantic hook,
@@ -477,9 +484,9 @@
 ;   it receives, so that it accepts expressions
 ;   containing unbound variables that are defined later."
 ;   [& subrules]
-;   (m/with-monad parser-m
+;   (with-monad parser-m
 ;     (fn [state]
-;       ((m/m-seq subrules) state))))
+;       ((m-seq subrules) state))))
 ; 
 ; (with-test
 ;   (defn alt
@@ -497,7 +504,7 @@
 ;     receives, so that it accepts expressions containing
 ;     unbound variables that are defined later."
 ;     [& subrules]
-;     (m/with-monad parser-m (apply m/m-plus subrules)))
+;     (with-monad parser-m (apply m-plus subrules)))
 ;   (let [rule (alt (lit "hi") (lit "THEN"))
 ;         mock-state (partial make-cf-state ["THEN" "bye"])]
 ;     (is (= (rule (mock-state 0)) ["THEN" (mock-state 1)]))
@@ -541,7 +548,7 @@
 ; ;     (def a (opt b)) would be equivalent to the EBNF:
 ; ;       a = b?;"
 ; ;     [subrule]
-; ;     (m/with-monad parser-m
+; ;     (with-monad parser-m
 ; ;       (m-plus subrule emptiness)))
 ; ;   (let [opt-true (opt (lit "true"))]
 ; ;     (is (= (opt-true (make-cf-state ["true" "THEN"]))
@@ -586,8 +593,8 @@
 ; ;     ([token-seq]
 ; ;      (lit-conc-seq token-seq lit))
 ; ;     ([token-seq rule-maker]
-; ;      (m/with-monad parser-m
-; ;        (m/m-seq (map rule-maker token-seq)))))
+; ;      (with-monad parser-m
+; ;        (m-seq (map rule-maker token-seq)))))
 ; ;   (is (= ((lit-conc-seq "THEN") (make-cf-state "THEN print 42;"))
 ; ;          [(vec "THEN") (make-cf-state (seq " print 42;"))])
 ; ;       "created literal-sequence rule is based on sequence of given token sequencible")
@@ -610,7 +617,7 @@
 ; ;     ([token-seq]
 ; ;      (lit-alt-seq token-seq lit))
 ; ;     ([token-seq rule-maker]
-; ;      (m/with-monad parser-m
+; ;      (with-monad parser-m
 ; ;        (apply m-plus (map rule-maker token-seq)))))
 ; ;   (is (= ((lit-alt-seq "ABCD") (make-cf-state (seq "B 2")))
 ; ;          [\B (make-cf-state (seq " 2"))])
@@ -814,8 +821,8 @@
 ; ;     (factor= 3 :a) would eat the first three
 ; ;     tokens [:a :a :b] and fail."
 ; ;     [factor subrule]
-; ;     (m/with-monad parser-m
-; ;       (m/m-seq (replicate factor subrule))))
+; ;     (with-monad parser-m
+; ;       (m-seq (replicate factor subrule))))
 ; ;   (let [tested-rule-3 (factor= 3 (lit "A"))
 ; ;         tested-rule-0 (factor= 0 (lit "A"))]
 ; ;     (is (= (tested-rule-3 (make-cf-state (list "A" "A" "A" "A" "C")))
