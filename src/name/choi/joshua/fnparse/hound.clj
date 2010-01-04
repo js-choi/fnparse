@@ -1,4 +1,4 @@
-(ns name.choi.joshua.fnparse
+(ns name.choi.joshua.fnparse.hound
   [:use clojure.contrib.seq-utils clojure.contrib.def clojure.test
         clojure.set clojure.contrib.monads]
   [:import [clojure.lang Sequential IPersistentMap IPersistentVector Var]])
@@ -184,11 +184,11 @@
   (alt rule emptiness))
 
 (defn mapconc
-  ([tokens] (map-conc lit tokens))
+  ([tokens] (mapconc lit tokens))
   ([rule-maker tokens] (apply conc (map rule-maker tokens))))
 
 (defn mapalt
-  ([tokens] (map-alt lit tokens))
+  ([tokens] (mapalt lit tokens))
   ([rule-maker tokens] (apply alt (map rule-maker tokens))))
 
 (defn lex [subrule]
@@ -196,19 +196,19 @@
     (-> state subrule (assoc :tokens-consumed? false))))
 
 (defvar decimal-digit
-  (with-label "decimal digit" (map-alt lit* "1234567890")))
+  (with-label "decimal digit" (mapalt lit* "1234567890")))
 
 (defvar hexadecimal-digit
   (with-label "hexadecimal digit"
-    (map-alt lit* "1234567890ABCDEFabcdef")))
+    (mapalt lit* "1234567890ABCDEFabcdef")))
 
 (defvar uppercase-ascii-letter
   (with-label "uppercase ASCII letter"
-    (map-alt lit* "ABCDEFGHIJKLMNOPQRSTUVWXYZ")))
+    (mapalt lit* "ABCDEFGHIJKLMNOPQRSTUVWXYZ")))
 
 (defvar lowercase-ascii-letter
   (with-label "lowercase ASCII letter"
-    (map-alt lit* "abcdefghijklmnopqrstuvwxyz")))
+    (mapalt lit* "abcdefghijklmnopqrstuvwxyz")))
 
 (defvar ascii-letter
   (with-label "ASCII letter"
@@ -226,19 +226,22 @@
 ;   (with-monad parser-m
 ;     (m-seq-while (complement failure?) (repeat 10 rule))))
 
+(defn rep+ [rule]
+  (opt (rep* rule)))
+
 ; (def rule (complex [a anything, b anything] [a b]))
 ; (def rule (validate anything (partial = 'a)))
-; (def rule (map-conc '[a b]))
+; (def rule (mapconc '[a b]))
 ; (def rule (lit \3))
-; (def rule (alt (lex (map-conc "let 3")) (lit \3)))
-; (def rule (lex (with-label "let expr" (map-conc "let 3"))))
-; (def rule (alt (lex (with-label "let expr" (map-conc "let 3")))
+; (def rule (alt (lex (mapconc "let 3")) (lit \3)))
+; (def rule (lex (with-label "let expr" (mapconc "let 3"))))
+; (def rule (alt (lex (with-label "let expr" (mapconc "let 3")))
 ;                (lit \3)))
 ;(def rule emptiness)
-(def rule (rep* (lit \3)))
+;(def rule (rep* (lit \3)))
 ;(def rule (rep* decimal-digit))
 
-(-> "33" make-state rule println)
+;(-> "33" make-state rule println)
 
 ; (with-test
 ;   (defrule anything
