@@ -131,23 +131,37 @@
   [steps & product-expr]
   `(domonad parser-m ~steps ~@product-expr))
 
-(defn term [predicate]
+(defn with-label [label rule]
+  (fn [state]
+    (let [reply (rule state)]
+      (if (:tokens-consumed? reply)
+        reply
+        (assoc-in reply [:result :expectation :expected-rules]
+          #{label})))))
+
+(defn term [label predicate]
   (with-monad parser-m
-    (fn [state]
-      (let [position (:position state)]
-        (if-let [remainder (-> state :remainder seq)]
-          (let [first-token (first remainder)]
-            (if (predicate first-token)
-              (Reply true (delay (Success first-token
-                                          (assoc state
-                                            :remainder (next remainder)
-                                            :position (inc position))
-                                          (Expectation position nil nil))))
-              (Reply false (Failure (Expectation position first-token nil)))))
-          (Reply false (Failure (Expectation position :nothing nil))))))))
+    (with-label label
+      (fn [state]
+        (let [position (:position state)]
+          (if-let [remainder (-> state :remainder seq)]
+            (let [first-token (first remainder)]
+              (if (predicate first-token)
+                (Reply true
+                  (delay (Success first-token
+                           (assoc state
+                             :remainder (next remainder)
+                             :position (inc position))
+                           (Expectation position nil nil))))
+                (Reply false (Failure (Expectation position
+                                        first-token nil)))))
+            (Reply false (Failure (Expectation position :nothing nil)))))))))
+
+(defn antiterm [label pred]
+  (term label (complement pred)))
 
 (defvar anything
-  (term (constantly true)))
+  (term "anything" (constantly true)))
 
 (defn with-result [product]
   (with-monad parser-m (m-result product)))
@@ -158,30 +172,17 @@
 (defvar nothing
   (with-monad parser-m m-zero))
 
-(defn with-label [label rule]
-  (fn [state]
-    (let [reply (rule state)]
-      (if (:tokens-consumed? reply)
-        reply
-        (assoc-in reply [:result :expectation :expected-rules]
-          #{label})))))
-
-(defn lit* [token]
-  (term (partial = token)))
-
 (defn lit [token]
-  (with-label token (lit* token)))
+  (term token #(= token %)))
 
-(defn string-set [string]
-  (into #{} string))
+(defn antilit [token]
+  (term (str "anything except " token) #(not= token %)))
 
-(defn multilit [label tokens]
-  (with-label label (term (into #{} tokens))))
+(defn set-lit [label tokens]
+  (term label (set tokens)))
 
-(defn anti-multilit [label tokens]
-  (with-label label (term (complement (into #{} tokens)))))
-
-(defn anything-except [arst
+(defn anti-set-lit [label tokens]
+  (antiterm label (tokens set)))
 
 (defn alt [& subrules]
   (with-monad parser-m
@@ -193,14 +194,6 @@
 
 (defn opt [rule]
   (alt rule emptiness))
-
-(defn mapconc
-  ([tokens] (mapconc lit tokens))
-  ([rule-maker tokens] (apply conc (map rule-maker tokens))))
-
-(defn mapalt
-  ([tokens] (mapalt lit tokens))
-  ([rule-maker tokens] (apply alt (map rule-maker tokens))))
 
 (defn lex [subrule]
   (fn [state]
@@ -220,14 +213,15 @@
   (opt (rep+ rule)))
 
 (defvar decimal-digit
-  (with-label "decimal digit" (mapalt lit* "1234567890")))
+  (set-lit "decimal digit" "1234567890"))
 
 (let [decimal-digits (rep+ decimal-digit)]
   (def decimal-number
-    (complex [sign (opt (mapalt "+-"))
+    (complex [sign (opt (set-lit "plus or minus sign" "+-"))
               integer-part decimal-digits
               fractional-part (opt (conc (lit \.) (opt decimal-digits)))
-              exponent-part (opt (conc (mapalt "eE") decimal-digits))]
+              exponent-part (opt (conc (set-lit "exponent sign" "eE")
+                                       decimal-digits))]
       (let [digits (->> [sign integer-part fractional-part exponent-part]
                      flatten (apply str))]
         (if (or fractional-part exponent-part)
@@ -235,16 +229,13 @@
           (Integer/parseInt digits))))))
 
 (defvar hexadecimal-digit
-  (with-label "hexadecimal digit"
-    (mapalt lit* "1234567890ABCDEFabcdef")))
+  (set-lit "hexadecimal digit" "1234567890ABCDEFabcdef"))
 
 (defvar uppercase-ascii-letter
-  (with-label "uppercase ASCII letter"
-    (mapalt lit* "ABCDEFGHIJKLMNOPQRSTUVWXYZ")))
+  (set-lit "hexadecimal digit" "ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
 
 (defvar lowercase-ascii-letter
-  (with-label "lowercase ASCII letter"
-    (mapalt lit* "abcdefghijklmnopqrstuvwxyz")))
+  (set-lit "hexadecimal digit" "abcdefghijklmnopqrstuvwxyz"))
 
 (defvar ascii-letter
   (with-label "ASCII letter"
@@ -259,10 +250,10 @@
 ; (def rule (alt (lex (with-label "let expr" (mapconc "let 3")))
 ;                (lit \3)))
 ;(def rule emptiness)
-;(def rule (rep* (lit \3)))
+;(def rule (rep* (antilit \3)))
 ;(def rule (rep* decimal-digit))
 
-;(-> "33" make-state rule println)
+;(-> "aaaaa   33" make-state rule println)
 
 ; (with-test
 ;   (defrule anything
