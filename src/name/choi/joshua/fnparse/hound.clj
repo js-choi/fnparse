@@ -217,6 +217,7 @@
 (defn debug [x] (println ">" x) x)
 
 (defn rep* [rule]
+  ; TODO: Rewrite to not blow up stack with many valid tokens
   (complex [first-token rule
             rest-tokens (opt (rep* rule))]
     (cons first-token rest-tokens)))
@@ -234,10 +235,10 @@
 ; (def rule (alt (lex (with-label "let expr" (map-conc "let 3")))
 ;                (lit \3)))
 ;(def rule emptiness)
-(def rule (opt (lit \3)))
+(def rule (rep* (lit \3)))
 ;(def rule (rep* decimal-digit))
 
-(-> "" make-state rule println)
+(-> "33" make-state rule println)
 
 ; (with-test
 ;   (defrule anything
