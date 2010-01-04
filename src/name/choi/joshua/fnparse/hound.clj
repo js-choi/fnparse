@@ -183,11 +183,11 @@
 (defn opt [rule]
   (alt rule emptiness))
 
-(defn map-conc
+(defn mapconc
   ([tokens] (map-conc lit tokens))
   ([rule-maker tokens] (apply conc (map rule-maker tokens))))
 
-(defn map-alt
+(defn mapalt
   ([tokens] (map-alt lit tokens))
   ([rule-maker tokens] (apply alt (map rule-maker tokens))))
 
