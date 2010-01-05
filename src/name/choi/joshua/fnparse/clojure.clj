@@ -1,5 +1,6 @@
 (ns name.choi.joshua.fnparse.clojure
-  (:use name.choi.joshua.fnparse.hound clojure.set clojure.contrib.seq-utils))
+  (:use name.choi.joshua.fnparse.hound clojure.set clojure.template
+        clojure.contrib.seq-utils))
 
 ; TODO
 ; Radix bases and hexadecimal digits in integers.
@@ -83,7 +84,20 @@
   (complex [_ (lit \:), content symbol-r]
     content))
 
-(def object
-  (alt string-r quoted-object division-symbol character-r keyword-r special-symbol symbol-r decimal-number))
+(def object-series
+  (complex [_ ws, contents (rep* (invisi-conc #'object ws))]
+    contents))
 
-(-> "truea" make-state object println)
+(do-template [rule-name start-token end-token product-fn]
+  (def rule-name
+    (complex [_ (lit start-token), contents object-series, _ (lit end-token)]
+      (product-fn contents)))
+  list-r \( \) list*
+  vector-r \[ \] vec
+  map-r \{ \} #(apply hash-map %)
+  set-inner-r \{ \} set)
+
+(def object
+  (alt list-r vector-r map-r string-r quoted-object division-symbol character-r keyword-r special-symbol symbol-r decimal-number))
+
+(-> "[a b]" make-state object println)
