@@ -163,11 +163,11 @@
 (defvar anything
   (term "anything" (constantly true)))
 
-(defn with-result [product]
-  (with-monad parser-m (m-result product)))
+(defn constant-semantics [subrule product]
+  (complex [_ subrule] product))
 
 (defvar emptiness
-  (with-result nil))
+  (with-monad parser-m (m-result nil)))
 
 (defvar nothing
   (with-monad parser-m m-zero))
@@ -211,6 +211,9 @@
 
 (defn rep* [rule]
   (opt (rep+ rule)))
+
+(defn mapconc [tokens]
+  (apply conc (map lit tokens)))
 
 (defvar decimal-digit
   (set-lit "decimal digit" "1234567890"))
