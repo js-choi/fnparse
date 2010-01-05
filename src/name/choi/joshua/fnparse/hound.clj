@@ -229,8 +229,10 @@
       (if (failure? result)
         (Reply false result)
         ((with-product (:product result)) state)))))
-;   (complex [state fetch-state, subproduct subrule, _ (set-state state)]
-;     subproduct))
+
+(defn invisi-conc [first-rule & rest-rules]
+  (complex [product first-rule, _ (apply conc rest-rules)]
+    product))
 
 (defvar decimal-digit
   (set-lit "decimal digit" "1234567890"))

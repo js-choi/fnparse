@@ -12,8 +12,10 @@
 
 (def ws-set (set " ,\t\n"))
 (def indicator-set (set ";()[]{}\\'@^`#"))
+(def separator-set (union ws-set indicator-set))
 (def ws (rep* (term "whitespace" ws-set)))
-(def symbol-char (antiterm "non-whitespace char" (union ws-set indicator-set)))
+(def symbol-char (antiterm "symbol char" separator-set))
+(def object-end (followed-by (term "whitespace or indicator" separator-set)))
 
 (def symbol-r
   (complex [first-letter ascii-letter, other-chars (rep* symbol-char)]
@@ -72,8 +74,10 @@
     content))
 
 (def special-symbol
-  (mapalt #(constant-semantics (mapconc (key %)) (val %))
-    {"nil" nil, "true" true, "false" false}))
+  (lex (invisi-conc
+         (mapalt #(constant-semantics (mapconc (key %)) (val %))
+           {"nil" nil, "true" true, "false" false})
+         object-end)))
 
 (def keyword-r
   (complex [_ (lit \:), content symbol-r]
