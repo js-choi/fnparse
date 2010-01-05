@@ -9,15 +9,17 @@
 ; Unicode character codes.
 ; Keyword-specific restrictions.
 
-(declare object)
+(declare obj)
 
 (def ws-set (set " ,\t\n"))
 (def indicator-set (set ";()[]{}\\'@^`#"))
 (def separator-set (union ws-set indicator-set))
 (def comment-r (conc (lit \;) (rep* (antilit \newline))))
-(def ws (rep* (alt (term "whitespace" ws-set) comment-r)))
+(def ws (alt (rep+ (alt (term "whitespace" ws-set) comment-r)) end-of-input))
+(def ws? (opt ws))
+(def indicator (term "indicator" indicator-set))
 (def symbol-char (antiterm "symbol char" separator-set))
-(def object-end (followed-by (term "whitespace or indicator" separator-set)))
+(def obj-end (followed-by (alt ws indicator)))
 
 (def symbol-r
   (complex [first-letter ascii-letter, other-chars (rep* symbol-char)]
@@ -63,10 +65,19 @@
             _ string-delimiter]
     (->> content flatten (apply str))))
 
-(def quoted-object
-  (apply alt (map #(complex [_ (lit (key %)), content #'object]
-                     (list (val %) content))
-               {\' `quote, \` `syntax-quote})))
+(do-template [rule-name prefix-char product-fn-symbol]
+  (def rule-name
+    (complex [_ (lit prefix-char), content #'obj]
+      (list product-fn-symbol content)))
+  quoted-obj \' `quote
+  syntax-quoted-obj \` `syntax-quote
+  unquoted-obj \~ `unquote
+  derefed-obj \@ `deref
+  var-inner-r \' `var)
+
+(def unquote-spliced-obj
+  (complex [_ (mapconc "~@"), content #'obj]
+    (list `unquote-splicing content)))
 
 (def character-name
   (mapalt #(constant-semantics (mapconc (val %)) (key %))
@@ -77,24 +88,26 @@
     content))
 
 (def special-symbol
-  (lex (invisi-conc
-         (mapalt #(constant-semantics (mapconc (key %)) (val %))
-           {"nil" nil, "true" true, "false" false})
-         object-end)))
+  (suffix-conc
+    (mapalt #(constant-semantics (mapconc (key %)) (val %))
+      {"nil" nil, "true" :true, "false" false})
+    obj-end))
 
 (def keyword-r
   (complex [_ (lit \:), content symbol-r]
     content))
 
-(def object-series
-  (complex [_ ws, contents (rep* (invisi-conc #'object ws))]
+(def obj-series
+  (complex [_ ws?, contents (rep* (prefix-conc ws #'obj)), _ ws?]
     contents))
+;   (complex [_ ws, contents (rep* (invisi-conc #'obj ws))]
+;     contents))
 
 (do-template [rule-name start-token end-token product-fn]
   (def rule-name
     (complex [_ (lit start-token)
-              contents object-series
-              _ (with-label (format "%s or object" end-token)
+              contents obj-series
+              _ (with-label (format "%s or obj" end-token)
                   (lit end-token))]
       (product-fn contents)))
   list-r \( \) list*
@@ -102,8 +115,9 @@
   map-r \{ \} #(apply hash-map %)
   set-inner-r \{ \} set)
 
-(def object
-  (with-label "object"
-    (alt list-r vector-r map-r string-r quoted-object division-symbol character-r keyword-r special-symbol symbol-r decimal-number)))
+(def obj
+  (with-label "obj"
+    (alt list-r vector-r map-r string-r quoted-obj syntax-quoted-obj (lex unquote-spliced-obj) unquoted-obj derefed-obj division-symbol character-r keyword-r (lex special-symbol) symbol-r decimal-number)))
 
-(-> "[a b;Comment\n]" make-state object println)
+; (-> "~@[a b;Comment\n]" make-state ((lex unquote-spliced-obj)) prn)
+(-> "true" make-state ((alt (lex special-symbol))) prn)

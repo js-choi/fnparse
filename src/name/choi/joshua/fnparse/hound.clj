@@ -177,6 +177,17 @@
 (defvar nothing
   (with-monad parser-m m-zero))
 
+(defvar end-of-input
+  (with-label "end of input"
+    (fn [state]
+      (if (-> state anything :result failure?)
+        (emptiness state)
+        (nothing state))))
+  "WARNING: Because this is an always succeeding,
+  always empty rule, putting this directly into a
+  rep*/rep+/etc.-type rule will result in an
+  infinite loop.")
+
 (defn lit [token]
   (term token #(= token %)))
 
@@ -230,9 +241,11 @@
         (Reply false result)
         ((with-product (:product result)) state)))))
 
-(defn invisi-conc [first-rule & rest-rules]
-  (complex [product first-rule, _ (apply conc rest-rules)]
-    product))
+(defn prefix-conc [prefix body]
+  (complex [_ prefix, content body] content))
+
+(defn suffix-conc [suffix body]
+  (complex [content body, _ suffix] content))
 
 (defvar decimal-digit
   (set-lit "decimal digit" "1234567890"))
