@@ -6,15 +6,17 @@
 ; Namespace-qualified symbols.
 ; The qualified division symbol.
 ; Unicode character codes.
+; Keyword-specific restrictions.
 
 (declare object)
 
 (def ws-set (set " \t\n"))
+(def indicator-set (set ";()[]{}\\'@^`#"))
 (def ws (rep* (term "whitespace" ws-set)))
-(def non-ws-char (antiterm "non-whitespace char" ws-set))
+(def symbol-char (antiterm "non-whitespace char" (union ws-set indicator-set)))
 
 (def symbol-r
-  (complex [first-letter ascii-letter, other-chars (rep* non-ws-char)]
+  (complex [first-letter ascii-letter, other-chars (rep* symbol-char)]
     (->> other-chars (cons first-letter) (apply str) symbol)))
 
 (def division-symbol
@@ -73,17 +75,11 @@
   (mapalt #(constant-semantics (mapconc (key %)) (val %))
     {"nil" nil, "true" true, "false" false}))
 
-; (def special-symbol
-;   (alt (do-template [tokens product]
-;          (constant-semantics (mapconc tokens) product)
-;          "nil" nil, "true" true, "false" false)))
-
-; (let [special-symbol-names {"nil" nil, "true" true, "false" false}]
-;   (def special-symbol
-;     (semantics (apply alt (map mapconc (keys special-symbol-names)))
-;       special-symbol-names)))
+(def keyword-r
+  (complex [_ (lit \:), content symbol-r]
+    content))
 
 (def object
-  (alt string-r quoted-object division-symbol character-r special-symbol symbol-r decimal-number))
+  (alt string-r quoted-object division-symbol character-r keyword-r special-symbol symbol-r decimal-number))
 
-(-> "true" make-state object println)
+(-> ":a" make-state object println)
