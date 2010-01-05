@@ -85,7 +85,7 @@
                      (if (failure? result)
                        result
                        (-> result apply-product-fn :result force)))))
-               (let [result (-> reply :result)]
+               (let [result (-> reply :result force)]
                  (if (failure? result)
                    (Reply false result)
                    (apply-product-fn result))))))))
@@ -221,6 +221,15 @@
 (defn mapalt [f coll]
   (apply alt (map f coll)))
 
+; (defn followed-by [rule]
+;   (let [lexed-rule (lex rule)]
+;     (fn [state]
+;       (let [reply (rule state)]
+;         (if (:tokens-consumed? reply)
+;           (
+;   (complex [state fetch-state, subproduct subrule, _ (set-state state)]
+;     subproduct))
+
 (defvar decimal-digit
   (set-lit "decimal digit" "1234567890"))
 
@@ -241,7 +250,8 @@
 ; (def rule (validate anything (partial = 'a)))
 ; (def rule (mapconc '[a b]))
 ; (def rule (lit \3))
-; (def rule (alt (lex (mapconc "let 3")) (lit \3)))
+(def rule (lex (mapconc "let 3")))
+; (def rule (alt (lex (mapconc "let 3")) (mapconc "la")))
 ; (def rule (lex (with-label "let expr" (mapconc "let 3"))))
 ; (def rule (alt (lex (with-label "let expr" (mapconc "let 3")))
 ;                (lit \3)))
@@ -249,7 +259,7 @@
 ;(def rule (rep* (antilit \3)))
 ;(def rule (rep* decimal-digit))
 
-;(-> "aaaaa   33" make-state rule println)
+(-> "let 3" make-state rule println)
 
 ; (with-test
 ;   (defrule anything

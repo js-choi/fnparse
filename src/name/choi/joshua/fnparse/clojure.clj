@@ -82,4 +82,4 @@
 (def object
   (alt string-r quoted-object division-symbol character-r keyword-r special-symbol symbol-r decimal-number))
 
-(-> ":a" make-state object println)
+(-> "truea" make-state object println)
