@@ -63,8 +63,9 @@
     (->> content flatten (apply str))))
 
 (def quoted-object
-  (complex [_ (lit \'), content #'object]
-    (list `quote content)))
+  (apply alt (map #(complex [_ (lit (key %)), content #'object]
+                     (list (val %) content))
+               {\' `quote, \` `syntax-quote})))
 
 (def character-name
   (mapalt #(constant-semantics (mapconc (val %)) (key %))
@@ -90,7 +91,10 @@
 
 (do-template [rule-name start-token end-token product-fn]
   (def rule-name
-    (complex [_ (lit start-token), contents object-series, _ (lit end-token)]
+    (complex [_ (lit start-token)
+              contents object-series
+              _ (with-label (format "%s, object or comment" end-token)
+                  (lit end-token))]
       (product-fn contents)))
   list-r \( \) list*
   vector-r \[ \] vec
@@ -98,6 +102,7 @@
   set-inner-r \{ \} set)
 
 (def object
-  (alt list-r vector-r map-r string-r quoted-object division-symbol character-r keyword-r special-symbol symbol-r decimal-number))
+  (with-label "object or comment"
+    (alt list-r vector-r map-r string-r quoted-object division-symbol character-r keyword-r special-symbol symbol-r decimal-number)))
 
-(-> "[a b]" make-state object println)
+(-> "[a b}" make-state object println)
