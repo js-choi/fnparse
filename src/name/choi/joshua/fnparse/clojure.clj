@@ -10,7 +10,7 @@
 
 (declare object)
 
-(def ws-set (set " \t\n"))
+(def ws-set (set " ,\t\n"))
 (def indicator-set (set ";()[]{}\\'@^`#"))
 (def ws (rep* (term "whitespace" ws-set)))
 (def symbol-char (antiterm "non-whitespace char" (union ws-set indicator-set)))

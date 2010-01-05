@@ -169,8 +169,10 @@
 (defn constant-semantics [subrule product]
   (complex [_ subrule] product))
 
-(defvar emptiness
-  (with-monad parser-m (m-result nil)))
+(defn with-product [product]
+  (with-monad parser-m (m-result product)))
+
+(defvar emptiness (with-product nil))
 
 (defvar nothing
   (with-monad parser-m m-zero))
@@ -221,12 +223,12 @@
 (defn mapalt [f coll]
   (apply alt (map f coll)))
 
-; (defn followed-by [rule]
-;   (let [lexed-rule (lex rule)]
-;     (fn [state]
-;       (let [reply (rule state)]
-;         (if (:tokens-consumed? reply)
-;           (
+(defn followed-by [rule]
+  (fn [state]
+    (let [result (-> state rule :result force)]
+      (if (failure? result)
+        (Reply false result)
+        ((with-product (:product result)) state)))))
 ;   (complex [state fetch-state, subproduct subrule, _ (set-state state)]
 ;     subproduct))
 
@@ -250,16 +252,17 @@
 ; (def rule (validate anything (partial = 'a)))
 ; (def rule (mapconc '[a b]))
 ; (def rule (lit \3))
-(def rule (lex (mapconc "let 3")))
+; (def rule (lex (mapconc "let 3")))
 ; (def rule (alt (lex (mapconc "let 3")) (mapconc "la")))
 ; (def rule (lex (with-label "let expr" (mapconc "let 3"))))
 ; (def rule (alt (lex (with-label "let expr" (mapconc "let 3")))
 ;                (lit \3)))
-;(def rule emptiness)
-;(def rule (rep* (antilit \3)))
-;(def rule (rep* decimal-digit))
+; (def rule emptiness)
+; (def rule (rep* (antilit \3)))
+; (def rule (rep* decimal-digit))
+; (def rule (followed-by (mapconc "li")))
 
-(-> "let 3" make-state rule println)
+; (-> "lit 3" make-state rule println)
 
 ; (with-test
 ;   (defrule anything
