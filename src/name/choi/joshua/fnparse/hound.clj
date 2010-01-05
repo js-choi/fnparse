@@ -215,19 +215,6 @@
 (defvar decimal-digit
   (set-lit "decimal digit" "1234567890"))
 
-(let [decimal-digits (rep+ decimal-digit)]
-  (def decimal-number
-    (complex [sign (opt (set-lit "plus or minus sign" "+-"))
-              integer-part decimal-digits
-              fractional-part (opt (conc (lit \.) (opt decimal-digits)))
-              exponent-part (opt (conc (set-lit "exponent sign" "eE")
-                                       decimal-digits))]
-      (let [digits (->> [sign integer-part fractional-part exponent-part]
-                     flatten (apply str))]
-        (if (or fractional-part exponent-part)
-          (Double/parseDouble digits)
-          (Integer/parseInt digits))))))
-
 (defvar hexadecimal-digit
   (set-lit "hexadecimal digit" "1234567890ABCDEFabcdef"))
 
