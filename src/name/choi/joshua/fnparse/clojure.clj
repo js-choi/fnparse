@@ -14,7 +14,8 @@
 (def ws-set (set " ,\t\n"))
 (def indicator-set (set ";()[]{}\\'@^`#"))
 (def separator-set (union ws-set indicator-set))
-(def ws (rep* (term "whitespace" ws-set)))
+(def comment-r (conc (lit \;) (rep* (antilit \newline))))
+(def ws (rep* (alt (term "whitespace" ws-set) comment-r)))
 (def symbol-char (antiterm "symbol char" separator-set))
 (def object-end (followed-by (term "whitespace or indicator" separator-set)))
 
@@ -93,7 +94,7 @@
   (def rule-name
     (complex [_ (lit start-token)
               contents object-series
-              _ (with-label (format "%s, object or comment" end-token)
+              _ (with-label (format "%s or object" end-token)
                   (lit end-token))]
       (product-fn contents)))
   list-r \( \) list*
@@ -102,7 +103,7 @@
   set-inner-r \{ \} set)
 
 (def object
-  (with-label "object or comment"
+  (with-label "object"
     (alt list-r vector-r map-r string-r quoted-object division-symbol character-r keyword-r special-symbol symbol-r decimal-number)))
 
-(-> "[a b}" make-state object println)
+(-> "[a b;Comment\n]" make-state object println)
