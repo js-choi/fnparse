@@ -1,11 +1,11 @@
 (ns name.choi.joshua.fnparse.clojure
-  (:use name.choi.joshua.fnparse.hound clojure.contrib.seq-utils))
+  (:use name.choi.joshua.fnparse.hound clojure.set clojure.contrib.seq-utils))
 
 ; TODO
 ; Radix bases and hexadecimal digits in integers.
 ; Namespace-qualified symbols.
 ; The qualified division symbol.
-; Complete character codes.
+; Unicode character codes.
 
 (declare object)
 
@@ -61,14 +61,29 @@
   (complex [_ (lit \'), content #'object]
     (list `quote content)))
 
-(def character-codes
-  {"newline" \newline, "space" \space, "tab" \tab, "backspace" \backspace})
+(def character-name
+  (mapalt #(constant-semantics (mapconc (val %)) (key %))
+    char-name-string))
+
 (def character-r
-  (complex [_ (lit \\)
-            content (apply alt (map mapconc (keys character-codes)))]
-    (character-codes (apply str content))))
+  (complex [_ (lit \\), content character-name]
+    content))
+
+(def special-symbol
+  (mapalt #(constant-semantics (mapconc (key %)) (val %))
+    {"nil" nil, "true" true, "false" false}))
+
+; (def special-symbol
+;   (alt (do-template [tokens product]
+;          (constant-semantics (mapconc tokens) product)
+;          "nil" nil, "true" true, "false" false)))
+
+; (let [special-symbol-names {"nil" nil, "true" true, "false" false}]
+;   (def special-symbol
+;     (semantics (apply alt (map mapconc (keys special-symbol-names)))
+;       special-symbol-names)))
 
 (def object
-  (alt string-r quoted-object division-symbol character-r symbol-r decimal-number))
+  (alt string-r quoted-object division-symbol character-r special-symbol symbol-r decimal-number))
 
-(-> "'\\space" make-state object println)
+(-> "true" make-state object println)

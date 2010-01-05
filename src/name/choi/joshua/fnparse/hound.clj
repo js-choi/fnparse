@@ -163,6 +163,9 @@
 (defvar anything
   (term "anything" (constantly true)))
 
+(defn semantics [subrule semantic-hook]
+  (complex [product subrule] (semantic-hook product)))
+
 (defn constant-semantics [subrule product]
   (complex [_ subrule] product))
 
@@ -214,6 +217,9 @@
 
 (defn mapconc [tokens]
   (apply conc (map lit tokens)))
+
+(defn mapalt [f coll]
+  (apply alt (map f coll)))
 
 (defvar decimal-digit
   (set-lit "decimal digit" "1234567890"))
