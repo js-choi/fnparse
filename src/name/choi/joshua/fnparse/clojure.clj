@@ -14,12 +14,13 @@
 (def ws-set (set " ,\t\n"))
 (def indicator-set (set ";()[]{}\\'@^`#"))
 (def separator-set (union ws-set indicator-set))
-(def comment-r (conc (lit \;) (rep* (antilit \newline))))
-(def ws (alt (rep+ (alt (term "whitespace" ws-set) comment-r)) end-of-input))
+(def comment-r
+  (with-label "comment" (conc (lit \;) (rep* (antilit \newline)))))
+(def ws (rep+ (alt (term "whitespace" ws-set) comment-r)))
 (def ws? (opt ws))
 (def indicator (term "indicator" indicator-set))
 (def symbol-char (antiterm "symbol char" separator-set))
-(def obj-end (followed-by (alt ws indicator)))
+(def obj-end (alt (followed-by (alt ws indicator)) end-of-input))
 
 (def symbol-r
   (complex [first-letter ascii-letter, other-chars (rep* symbol-char)]
@@ -98,15 +99,12 @@
     content))
 
 (def obj-series
-  (complex [_ ws?, contents (rep* (prefix-conc ws #'obj)), _ ws?]
-    contents))
-;   (complex [_ ws, contents (rep* (invisi-conc #'obj ws))]
-;     contents))
+  (circumfix-conc ws? (separated-rep ws #'obj) ws?))
 
 (do-template [rule-name start-token end-token product-fn]
   (def rule-name
     (complex [_ (lit start-token)
-              contents obj-series
+              contents (opt obj-series)
               _ (with-label (format "%s or obj" end-token)
                   (lit end-token))]
       (product-fn contents)))
@@ -119,5 +117,7 @@
   (with-label "obj"
     (alt list-r vector-r map-r string-r quoted-obj syntax-quoted-obj (lex unquote-spliced-obj) unquoted-obj derefed-obj division-symbol character-r keyword-r (lex special-symbol) symbol-r decimal-number)))
 
-; (-> "~@[a b;Comment\n]" make-state ((lex unquote-spliced-obj)) prn)
-(-> "true" make-state ((alt (lex special-symbol))) prn)
+; (-> "~@[a b;Comment\nc]" make-state ((lex unquote-spliced-obj)) prn)
+; (-> "false]" make-state ((alt (lex special-symbol))) prn)
+; (-> "" make-state obj-end prn)
+(-> "a b;Comment\nc" make-state obj-series prn)

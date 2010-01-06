@@ -54,10 +54,10 @@
 (letfn [(reply-expected-rules [reply]
           (-> reply :result :expectation :expected-rules))]
   (defn merge-replies [mergee merger]
-    (let [merger-set (reply-expected-rules merger)
-          mergee-set (reply-expected-rules mergee)]
+    (let [merger-rules (reply-expected-rules merger)
+          mergee-rules (reply-expected-rules mergee)]
       (assoc-in merger [:result :expectation :expected-rules]
-        (union merger-set mergee-set)))))
+        (concat mergee-rules merger-rules)))))
 
 (defmonad parser-m
   "The monad that FnParse uses."
@@ -137,7 +137,7 @@
       (if (:tokens-consumed? reply)
         reply
         (assoc-in reply [:result :expectation :expected-rules]
-          #{label})))))
+          (list label))))))
 
 (defn term [label predicate]
   (with-monad parser-m
@@ -244,8 +244,16 @@
 (defn prefix-conc [prefix body]
   (complex [_ prefix, content body] content))
 
-(defn suffix-conc [suffix body]
+(defn suffix-conc [body suffix]
   (complex [content body, _ suffix] content))
+
+(defn circumfix-conc [prefix body suffix]
+  (prefix-conc prefix (suffix-conc body suffix)))
+
+(defn separated-rep [separator element]
+  (complex [first-element element
+            rest-elements (rep* (prefix-conc separator element))]
+    (cons first-element rest-elements)))
 
 (defvar decimal-digit
   (set-lit "decimal digit" "1234567890"))
