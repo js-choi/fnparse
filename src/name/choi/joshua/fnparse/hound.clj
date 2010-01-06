@@ -1,6 +1,6 @@
 (ns name.choi.joshua.fnparse.hound
   [:use clojure.contrib.seq-utils clojure.contrib.def clojure.test
-        clojure.set clojure.contrib.monads]
+        clojure.set clojure.contrib.monads clojure.template]
   [:import [clojure.lang Sequential IPersistentMap IPersistentVector Var]])
 
 (set! *warn-on-reflection* true)

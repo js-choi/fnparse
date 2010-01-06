@@ -11,12 +11,11 @@
 
 (declare obj)
 
+(def comment-symbol (gensym "comment"))
 (def ws-set (set " ,\t\n"))
-(def indicator-set (set ";()[]{}\\'@^`#"))
+(def indicator-set (set ";()[]{}\\\"'@^`#"))
 (def separator-set (union ws-set indicator-set))
-(def comment-r
-  (with-label "comment" (conc (lit \;) (rep* (antilit \newline)))))
-(def ws (rep+ (alt (term "whitespace" ws-set) comment-r)))
+(def ws (rep+ (term "whitespace" ws-set)))
 (def ws? (opt ws))
 (def indicator (term "indicator" indicator-set))
 (def symbol-char (antiterm "symbol char" separator-set))
@@ -26,8 +25,7 @@
   (complex [first-letter ascii-letter, other-chars (rep* symbol-char)]
     (->> other-chars (cons first-letter) (apply str) symbol)))
 
-(def division-symbol
-  (constant-semantics (lit \/) '/))
+(def division-symbol (constant-semantics (lit \/) '/))
 
 (let [decimal-digits (rep+ decimal-digit)
       optional-sign (opt (set-lit "plus or minus sign" "+-"))
@@ -56,15 +54,14 @@
    \\ \\
    \" \"})
 (def escape-sequence
-  (complex [_ (lit \\)
-            sequence (set-lit "valid escape sequence"
-                       (keys escape-sequence-map))]
-    (escape-sequence-map sequence)))
+  (semantics (prefix-conc (lit \\) (set-lit "valid escape sequence"
+                                     (keys escape-sequence-map)))
+    escape-sequence-map))
 (def string-r
-  (complex [_ string-delimiter
-            content (rep* (alt escape-sequence (antilit \")))
-            _ string-delimiter]
-    (->> content flatten (apply str))))
+  (semantics (circumfix-conc string-delimiter
+                             (rep* (alt escape-sequence (antilit \")))
+                             string-delimiter)
+    #(->> % flatten (apply str))))
 
 (do-template [rule-name prefix-char product-fn-symbol]
   (def rule-name
@@ -77,8 +74,8 @@
   var-inner-r \' `var)
 
 (def unquote-spliced-obj
-  (complex [_ (mapconc "~@"), content #'obj]
-    (list `unquote-splicing content)))
+  (semantics (prefix-conc (mapconc "~@") #'obj)
+    #(list `unquote-splicing %)))
 
 (def character-name
   (mapalt #(constant-semantics (mapconc (val %)) (key %))
@@ -99,7 +96,8 @@
     content))
 
 (def obj-series
-  (circumfix-conc ws? (separated-rep ws #'obj) ws?))
+  (semantics (suffix-conc (rep* (prefix-conc ws? #'obj)) ws?)
+    (partial remove #(= % comment-symbol))))
 
 (do-template [rule-name start-token end-token product-fn]
   (def rule-name
@@ -113,11 +111,22 @@
   map-r \{ \} #(apply hash-map %)
   set-inner-r \{ \} set)
 
-(def obj
-  (with-label "obj"
-    (alt list-r vector-r map-r string-r quoted-obj syntax-quoted-obj (lex unquote-spliced-obj) unquoted-obj derefed-obj division-symbol character-r keyword-r (lex special-symbol) symbol-r decimal-number)))
+(def comment-r
+  (constant-semantics (conc (lit \;) (rep* (antilit \newline)))
+    comment-symbol))
 
-; (-> "~@[a b;Comment\nc]" make-state ((lex unquote-spliced-obj)) prn)
-; (-> "false]" make-state ((alt (lex special-symbol))) prn)
-; (-> "" make-state obj-end prn)
-(-> "a b;Comment\nc" make-state obj-series prn)
+(def dispatched-form
+  (prefix-conc
+    (lit \#)
+    (mapalt #(prefix-conc (lit (key %)) (val %))
+      {\' (semantics #'obj #(list `var %))})))
+
+(def obj
+  (with-label "object or comment"
+    (alt list-r vector-r map-r string-r comment-r dispatched-form quoted-obj syntax-quoted-obj (lex unquote-spliced-obj) unquoted-obj derefed-obj division-symbol character-r keyword-r (lex special-symbol) symbol-r decimal-number)))
+
+(-> "#'[a b;Comment\nc]" make-state obj prn)
+; (-> "aa\" 2\"]" make-state obj println)
+; (-> "\"a\\tb\"" make-state obj prn)
+; (-> "\\t\"" make-state escape-sequence prn)
+; (-> "a b;Comment\nc" make-state obj-series prn)
