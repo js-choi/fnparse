@@ -118,8 +118,9 @@
 (def dispatched-form
   (prefix-conc
     (lit \#)
-    (mapalt #(prefix-conc (lit (key %)) (val %))
-      {\' (semantics #'obj #(list `var %))})))
+    (template-alt [prefix-token body]
+      (prefix-conc (lit prefix-token) body)
+      \' (semantics #'obj #(list `var %)))))
 
 (def obj
   (with-label "object or comment"

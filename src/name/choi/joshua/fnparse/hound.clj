@@ -255,6 +255,11 @@
             rest-elements (rep* (prefix-conc separator element))]
     (cons first-element rest-elements)))
 
+(defmacro template-alt [argv expr & values]
+  (let [c (count argv)]
+    `(alt ~@(map (fn [a] (apply-template argv expr a)) 
+              (partition c values)))))
+
 (defvar decimal-digit
   (set-lit "decimal digit" "1234567890"))
 
