@@ -9,18 +9,21 @@
 ; Unicode character codes.
 ; Keyword-specific restrictions.
 
-(declare obj)
+(declare form)
 
-(def comment-symbol (gensym "comment"))
 (def ws-set (set " ,\t\n"))
 (def indicator-set (set ";()[]{}\\\"'@^`#"))
 (def separator-set (union ws-set indicator-set))
-(def discarded-form (prefix-conc (mapconc "#_") #'obj))
-(def ws (rep+ (alt (term "whitespace character" ws-set) (lex discarded-form))))
+(def comment-r (conc (lit \;) (rep* (antilit \newline))))
+(def discarded-form (prefix-conc (lex (mapconc "#_")) #'form))
+(def ws
+  (with-label "ws"
+    (rep+ (alt (term "whitespace character" ws-set)
+               comment-r discarded-form)))
 (def ws? (opt ws))
 (def indicator (term "indicator" indicator-set))
 (def symbol-char (antiterm "symbol char" separator-set))
-(def obj-end (alt (followed-by (alt ws indicator)) end-of-input))
+(def form-end (alt (followed-by (alt ws indicator)) end-of-input))
 
 (def symbol-r
   (complex [first-letter ascii-letter, other-chars (rep* symbol-char)]
@@ -66,16 +69,16 @@
 
 (do-template [rule-name prefix-char product-fn-symbol]
   (def rule-name
-    (complex [_ (lit prefix-char), content #'obj]
+    (complex [_ (lit prefix-char), content #'form]
       (list product-fn-symbol content)))
-  quoted-obj \' `quote
-  syntax-quoted-obj \` `syntax-quote
-  unquoted-obj \~ `unquote
-  derefed-obj \@ `deref
+  quoted-form \' `quote
+  syntax-quoted-form \` `syntax-quote
+  unquoted-form \~ `unquote
+  derefed-form \@ `deref
   var-inner-r \' `var)
 
-(def unquote-spliced-obj
-  (semantics (prefix-conc (mapconc "~@") #'obj)
+(def unquote-spliced-form
+  (semantics (prefix-conc (mapconc "~@") #'form)
     #(list `unquote-splicing %)))
 
 (def character-name
@@ -90,21 +93,19 @@
   (suffix-conc
     (mapalt #(constant-semantics (mapconc (key %)) (val %))
       {"nil" nil, "true" :true, "false" false})
-    obj-end))
+    form-end))
 
 (def keyword-r
   (complex [_ (lit \:), content symbol-r]
     content))
 
-(def obj-series
-  (semantics (suffix-conc (rep* (prefix-conc ws? #'obj)) ws?)
-    (partial remove #(= % comment-symbol))))
+(def form-series (suffix-conc (rep* #'form) ws?))
 
 (do-template [rule-name start-token end-token product-fn]
   (def rule-name
     (complex [_ (lit start-token)
-              contents (opt obj-series)
-              _ (with-label (format "a %s or an object" end-token)
+              contents (opt form-series)
+              _ (with-label (format "a %s or an form" end-token)
                   (lit end-token))]
       (product-fn contents)))
   list-r \( \) list*
@@ -112,34 +113,32 @@
   map-r \{ \} #(apply hash-map %)
   set-inner-r \{ \} set)
 
-(def comment-r
-  (constant-semantics (conc (lit \;) (rep* (antilit \newline)))
-    comment-symbol))
-
 (def dispatched-form
   (prefix-conc
     (lit \#)
     (template-alt [label prefix-token body]
       (with-label label (prefix-conc (lit prefix-token) body))
       "a set" \{
-        (semantics (suffix-conc obj-series (lit \})) set)
+        (semantics (suffix-conc form-series (lit \})) set)
       "a mini-function" \(
-        (semantics (suffix-conc obj-series (lit \))) #(list `mini-fn %))
-      "a var-quoted object" \'
-        (semantics #'obj #(list `var %))
-      "an object with metadata" \^
+        (semantics (suffix-conc form-series (lit \))) #(list `mini-fn %))
+      "a var-quoted form" \'
+        (semantics #'form #(list `var %))
+      "an form with metadata" \^
         (complex [metadata (alt map-r symbol-r keyword-r)
                   _ ws?
-                  base-obj #'obj]
-          (list `with-meta base-obj metadata)))))
+                  base-form #'form]
+          (list `with-meta base-form metadata)))))
 
-(def obj
-  (with-label "an object"
-    (alt list-r vector-r map-r string-r comment-r dispatched-form quoted-obj syntax-quoted-obj (lex unquote-spliced-obj) unquoted-obj derefed-obj division-symbol character-r keyword-r (lex special-symbol) symbol-r decimal-number)))
+(def form
+  (with-label "a form"
+    (prefix-conc
+      ws?
+      (alt list-r vector-r map-r string-r dispatched-form quoted-form syntax-quoted-form (lex unquote-spliced-form) unquoted-form derefed-form division-symbol character-r keyword-r (lex special-symbol) symbol-r decimal-number))))
 
-; (-> "#^{} #{[a b;Comment\nc]}" make-state obj prn)
-(-> "#_#_'a'b'c" make-state obj-series prn)
-; (-> "aa\" 2\"]" make-state obj println)
-; (-> "\"a\\tb\"" make-state obj prn)
+; (-> "#^{} #{[a b;Comment\nc]}" make-state form prn)
+(-> "#_#_'a'b'c" make-state form prn)
+; (-> "aa\" 2\"]" make-state form println)
+; (-> "\"a\\tb\"" make-state form prn)
 ; (-> "\\t\"" make-state escape-sequence prn)
-; (-> "a b;Comment\nc" make-state obj-series prn)
+; (-> "a b;Comment\nc" make-state form-series prn)
