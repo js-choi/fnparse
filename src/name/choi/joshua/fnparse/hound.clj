@@ -261,19 +261,19 @@
               (partition c values)))))
 
 (defvar decimal-digit
-  (set-lit "decimal digit" "1234567890"))
+  (set-lit "a decimal digit" "1234567890"))
 
 (defvar hexadecimal-digit
-  (set-lit "hexadecimal digit" "1234567890ABCDEFabcdef"))
+  (set-lit "a hexadecimal digit" "1234567890ABCDEFabcdef"))
 
 (defvar uppercase-ascii-letter
-  (set-lit "hexadecimal digit" "ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
+  (set-lit "an uppercase ASCII letter" "ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
 
 (defvar lowercase-ascii-letter
-  (set-lit "hexadecimal digit" "abcdefghijklmnopqrstuvwxyz"))
+  (set-lit "a lowercase ASCII letter" "abcdefghijklmnopqrstuvwxyz"))
 
 (defvar ascii-letter
-  (with-label "ASCII letter"
+  (with-label "an ASCII letter"
     (alt uppercase-ascii-letter lowercase-ascii-letter)))
 
 ; (def rule (complex [a anything, b anything] [a b]))

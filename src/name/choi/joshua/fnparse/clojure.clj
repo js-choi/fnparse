@@ -103,7 +103,7 @@
   (def rule-name
     (complex [_ (lit start-token)
               contents (opt obj-series)
-              _ (with-label (format "%s or obj" end-token)
+              _ (with-label (format "a %s or an object" end-token)
                   (lit end-token))]
       (product-fn contents)))
   list-r \( \) list*
@@ -118,15 +118,25 @@
 (def dispatched-form
   (prefix-conc
     (lit \#)
-    (template-alt [prefix-token body]
-      (prefix-conc (lit prefix-token) body)
-      \' (semantics #'obj #(list `var %)))))
+    (template-alt [label prefix-token body]
+      (with-label label (prefix-conc (lit prefix-token) body))
+      "a set" \{
+        (semantics (suffix-conc obj-series (lit \})) set)
+      "a mini-function" \(
+        (semantics (suffix-conc obj-series (lit \))) #(list `mini-fn %))
+      "a var-quoted object" \'
+        (semantics #'obj #(list `var %))
+      "an object with metadata" \^
+        (complex [metadata (alt map-r symbol-r keyword-r)
+                  _ ws?
+                  base-obj #'obj]
+          (list `with-meta base-obj metadata)))))
 
 (def obj
-  (with-label "object or comment"
+  (with-label "an object"
     (alt list-r vector-r map-r string-r comment-r dispatched-form quoted-obj syntax-quoted-obj (lex unquote-spliced-obj) unquoted-obj derefed-obj division-symbol character-r keyword-r (lex special-symbol) symbol-r decimal-number)))
 
-(-> "#'[a b;Comment\nc]" make-state obj prn)
+(-> "#^{} #{[a b;Comment\nc]}" make-state obj prn)
 ; (-> "aa\" 2\"]" make-state obj println)
 ; (-> "\"a\\tb\"" make-state obj prn)
 ; (-> "\\t\"" make-state escape-sequence prn)
