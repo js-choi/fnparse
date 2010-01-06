@@ -100,7 +100,7 @@
                (if (empty? empty-replies)
                  (m-zero state)
                  (let [empty-replies (reductions merge-replies empty-replies)]
-                   (or (first (drop-while #(-> % :result failure?)
+                   (or (first (drop-while #(-> % :result force failure?)
                                 empty-replies))
                        (last empty-replies))))
                (first consuming-replies))))))])
@@ -213,7 +213,9 @@
 
 (defn lex [subrule]
   (fn [state]
-    (-> state subrule (assoc :tokens-consumed? false))))
+    (-> state subrule
+      (assoc :tokens-consumed? false)
+      (update-in [:result] force))))
 
 (defn rep+ [rule]
   ; TODO: Rewrite to not blow up stack with many valid tokens

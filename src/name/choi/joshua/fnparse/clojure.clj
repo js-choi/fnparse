@@ -15,7 +15,8 @@
 (def ws-set (set " ,\t\n"))
 (def indicator-set (set ";()[]{}\\\"'@^`#"))
 (def separator-set (union ws-set indicator-set))
-(def ws (rep+ (term "whitespace" ws-set)))
+(def discarded-form (prefix-conc (mapconc "#_") #'obj))
+(def ws (rep+ (alt (term "whitespace character" ws-set) (lex discarded-form))))
 (def ws? (opt ws))
 (def indicator (term "indicator" indicator-set))
 (def symbol-char (antiterm "symbol char" separator-set))
@@ -136,7 +137,8 @@
   (with-label "an object"
     (alt list-r vector-r map-r string-r comment-r dispatched-form quoted-obj syntax-quoted-obj (lex unquote-spliced-obj) unquoted-obj derefed-obj division-symbol character-r keyword-r (lex special-symbol) symbol-r decimal-number)))
 
-(-> "#^{} #{[a b;Comment\nc]}" make-state obj prn)
+; (-> "#^{} #{[a b;Comment\nc]}" make-state obj prn)
+(-> "#_#_'a'b'c" make-state obj-series prn)
 ; (-> "aa\" 2\"]" make-state obj println)
 ; (-> "\"a\\tb\"" make-state obj prn)
 ; (-> "\\t\"" make-state escape-sequence prn)
