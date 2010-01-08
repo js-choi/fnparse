@@ -1,6 +1,6 @@
 (ns name.choi.joshua.fnparse.clojure
   (:use name.choi.joshua.fnparse.hound clojure.set clojure.template
-        clojure.contrib.seq-utils))
+        clojure.contrib.def clojure.contrib.seq-utils))
 
 ; TODO
 ; Radix bases and hexadecimal digits in integers.
