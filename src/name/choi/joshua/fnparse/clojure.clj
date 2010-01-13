@@ -9,6 +9,9 @@
 ; Unicode character codes.
 ; Keyword-specific restrictions.
 
+(defn- prefix-list-fn [prefix-form]
+  #(list prefix-form %))
+
 (declare form)
 
 (defvar- ws-set (set " ,\t\n"))
@@ -29,7 +32,8 @@
 
 (defvar- normal-symbol
   (complex [first-letter ascii-letter, other-chars (rep* symbol-char)]
-    (->> other-chars (cons first-letter) (apply str) symbol)))
+    (->> other-chars
+      (cons first-letter) (apply str) (list `symbol))))
 
 (defvar- symbol-r (alt division-symbol normal-symbol))
 
@@ -44,15 +48,16 @@
 
 (defvar- character-form (prefix-conc (lit \\) character-name))
 
-(defvar- special-form
-  (suffix-conc
-    (mapalt #(constant-semantics (mapconc (key %)) (val %))
-      {"nil" nil, "true" :true, "false" false})
-    form-end))
+(defvar- peculiar-symbol
+  (lex (suffix-conc
+         (mapalt #(constant-semantics (mapconc (key %)) (val %))
+           {"nil" nil, "true" :true, "false" false})
+         form-end)))
+
+(defvar- keyword-indicator (lit \:))
 
 (defvar- keyword-r
-  (complex [_ (lit \:), content symbol-r]
-    content))
+  (prefix-conc keyword-indicator symbol-r))
 
 (defvar- decimal-number
   (complex [sign optional-sign
@@ -104,9 +109,6 @@
   map-r \{ \} #(apply hash-map %)
   set-inner-r \{ \} set)
 
-(defn- prefix-list-fn [prefix-form]
-  #(list prefix-form %))
-
 (defn- padded-lit [token]
   (prefix-conc (lit token) ws?))
 
@@ -128,13 +130,13 @@
     (prefix-list-fn `mini-fn)))
 
 (defvar- metadata-r
-  map-r)
+  (alt map-r (semantics (alt keyword-r symbol-r) #(hash-map :tag %))))
 
 (defvar- with-meta-inner-r
   (prefix-conc
     (padded-lit \^)
     (complex [metadata metadata-r, _ ws?, content #'form]
-      (list `with-meta content metadata-r))))
+      (list `with-meta content metadata))))
 
 (defvar- dispatched-form
   (prefix-conc
@@ -145,12 +147,11 @@
   (with-label "a form"
     (prefix-conc
       ws?
-      (alt list-r vector-r map-r dispatched-form string-r syntax-quoted-form unquote-spliced-form unquoted-form division-symbol character-form keyword-r (lex special-form) symbol-r decimal-number))))
-;       (alt string-r dispatched-form quoted-form syntax-quoted-form (lex unquote-spliced-form) unquoted-form derefed-form division-symbol character-form keyword-r (lex special-form) symbol-r decimal-number))))
+      (alt list-r vector-r map-r dispatched-form string-r syntax-quoted-form unquote-spliced-form unquoted-form division-symbol character-form keyword-r peculiar-symbol symbol-r decimal-number))))
 
 ; (-> "#^{} #{[a b;Comment\nc]}" make-state form prn)
 ; (-> "#_#_'a'b'c" make-state form prn)
-(-> "#{a b c d}" make-state form prn)
+(-> "#^:monster #{a b c d}" make-state form prn)
 ; (-> "aa\" 2\"]" make-state form println)
 ; (-> "\"a\\tb\"" make-state form prn)
 ; (-> "\\t\"" make-state escape-sequence prn)
