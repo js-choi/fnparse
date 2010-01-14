@@ -149,9 +149,12 @@
       ws?
       (alt list-r vector-r map-r dispatched-form string-r syntax-quoted-form unquote-spliced-form unquoted-form division-symbol character-form keyword-r peculiar-symbol symbol-r decimal-number))))
 
+(use 'clojure.test 'name.choi.joshua.fnparse.hound.test)
+
+(is (full-match? "55" decimal-number 55 2))
 ; (-> "#^{} #{[a b;Comment\nc]}" make-state form prn)
 ; (-> "#_#_'a'b'c" make-state form prn)
-(-> "#^:monster #{a b c d}" make-state form prn)
+; (-> "#^:monster #{a b c d}" (parse form vector nil) prn)
 ; (-> "aa\" 2\"]" make-state form println)
 ; (-> "\"a\\tb\"" make-state form prn)
 ; (-> "\\t\"" make-state escape-sequence prn)

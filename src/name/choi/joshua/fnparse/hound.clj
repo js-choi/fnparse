@@ -1,7 +1,7 @@
 (ns name.choi.joshua.fnparse.hound
-  [:use clojure.contrib.seq-utils clojure.contrib.def clojure.test
-        clojure.set clojure.contrib.monads clojure.template]
-  [:import [clojure.lang Sequential IPersistentMap IPersistentVector Var]])
+  (:use clojure.contrib.seq-utils clojure.contrib.def clojure.test
+        clojure.set clojure.contrib.monads clojure.template)
+  (:import [clojure.lang Sequential IPersistentMap IPersistentVector Var]))
 
 (set! *warn-on-reflection* true)
 
@@ -50,6 +50,13 @@
 
 (defn failure? [result]
   (isa? (type result) ::Failure))
+
+(defn parse
+  [input rule success-fn failure-fn]
+  (let [result (-> input make-state rule :result force)]
+    (if (failure? result)
+      (failure-fn (:expectation result))
+      (success-fn (:product result) (-> result :state :remainder)))))
 
 (letfn [(reply-expected-rules [reply]
           (-> reply :result :expectation :expected-rules))]

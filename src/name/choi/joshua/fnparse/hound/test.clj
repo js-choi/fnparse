@@ -1,0 +1,38 @@
+(ns name.choi.joshua.fnparse.hound.test
+  (:use name.choi.joshua.fnparse.hound clojure.test)
+  (:require [clojure.contrib.str-utils2 :as str]))
+
+(defmethod assert-expr 'partial-match?
+  [msg [_ input rule product consumed-tokens-num]]
+  (let [input-count (count input)]
+   `(letfn [(report-this#
+              ([kind# format-template# expected-arg# actual-arg# & other-args#]
+               (report {:type kind#, :message ~msg,
+                        :expected (apply format format-template#
+                                    expected-arg# other-args#),
+                        :actual (apply format format-template#
+                                  actual-arg# other-args#)}))
+              ([kind#] (report {:type kind#, :message ~msg})))]
+      (parse ~input ~rule
+        (fn [actual-product# actual-remainder#]
+          (let [actual-consumed-tokens-num#
+                 (- ~input-count (count actual-remainder#))]
+            (if (not= actual-consumed-tokens-num# ~consumed-tokens-num)
+              (report-this# :fail "%s tokens consumed"
+                ~consumed-tokens-num actual-consumed-tokens-num#)
+              (if (not= actual-product# ~product)
+                (report-this# :fail "a product of %s"
+                  ~product actual-product#)
+                (report-this# :pass)))))
+        (fn [expectation#]
+          (let [unexpected-token# (:unexpected-token expectation#)]
+            (report-this# :fail "%s at position %s"
+              (str/join " or " (:expected-rules expectation#))
+              (str "a token " unexpected-token# " (of the type "
+                   (pr-str (type unexpected-token#)) ")")
+              (:position expectation#))))))))
+
+(defmethod assert-expr 'full-match?
+  [msg [_ input rule product]]
+  (assert-expr msg
+    (list 'partial-match? input rule product (count input))))
