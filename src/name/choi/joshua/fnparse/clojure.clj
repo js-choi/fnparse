@@ -180,7 +180,7 @@
 (use 'clojure.test 'name.choi.joshua.fnparse.hound.test)
 
 (is (full-match? "55.2e2" number-form == 5520.))
-(is (full-match? "" number-form == 255))
+(is (full-match? "16rFF" number-form == 255))
 ; (-> "#^{} #{[a b;Comment\nc]}" make-state form prn)
 ; (-> "#_#_'a'b'c" make-state form prn)
 ; (-> "#^:monster #{a b c d}" (parse form vector nil) prn)
