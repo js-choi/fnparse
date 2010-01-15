@@ -89,8 +89,12 @@
             big-dec? (opt (lit \M))]
     (comp (if big-dec? bigdec double) tail-fn)))
 
+(defvar- radix-coefficient-tail
+  (prefix-conc (lit \r)
+    nothing))
+
 (defvar- number-tail
-  (alt double-number-tail
+  (alt double-number-tail radix-coefficient-tail
        (constant-semantics emptiness identity)))
 
 (defvar- simple-integer
@@ -176,7 +180,7 @@
 (use 'clojure.test 'name.choi.joshua.fnparse.hound.test)
 
 (is (full-match? "55.2e2" number-form == 5520.))
-(is (full-match? "55.253" number-form == 55.253))
+(is (full-match? "" number-form == 255))
 ; (-> "#^{} #{[a b;Comment\nc]}" make-state form prn)
 ; (-> "#_#_'a'b'c" make-state form prn)
 ; (-> "#^:monster #{a b c d}" (parse form vector nil) prn)

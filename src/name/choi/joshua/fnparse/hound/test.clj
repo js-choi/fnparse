@@ -31,8 +31,10 @@
           (let [unexpected-token# (:unexpected-token expectation#)]
             (report-this# :fail "%s at position %s"
               (str/join " or " (:expected-rules expectation#))
-              (str "a token " unexpected-token# " (of the type "
-                   (pr-str (type unexpected-token#)) ")")
+              (if (= unexpected-token# :nothing)
+                "the end of the input (no more tokens)"
+                (str "a token " unexpected-token# " (of the type "
+                     (pr-str (type unexpected-token#)) ")"))
               (:position expectation#))))))))
 
 (defmethod assert-expr 'full-match?
