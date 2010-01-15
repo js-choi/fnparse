@@ -37,11 +37,6 @@
 
 (defvar- symbol-r (alt division-symbol normal-symbol))
 
-(defvar- decimal-digits (rep+ decimal-digit))
-(defvar- optional-sign (opt (set-lit "plus or minus sign" "+-")))
-(defn- digits-to-int [digit-chars]
-  (->> digit-chars (apply str) Integer/parseInt))
-
 (defvar- character-name
   (mapalt #(constant-semantics (mapconc (val %)) (key %))
     char-name-string))
@@ -59,22 +54,44 @@
 (defvar- keyword-r
   (prefix-conc keyword-indicator symbol-r))
 
-(defvar- decimal-number
-  (complex [sign optional-sign
-            body decimal-digits
-            tail (alt (opt (conc (lit \/) decimal-digits))
-                      (opt (conc (set-lit "radix sign" "rR") decimal-digits))
-                      (conc (opt (conc (lit \.) decimal-digits))
-                            (opt (conc (set-lit "exponent sign" "eE")
-                                       optional-sign decimal-digits))))]
-    (let [signed-body (cons sign body)
-          first-tail-token (first tail)]
-      (if-not (or tail (= first-tail-token \r))
-        (digits-to-int (concat signed-body tail))
-        (if (= first-tail-token \/)
-          (/ (digits-to-int signed-body) (digits-to-int (next tail)))
-          (->> tail (concat signed-body) (apply str)
-            Double/parseDouble))))))
+(defvar- natural-number
+  (cascading-rep+ decimal-digit identity #(+ (* 10 %1) %2)))
+
+(defvar- number-sign
+  (template-alt [label token product]
+    (with-label label (constant-semantics (lit token) product))
+    "positive sign" \+ 1, "negative sign" \- -1))
+
+(defvar- fractional-part
+  (prefix-conc
+    (lit \.)
+    (semantics (cascading-rep+ decimal-digit #(/ % 10) #(/ (+ %1 %2) 10))
+      #(partial + (double %)))))
+
+(defn- expt-int [base pow]
+  (loop [n pow, y 1, z base]
+    (let [t (bit-and n 1), n (bit-shift-right n 1)]
+      (cond
+       (zero? t) (recur n y (* z z))
+       (zero? n) (* z y)
+       :else (recur n (* z y) (* z z))))))
+
+(defvar- exponential-part
+  (prefix-conc
+    (alt (lit \e) (lit \E))
+    (semantics natural-number
+      #(partial * (expt-int 10. %)))))
+
+(defvar- number-tail
+  (alt fractional-part exponential-part
+       (constant-semantics emptiness identity)))
+
+(defvar- simple-integer
+  (complex [sign (opt number-sign), digits natural-number, tail number-tail]
+    (tail (* (or sign 1) digits))))
+
+(defvar- number-form
+  simple-integer)
 
 (defvar- string-delimiter (lit \"))
 (defvar- escape-sequence-map
@@ -147,11 +164,12 @@
   (with-label "a form"
     (prefix-conc
       ws?
-      (alt list-r vector-r map-r dispatched-form string-r syntax-quoted-form unquote-spliced-form unquoted-form division-symbol character-form keyword-r peculiar-symbol symbol-r decimal-number))))
+      (alt list-r vector-r map-r dispatched-form string-r syntax-quoted-form unquote-spliced-form unquoted-form division-symbol character-form keyword-r peculiar-symbol symbol-r number-form))))
 
 (use 'clojure.test 'name.choi.joshua.fnparse.hound.test)
 
-(is (full-match? "55" decimal-number 55 2))
+(is (full-match? "55e2" number-form == 5500.))
+(is (full-match? "55.253" number-form == 55.253))
 ; (-> "#^{} #{[a b;Comment\nc]}" make-state form prn)
 ; (-> "#_#_'a'b'c" make-state form prn)
 ; (-> "#^:monster #{a b c d}" (parse form vector nil) prn)

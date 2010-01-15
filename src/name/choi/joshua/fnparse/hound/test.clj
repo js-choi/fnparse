@@ -3,7 +3,7 @@
   (:require [clojure.contrib.str-utils2 :as str]))
 
 (defmethod assert-expr 'partial-match?
-  [msg [_ input rule product consumed-tokens-num]]
+  [msg [_ input rule consumed-tokens-num product-pred & product-pred-args]]
   (let [input-count (count input)]
    `(letfn [(report-this#
               ([kind# format-template# expected-arg# actual-arg# & other-args#]
@@ -20,9 +20,12 @@
             (if (not= actual-consumed-tokens-num# ~consumed-tokens-num)
               (report-this# :fail "%s tokens consumed"
                 ~consumed-tokens-num actual-consumed-tokens-num#)
-              (if (not= actual-product# ~product)
-                (report-this# :fail "a product of %s"
-                  ~product actual-product#)
+              (if (not (~product-pred actual-product# ~@product-pred-args))
+                (report-this# :fail "%s"
+                  (format "a product P so that %s is true"
+                    (list* '~product-pred '~'P '~product-pred-args))
+                  (format "the unmatching product %s"
+                    actual-product#))
                 (report-this# :pass)))))
         (fn [expectation#]
           (let [unexpected-token# (:unexpected-token expectation#)]
@@ -33,6 +36,7 @@
               (:position expectation#))))))))
 
 (defmethod assert-expr 'full-match?
-  [msg [_ input rule product]]
+  [msg [_ input rule product-pred & product-pred-args]]
   (assert-expr msg
-    (list 'partial-match? input rule product (count input))))
+    (list* 'partial-match? input rule (count input) product-pred
+           product-pred-args)))

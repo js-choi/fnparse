@@ -1,8 +1,8 @@
 (ns name.choi.joshua.fnparse.cat
-  [:use clojure.contrib.except clojure.contrib.def clojure.test
-        clojure.contrib.seq-utils]
-  [:require [clojure.contrib.monads :as m]]
-  [:import [clojure.lang Sequential IPersistentMap IPersistentVector Var]])
+  (:use clojure.contrib.except clojure.contrib.def clojure.test
+        clojure.contrib.seq-utils)
+  (:require [clojure.contrib.monads :as m])
+  (:import [clojure.lang Sequential IPersistentMap IPersistentVector Var]))
 
 (declare remember lit rep* rep+)
 
@@ -71,13 +71,12 @@
 (defn inc-position [state]
   (update-in state [:position] inc))
 
-(defn- conj-to-rule-stack [state rule]
-  (vary-meta state update-in [:rule-stack] conj rule))
-
-(defn name-rule
-  [rule rule-rep]
-  (fn [state]
-    (-> state (conj-to-rule-stack rule-rep) rule)))
+; (defn parse
+;   [input rule success-fn failure-fn]
+;   (let [result (-> input make-state rule)]
+;     (if (failure? result)
+;       (failure-fn (:expectation result))
+;       (success-fn (:product result) (-> result :state :remainder)))))
 
 (defn get-var-name [#^Var variable]
   (symbol (str (.ns variable)) (name (.sym variable))))

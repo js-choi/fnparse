@@ -224,11 +224,17 @@
       (assoc :tokens-consumed? false)
       (update-in [:result] force))))
 
-(defn rep+ [rule]
+(defn cascading-rep+ [rule unary-hook binary-hook]
   ; TODO: Rewrite to not blow up stack with many valid tokens
   (complex [first-token rule
-            rest-tokens (opt (rep+ rule))]
-    (cons first-token rest-tokens)))
+            rest-tokens (opt (cascading-rep+ rule unary-hook binary-hook))]
+    (if (nil? rest-tokens)
+      (unary-hook first-token)
+      (binary-hook first-token rest-tokens))))
+
+(defn rep+ [rule]
+  ; TODO: Rewrite to not blow up stack with many valid tokens
+  (cascading-rep+ rule cons cons))
 
 ; (defn rep* [rule]
 ;   (with-monad parser-m
@@ -270,7 +276,8 @@
               (partition c values)))))
 
 (defvar decimal-digit
-  (set-lit "a decimal digit" "1234567890"))
+  (with-label "a decimal digit"
+    (mapalt #(constant-semantics (lit (first (str %))) %) (range 9))))
 
 (defvar hexadecimal-digit
   (set-lit "a hexadecimal digit" "1234567890ABCDEFabcdef"))
