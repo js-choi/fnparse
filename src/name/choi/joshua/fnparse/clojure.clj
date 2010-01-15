@@ -63,10 +63,9 @@
     "positive sign" \+ 1, "negative sign" \- -1))
 
 (defvar- fractional-part
-  (prefix-conc
-    (lit \.)
+  (prefix-conc (lit \.)
     (semantics (cascading-rep+ decimal-digit #(/ % 10) #(/ (+ %1 %2) 10))
-      #(partial + (double %)))))
+      #(partial + %))))
 
 (defn- expt-int [base pow]
   (loop [n pow, y 1, z base]
@@ -77,13 +76,21 @@
        :else (recur n (* z y) (* z z))))))
 
 (defvar- exponential-part
-  (prefix-conc
-    (alt (lit \e) (lit \E))
+  (prefix-conc (alt (lit \e) (lit \E))
     (semantics natural-number
-      #(partial * (expt-int 10. %)))))
+      #(partial * (expt-int 10 %)))))
+
+(defvar- fractional-exponential-part
+  (complex [frac-fn fractional-part, exp-fn (opt exponential-part)]
+    (if exp-fn (comp exp-fn frac-fn) frac-fn)))
+
+(defvar- double-number-tail
+  (complex [tail-fn (alt fractional-exponential-part exponential-part)
+            big-dec? (opt (lit \M))]
+    (comp (if big-dec? bigdec double) tail-fn)))
 
 (defvar- number-tail
-  (alt fractional-part exponential-part
+  (alt double-number-tail
        (constant-semantics emptiness identity)))
 
 (defvar- simple-integer
@@ -168,7 +175,7 @@
 
 (use 'clojure.test 'name.choi.joshua.fnparse.hound.test)
 
-(is (full-match? "55e2" number-form == 5500.))
+(is (full-match? "55.2e2" number-form == 5520.))
 (is (full-match? "55.253" number-form == 55.253))
 ; (-> "#^{} #{[a b;Comment\nc]}" make-state form prn)
 ; (-> "#_#_'a'b'c" make-state form prn)
