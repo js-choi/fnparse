@@ -275,12 +275,31 @@
     `(alt ~@(map (fn [a] (apply-template argv expr a)) 
               (partition c values)))))
 
+(defn case-insensitive-lit [#^Character token]
+  (alt (lit (Character/toLowerCase token))
+       (lit (Character/toUpperCase token))))
+
+(defvar ascii-digits "0123456789")
+(defvar lowercase-ascii-alphabet "abcdefghijklmnopqrstuvwxyz")
+(defvar base-36-digits (str ascii-digits lowercase-ascii-alphabet))
+
+(defn radix-digit
+  ([base] (radix-digit (format "a base %s digit" base) base))
+  ([label base]
+   (->> base-36-digits (take base) indexed
+     (mapalt (fn [[index token]]
+               (constant-semantics (case-insensitive-lit token) index)))
+     (with-label label))))
+
 (defvar decimal-digit
-  (with-label "a decimal digit"
-    (mapalt #(constant-semantics (lit (first (str %))) %) (range 9))))
+  (radix-digit "a decimal digit" 10))
+;   (with-label "a decimal digit"
+;     (mapalt #(constant-semantics (lit (first (str %))) %) (range 9))))
 
 (defvar hexadecimal-digit
-  (set-lit "a hexadecimal digit" "1234567890ABCDEFabcdef"))
+  (radix-digit "a hexadecimal digit" 16))
+
+(-> "FA" make-state hexadecimal-digit prn)
 
 (defvar uppercase-ascii-letter
   (set-lit "an uppercase ASCII letter" "ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
