@@ -14,6 +14,8 @@
 
 (deftype State [tokens position] IPersistentMap)
 
+(deftype Success [product state] IPersistentMap)
+
 (deftype Failure [] IPersistentMap)
 
 (deftype Bank [memory lr-stack position-heads] IPersistentMap)
@@ -32,19 +34,16 @@
 
 (deftype Head [involved-rules rules-to-be-evaluated] IPersistentMap)
 
-(defn get-state [success]
-  (get success 1))
-
 (defn vary-state [success f & args]
-  (assoc success 1 (apply f (get-state success) args)))
+  (assoc success :state (apply f (:state success) args)))
 
 (extend ::State ABankable
   {:get-bank meta
    :set-bank with-meta})
 
-(extend IPersistentVector ABankable
-  {:get-bank (comp get-bank get-state)
-   :set-bank (fn [this new-bank] (vary-state this set-bank new-bank))})
+(extend ::Success ABankable
+  {:get-bank (comp get-bank :state)
+   :set-bank #(update-in %1 [:state] set-bank %2)})
 
 (extend ::Failure ABankable
   {:get-bank meta
@@ -94,15 +93,14 @@
      (fn [state] (set-bank basic-failure (get-bank state)))
    m-result
      (fn m-result-parser [product]
-       (fn [state] [product state]))
+       (fn [state] (Success product state)))
    m-bind
      (fn m-bind-parser [rule product-fn]
        (fn [state]
          (let [result (rule state)]
            (if (failure? result)
              result
-             (let [product (result 0), new-state (result 1)]
-               ((product-fn product) new-state))))))
+             ((product-fn (:product result)) (:state result))))))
    m-plus
     (fn m-plus-parser [& rules]
       (remember
@@ -112,128 +110,138 @@
             (or (find-first success? results)
                 (set-bank basic-failure (get-bank (last results))))))))])
 
-(defvar anything
-  (m/with-monad parser-m
-    (fn [state]
-      (let [token (nth (:tokens state) (:position state) ::nothing)]
-        (if (not= token ::nothing)
-          [token (inc-position state)]
-          (m/m-zero state)))))
+(defn with-product [product]
+  (m/with-monad parser-m (m-result product)))
+
+(defn anything
   "A rule that matches anything--that is, it matches
   the first token of the tokens it is given.
   This rule's product is the first token it receives.
-  It fails if there are no tokens left.")
+  It fails if there are no tokens left."
+  [state]
+  {:pre #{(isa? (type state) ::State)}}
+  (m/with-monad parser-m
+    (let [token (nth (:tokens state) (:position state) ::nothing)]
+      (if (not= token ::nothing)
+        (Success token (inc-position state))
+        (m/m-zero state)))))
 
-(letfn [(get-memory [bank subrule state-position]
-          (-> bank :memory (get-in [subrule state-position])))
-        (store-memory [bank subrule state-position result]
-          (assoc-in bank [:memory subrule state-position] result))
-        (clear-bank [bankable]
-          (set-bank bankable nil))
-        (get-lr-node [bank index]
-          (-> bank :lr-stack (get index)))
-        (grow-lr [subrule state node-index]
-          (let [state-0 state
-                position-0 (:position state-0)
-                bank-0
-                  (assoc-in (get-bank state-0) [:position-heads position-0]
-                    node-index)]
-            (loop [cur-bank bank-0]
-              (let [cur-bank (update-in cur-bank [:lr-stack node-index]
-                               #(assoc % :rules-to-be-evaluated
-                                  (:involved-rules %)))
-                    cur-result (subrule (set-bank state-0 cur-bank))
-                    cur-result-state (get-state cur-result)
-                    cur-result-bank (get-bank cur-result-state)
-                    cur-memory-val
-                      (get-memory cur-result-bank subrule position-0)
-                    cur-result-state-position (:position cur-result-state)
-                    cur-memory-val-state-position
-                      (-> cur-memory-val get-state :position)]
-                (if (or (failure? cur-result)
-                        (<= cur-result-state-position
-                            cur-memory-val-state-position))
-                  (let [cur-result-bank
-                          (update-in cur-result-bank [:position-heads]
-                            dissoc node-index)]
-                    (set-bank cur-memory-val cur-result-bank))
-                  (let [new-bank (store-memory cur-result-bank subrule
-                                   position-0 (clear-bank cur-result))]
-                    (recur new-bank)))))))
-        (add-head-if-not-already-there [head involved-rules]
-          (update-in (or head (Head #{} #{})) [:involved-rules]
-            into involved-rules))
-        (setup-lr [lr-stack stack-index]
-          (let [indexes (range (inc stack-index) (count lr-stack))
-                involved-rules
-                  (map :rule (subvec lr-stack (inc stack-index)))
-                lr-stack (update-in lr-stack [stack-index :head]
-                           add-head-if-not-already-there involved-rules)
-                lr-stack (reduce #(assoc-in %1 [%2 :head] stack-index)
-                           lr-stack indexes)]
-            lr-stack))
-        (lr-answer [subrule state node-index seed-result]
-          (let [bank (get-bank state)
-                bank (assoc-in bank [:lr-stack node-index :seed] seed-result)
-                lr-node (get-lr-node bank node-index)
-                node-seed (:seed lr-node)]
-            (if (-> lr-node :rule (not= subrule))
-              node-seed
-              (let [bank (store-memory bank subrule (:position state) node-seed)]
-                (if (failure? node-seed)
-                  (set-bank node-seed bank)
-                  (grow-lr subrule (set-bank state bank) node-index))))))
-        (recall [bank subrule state]
-          (let [position (:position state)
-                memory (get-memory bank subrule position)
-                node-index (-> bank :position-heads (get position))
-                lr-node (get-lr-node bank node-index)]
-            (if (nil? lr-node)
-              memory
-              (let [head (:head lr-node)]
-                (if-not (or memory (-> lr-node :rule (= subrule))
-                            (-> head :involved-rules (contains? subrule)))
-                  (set-bank basic-failure bank)
-                  (if (-> head :rules-to-be-evaluated (contains? subrule))
-                    (let [bank (update-in [:lr-stack node-index          
-                                           :rules-to-be-evalated]
-                                 disj subrule)
-                          result (-> state (set-bank bank) subrule)]
-                      (vary-bank result store-memory subrule position result))
-                    memory))))))]
-  (defn- remember [subrule]
-    (fn remembering-rule [state]
-      (let [bank (get-bank state)
-            state-position (:position state)
-            found-memory-val (recall bank subrule state)]
-        (if found-memory-val
-          (do
-            (if (integer? found-memory-val)
-              (let [bank (update-in bank [:lr-stack]
-                           setup-lr found-memory-val)
-                    new-failure (set-bank basic-failure bank)]
-                new-failure)
-              (set-bank found-memory-val bank)))
-          (do
-            (let [bank (store-memory bank subrule state-position
-                         (-> bank :lr-stack count))
-                  bank (update-in bank [:lr-stack] conj
-                         (LRNode nil subrule nil))
-                  state-0b (set-bank state bank)
-                  subresult (subrule state-0b)
-                  bank (get-bank subresult)
-                  submemory (get-memory bank subrule state-position)
-                  current-lr-node (-> bank :lr-stack peek)
-                  ; bank (update-in bank [:lr-stack] pop)
-                  bank (store-memory bank subrule state-position
-                         (clear-bank subresult))
-                  new-state (set-bank state bank)
-                  result
-                    (if (and (integer? submemory) (:head current-lr-node))
-                      (lr-answer subrule new-state submemory subresult)
-                      (set-bank subresult bank))
-                  result (vary-bank result update-in [:lr-stack] pop)]
-              result)))))))
+(defn- get-memory [bank subrule state-position]
+  (-> bank :memory (get-in [subrule state-position])))
+
+(defn- store-memory [bank subrule state-position result]
+  (assoc-in bank [:memory subrule state-position] result))
+
+(defn- clear-bank [bankable]
+  (set-bank bankable nil))
+
+(defn- get-lr-node [bank index]
+  (-> bank :lr-stack (get index)))
+
+(defn- grow-lr [subrule state node-index]
+  (let [state-0 state
+        position-0 (:position state-0)
+        bank-0 (assoc-in (get-bank state-0)
+                 [:position-heads position-0]
+                 node-index)]
+    (loop [cur-bank bank-0]
+      (let [cur-bank (update-in cur-bank [:lr-stack node-index]
+                       #(assoc % :rules-to-be-evaluated
+                          (:involved-rules %)))
+            cur-result (subrule (set-bank state-0 cur-bank))
+            cur-result-state (:state cur-result)
+            cur-result-bank (get-bank cur-result)
+            cur-memory-val (get-memory cur-result-bank subrule position-0)]
+        (if (or (failure? cur-result)
+                (<= (-> cur-result :state :position)
+                    (-> cur-memory-val :state :position)))
+          (let [cur-result-bank (update-in cur-result-bank
+                                  [:position-heads]
+                                  dissoc node-index)]
+            (set-bank cur-memory-val cur-result-bank))
+          (let [new-bank (store-memory cur-result-bank subrule
+                           position-0 (clear-bank cur-result))]
+            (recur new-bank)))))))
+
+(defn- add-head-if-not-already-there [head involved-rules]
+  (update-in (or head (Head #{} #{})) [:involved-rules]
+    into involved-rules))
+
+(defn- setup-lr [lr-stack stack-index]
+  (let [indexes (range (inc stack-index) (count lr-stack))
+        involved-rules (map :rule (subvec lr-stack (inc stack-index)))
+        lr-stack (update-in lr-stack [stack-index :head]
+                   add-head-if-not-already-there involved-rules)
+        lr-stack (reduce #(assoc-in %1 [%2 :head] stack-index)
+                   lr-stack indexes)]
+    lr-stack))
+
+(defn- lr-answer [subrule state node-index seed-result]
+  (let [bank (get-bank state)
+        bank (assoc-in bank [:lr-stack node-index :seed] seed-result)
+        lr-node (get-lr-node bank node-index)
+        node-seed (:seed lr-node)]
+    (if (-> lr-node :rule (not= subrule))
+      node-seed
+      (let [bank (store-memory bank subrule (:position state)
+                   node-seed)]
+        (if (failure? node-seed)
+          (set-bank node-seed bank)
+          (grow-lr subrule (set-bank state bank) node-index))))))
+
+(defn- recall [bank subrule state]
+  (let [position (:position state)
+        memory (get-memory bank subrule position)
+        node-index (-> bank :position-heads (get position))
+        lr-node (get-lr-node bank node-index)]
+    (if (nil? lr-node)
+      memory
+      (let [head (:head lr-node)]
+        (if-not (or memory
+                    (-> lr-node :rule (= subrule))
+                    (-> head :involved-rules (contains? subrule)))
+          (set-bank basic-failure bank)
+          (if (-> head :rules-to-be-evaluated (contains? subrule))
+            (let [bank (update-in [:lr-stack node-index          
+                                   :rules-to-be-evalated]
+                         disj subrule)
+                  result (-> state (set-bank bank) subrule)]
+              (vary-bank result store-memory subrule position result))
+            memory))))))
+
+(defn- remember [subrule]
+  (fn remembering-rule [state]
+    (let [bank (get-bank state)
+          state-position (:position state)
+          found-memory-val (recall bank subrule state)]
+      (if found-memory-val
+        (do
+          (if (integer? found-memory-val)
+            (let [bank (update-in bank [:lr-stack]
+                         setup-lr found-memory-val)
+                  new-failure (set-bank basic-failure bank)]
+              new-failure)
+            (set-bank found-memory-val bank)))
+        (do
+          (let [bank (store-memory bank subrule state-position
+                       (-> bank :lr-stack count))
+                bank (update-in bank [:lr-stack] conj
+                       (LRNode nil subrule nil))
+                state-0b (set-bank state bank)
+                subresult (subrule state-0b)
+                bank (get-bank subresult)
+                submemory (get-memory bank subrule state-position)
+                current-lr-node (-> bank :lr-stack peek)
+                ; bank (update-in bank [:lr-stack] pop)
+                bank (store-memory bank subrule state-position
+                       (clear-bank subresult))
+                new-state (set-bank state bank)
+                result
+                  (if (and (integer? submemory) (:head current-lr-node))
+                    (lr-answer subrule new-state submemory subresult)
+                    (set-bank subresult bank))
+                result (vary-bank result update-in [:lr-stack] pop)]
+            result))))))
 
 (m/with-monad parser-m
   (defvar nothing m/m-zero))
@@ -264,15 +272,15 @@
   [steps & product-expr]
   `(m/domonad parser-m ~steps ~@product-expr))
 
-(defvar- fetch-state
-  (m/fetch-state)
-  "A rule that consumes no tokens. Its product
-  is the entire current state.
-  [Equivalent to the result of fetch-state
-  from clojure.contrib.monads.]")
-
-(defn- set-state [state]
-  (m/set-state state))
+; (defvar- fetch-state
+;   (m/fetch-state)
+;   "A rule that consumes no tokens. Its product
+;   is the entire current state.
+;   [Equivalent to the result of fetch-state
+;   from clojure.contrib.monads.]")
+; 
+; (defn- set-state [state]
+;   (m/set-state state))
 
 ; (defn fetch-info
 ;   "Creates a rule that consumes no tokens.
@@ -395,13 +403,12 @@
           rule-map-form `(def ~map-name (array-map ~@keyword-rule-pairs))]
       `(do ~@rule-def-forms ~rule-map-form))))
 
-(defn followed-by
-  "Creates a rule that does not consume any tokens, but fails when the given
-  subrule fails.
-  The new rule's product would be the subrule's product."
-  [subrule]
-  (complex [state fetch-state, subproduct subrule, _ (set-state state)]
-    subproduct))
+(defn followed-by [rule]
+  (fn [state]
+    (let [result (rule state)]
+      (if (failure? result)
+        result
+        ((with-product (:product result)) state)))))
 
 (defn not-followed-by
   "Creates a rule that does not consume
@@ -412,7 +419,7 @@
   (m/with-monad parser-m
     (fn [state]
       (if (failure? (subrule state))
-        [true state]
+        (Success true state)
         (m/m-zero state)))))
 
 (defn semantics
@@ -543,10 +550,8 @@
   The new rule's products would be b-product. If
   b fails or c succeeds, then nil is simply returned."
   [minuend subtrahend]
-  (complex [state fetch-state
-            minuend-product minuend
-            :when (failure? (subtrahend state))]
-    minuend-product))
+  (complex [_ (not-followed-by subtrahend), product minuend]
+    product))
 
 (defn rep*
   "Creates a rule that is the zero-or-more
@@ -569,9 +574,8 @@
     (loop [cur-product (transient []), cur-state state]
       (let [subresult (subrule cur-state)]
         (if (success? subresult)
-          (let [[subproduct substate] subresult]
-            (recur (conj! cur-product subproduct) substate))
-          [(persistent! cur-product) cur-state])))))
+          (recur (conj! cur-product (:product subresult)) (:state subresult))
+          (Success (persistent! cur-product) cur-state))))))
 
 (defn rep-predicate
   "Like the rep* function, only that the number
