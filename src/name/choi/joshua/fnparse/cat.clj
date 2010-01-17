@@ -1,6 +1,5 @@
 (ns name.choi.joshua.fnparse.cat
-  (:use clojure.contrib.except clojure.contrib.def clojure.test
-        clojure.contrib.seq-utils)
+  (:use clojure.contrib.except clojure.contrib.def clojure.contrib.seq-utils)
   (:require [clojure.contrib.monads :as m])
   (:import [clojure.lang Sequential IPersistentMap IPersistentVector Var]))
 
@@ -13,9 +12,10 @@
 (defn- vary-bank [bankable f & args]
   (set-bank bankable (apply f (get-bank bankable) args)))
 
-(deftype StateMeta [bank rule-stack] IPersistentMap)
+(deftype StateMeta [bank] IPersistentMap)
 
-(deftype State [tokens context position] IPersistentMap)
+(deftype State [tokens position] IPersistentMap)
+
 (deftype Failure [] IPersistentMap)
 
 (deftype Bank [memory lr-stack position-heads] IPersistentMap)
@@ -45,11 +45,11 @@
    :set-bank (fn [this new-bank] (assoc this :bank new-bank))})
 
 (extend ::State ABankable
-  {:get-bank (comp :bank meta)
+  {:get-bank (comp get-bank meta)
    :set-bank (fn [this new-bank] (vary-meta this set-bank new-bank))})
 
 (extend IPersistentVector ABankable
-  {:get-bank (comp :bank meta get-state)
+  {:get-bank (comp get-bank get-state)
    :set-bank (fn [this new-bank] (vary-state this set-bank new-bank))})
 
 (extend ::Failure ABankable
@@ -65,8 +65,8 @@
 
 (defvar success? (complement failure?))
 
-(defn make-state [input context position]
-  (State input context position (StateMeta (Bank {} [] {}) []) nil))
+(defn make-state [input]
+  (State input 0 (StateMeta (Bank {} [] {})) nil))
 
 (defn inc-position [state]
   (update-in state [:position] inc))
@@ -75,7 +75,7 @@
 ;   [input rule success-fn failure-fn]
 ;   (let [result (-> input make-state rule)]
 ;     (if (failure? result)
-;       (failure-fn (:expectation result))
+;       (failure-fn nil)
 ;       (success-fn (:product result) (-> result :state :remainder)))))
 
 (defn get-var-name [#^Var variable]
@@ -93,9 +93,6 @@
 (defn mock-state
   ([tokens] (mock-state tokens nil))
   ([tokens context] (partial make-state tokens context)))
-
-(defn =result [result-to-test expected-result]
-  (= result-to-test expected-result))
 
 (m/defmonad parser-m
   "The monad that FnParse uses."
@@ -121,21 +118,17 @@
             (or (find-first success? results)
                 (set-bank basic-failure (get-bank (last results))))))))])
 
-(with-test
-  (defvar anything
-    (m/with-monad parser-m
-      (fn [state]
-        (let [token (nth (:tokens state) (:position state) ::nothing)]
-          (if (not= token ::nothing)
-            [token (inc-position state)]
-            (m/m-zero state)))))
-    "A rule that matches anything--that is, it matches
-    the first token of the tokens it is given.
-    This rule's product is the first token it receives.
-    It fails if there are no tokens left.")
-  (let [mock (mock-state '(A B C))]
-    (is (= ['A (mock 1)] (anything (mock 0))))
-    (is (failure? (anything (mock 3))))))
+(defvar anything
+  (m/with-monad parser-m
+    (fn [state]
+      (let [token (nth (:tokens state) (:position state) ::nothing)]
+        (if (not= token ::nothing)
+          [token (inc-position state)]
+          (m/m-zero state)))))
+  "A rule that matches anything--that is, it matches
+  the first token of the tokens it is given.
+  This rule's product is the first token it receives.
+  It fails if there are no tokens left.")
 
 (letfn [(get-memory [bank subrule state-position]
           (-> bank :memory (get-in [subrule state-position])))
@@ -206,7 +199,7 @@
               (let [head (:head lr-node)]
                 (if-not (or memory (-> lr-node :rule (= subrule))
                             (-> head :involved-rules (contains? subrule)))
-                  (with-meta basic-failure bank)
+                  (set-bank basic-failure bank)
                   (if (-> head :rules-to-be-evaluated (contains? subrule))
                     (let [bank (update-in [:lr-stack node-index          
                                            :rules-to-be-evalated]
@@ -224,7 +217,7 @@
             (if (integer? found-memory-val)
               (let [bank (update-in bank [:lr-stack]
                            setup-lr found-memory-val)
-                    new-failure (with-meta basic-failure bank)]
+                    new-failure (set-bank basic-failure bank)]
                 new-failure)
               (set-bank found-memory-val bank)))
           (do
@@ -248,52 +241,34 @@
                   result (vary-bank result update-in [:lr-stack] pop)]
               result)))))))
 
-(set-test remember
-  ; In the following forms, the suffix "-0"
-  ; means "initial". The suffix "-1" means "final".
-  ; The suffix "a" and "b" indicate first pass
-  ; and second pass respectively.
-  (let [rule (remember anything)
-        mock (mock-state '(a b c))
-        expected-result ['a (mock 1)]
-        state-0 (mock 0)
-        ; First pass
-        calc-results-a (rule state-0)
-        ; Second pass
-        calc-results-b
-          (-> state-0 (set-bank (get-bank calc-results-a)) rule)]
-    (is (= expected-result calc-results-a))
-    (is (= expected-result calc-results-b))))
-
 (m/with-monad parser-m
   (defvar nothing m/m-zero))
 
-(with-test
-  (defmacro complex
-    "Creates a complex rule in monadic
-    form. It's a lot easier than it sounds.
-    It's like a very useful combination of
-    conc and semantics.
-    The first argument is a vector
-    containing binding forms à la the let and for
-    forms. The keys are new, lexically scoped
-    variables. Their corresponding vals
-    are subrules. Each of these subrules are
-    sequentially called as if they were
-    concatinated together with conc. If any of
-    them fails, the whole rule immediately fails.
-    Meanwhile, each sequential subrule's product
-    is bound to its corresponding variable.
-    After all subrules match, all of the
-    variables can be used in the body.
-    The second argument of complex is a body
-    that calculates the whole new rule's
-    product, with access to any of the variables
-    defined in the binding vector.
-    It's basically like let, for, or any other
-    monad. Very useful!"
-    [steps & product-expr]
-    `(m/domonad parser-m ~steps ~@product-expr)))
+(defmacro complex
+  "Creates a complex rule in monadic
+  form. It's a lot easier than it sounds.
+  It's like a very useful combination of
+  conc and semantics.
+  The first argument is a vector
+  containing binding forms à la the let and for
+  forms. The keys are new, lexically scoped
+  variables. Their corresponding vals
+  are subrules. Each of these subrules are
+  sequentially called as if they were
+  concatinated together with conc. If any of
+  them fails, the whole rule immediately fails.
+  Meanwhile, each sequential subrule's product
+  is bound to its corresponding variable.
+  After all subrules match, all of the
+  variables can be used in the body.
+  The second argument of complex is a body
+  that calculates the whole new rule's
+  product, with access to any of the variables
+  defined in the binding vector.
+  It's basically like let, for, or any other
+  monad. Very useful!"
+  [steps & product-expr]
+  `(m/domonad parser-m ~steps ~@product-expr))
 
 (defvar- fetch-state
   (m/fetch-state)
@@ -355,69 +330,52 @@
 ;             ((update-info :variables conj 'foo)
 ;              (mock 0 {:variables #{}}))))))
  
-(with-test
-  (m/with-monad parser-m
-    (defvar emptiness
-      (m-result nil)
-      "A rule that matches emptiness--that
-      is, it always matches with every given
-      token sequence, and it always returns
-      [nil given-state].
-      (def a emptiness) would be equivalent
-      to the EBNF a = ; This rule's product
-      is always nil, and it therefore always
-      returns [nil given-state]."))
-  (let [mock (mock-state '(A B C))]
-    (is (= (emptiness (mock 0)) [nil (mock 0)]))
-    (is (= (emptiness (mock 6)) [nil (mock 6)]))))
+(m/with-monad parser-m
+  (defvar emptiness
+    (m-result nil)
+    "A rule that matches emptiness--that
+    is, it always matches with every given
+    token sequence, and it always returns
+    [nil given-state].
+    (def a emptiness) would be equivalent
+    to the EBNF a = ; This rule's product
+    is always nil, and it therefore always
+    returns [nil given-state]."))
 
-(with-test
-  (defn validate
-    "Creates a rule from attaching a product-validating function to the given
-    subrule--that is, any products of the subrule must fulfill the validator
-    function.
-    (def a (validate b validator)) says that the rule a succeeds only when b
-    succeeds and also when the evaluated value of (validator b-product) is true.
-    The new rule's product would be b-product."
-    [subrule validator]
-    (complex [subproduct subrule, :when (validator subproduct)]
-      subproduct))
-  (let [valid? (partial = "hi")
-        rule-a (validate anything valid?)
-        rule-b (validate nothing valid?)
-        mock (mock-state ["hi" "THEN"])]
-    (is (= (rule-a (mock 0)) ["hi" (mock 1)]))
-    (is (failure? (rule-b (mock 0))))
-    (is (failure? (rule-a (mock 1))))))
+(defn validate
+  "Creates a rule from attaching a product-validating function to the given
+  subrule--that is, any products of the subrule must fulfill the validator
+  function.
+  (def a (validate b validator)) says that the rule a succeeds only when b
+  succeeds and also when the evaluated value of (validator b-product) is true.
+  The new rule's product would be b-product."
+  [subrule validator]
+  (complex [subproduct subrule, :when (validator subproduct)]
+    subproduct))
  
-  (defn term
-    "(term validator) is equivalent
-    to (validate anything validator).
-    Creates a rule that is a terminal rule of the given validator--that is, it
-    accepts only tokens for whom (validator token) is true.
-    (def a (term validator)) would be equivalent to the EBNF
-      a = ? (validator %) evaluates to true ?;
-    The new rule's product would be the first token, if it fulfills the
-    validator."
-    [validator]
-    (validate anything validator))
+(defn term
+  "(term validator) is equivalent
+  to (validate anything validator).
+  Creates a rule that is a terminal rule of the given validator--that is, it
+  accepts only tokens for whom (validator token) is true.
+  (def a (term validator)) would be equivalent to the EBNF
+    a = ? (validator %) evaluates to true ?;
+  The new rule's product would be the first token, if it fulfills the
+  validator."
+  [validator]
+  (validate anything validator))
  
-(with-test
-  (defvar lit
-    (comp term (partial partial =))
-    "Equivalent to (comp term (partial partial =)).
-    Creates a rule that is the terminal
-    rule of the given literal token--that is,
-    it accepts only tokens that are equal to
-    the given literal token.
-    (def a (lit \"...\")) would be equivalent to the EBNF
-      a = \"...\";
-    The new rule's product would be the first
-    token, if it equals the given literal token.")
-  (let [rule (lit 'A)
-        mock (mock-state '[A B])]
-    (is (= (rule (mock 0)) ['A (mock 1)]))
-    (is (failure? (rule (mock 1))))))
+(defvar lit
+  (comp term (partial partial =))
+  "Equivalent to (comp term (partial partial =)).
+  Creates a rule that is the terminal
+  rule of the given literal token--that is,
+  it accepts only tokens that are equal to
+  the given literal token.
+  (def a (lit \"...\")) would be equivalent to the EBNF
+    a = \"...\";
+  The new rule's product would be the first
+  token, if it equals the given literal token.")
 
 (defvar re-term
   (comp term (partial partial re-matches))
@@ -442,12 +400,6 @@
                                (mapcat make-keyword-rule-entry))
           rule-map-form `(def ~map-name (array-map ~@keyword-rule-pairs))]
       `(do ~@rule-def-forms ~rule-map-form))))
-
-(set-test complex
-  (let [mock (mock-state '[A B C])
-        rule (complex [a (lit 'A), b (lit 'B)] (str a "!" b))]
-    (is (= (rule (mock 0)) ["A!B" (mock 2)]))
-    (is (failure? (rule (mock 1))))))
 
 (defn followed-by
   "Creates a rule that does not consume any tokens, but fails when the given
@@ -515,59 +467,23 @@
 (defn vconc [& subrules]
   (semantics (apply conc subrules) vec))
 
-(with-test
-  (defn alt
-    "Creates a rule that is the alternation
-    of the given subrules. It succeeds when
-    any of its subrules succeed, and fails
-    when none do. Its result is that of the first
-    subrule that succeeds, so the order of the
-    subrules that this function receives matters.
-    (def a (alt b c d)) would be equivalent to the EBNF:
-     a = b | c | d;
-    This macro is almost equivalent to m-plus for
-    the parser-m monad. The difference is that
-    it defers evaluation of whatever variables it
-    receives, so that it accepts expressions containing
-    unbound variables that are defined later."
-    [& subrules]
-    (m/with-monad parser-m (apply m/m-plus subrules)))
-  (let [rule (alt (lit "hi") (lit "THEN"))
-        mock (mock-state ["THEN" "bye"])]
-    (is (= (rule (mock 0)) ["THEN" (mock 1)]))
-    (is (failure? (rule (mock 1))))))
+(defn alt
+  "Creates a rule that is the alternation
+  of the given subrules. It succeeds when
+  any of its subrules succeed, and fails
+  when none do. Its result is that of the first
+  subrule that succeeds, so the order of the
+  subrules that this function receives matters.
+  (def a (alt b c d)) would be equivalent to the EBNF:
+   a = b | c | d;
+  This macro is almost equivalent to m-plus for
+  the parser-m monad. The difference is that
+  it defers evaluation of whatever variables it
+  receives, so that it accepts expressions containing
+  unbound variables that are defined later."
+  [& subrules]
+  (m/with-monad parser-m (apply m/m-plus subrules)))
 
-(defvar- number-rule (lit '0))
-
-(declare lr-test-rule)
-
-(with-test
-  (defvar- direct-lr-rule
-    (alt (conc #'direct-lr-rule (lit '-) number-rule)
-         number-rule))
-  (let [mock (mock-state '[0 - 0 - 0])]
-    (is (= ['[[0 - 0] - 0] (mock 5)] (direct-lr-rule (mock 0))))))
-
-(defvar- lr-test-fact
-  (alt (conc #'lr-test-fact (lit '*) number-rule)
-       (conc #'lr-test-fact (lit '/) number-rule)
-       number-rule))
-
-(defvar- lr-test-term
-  (alt (conc #'lr-test-rule (lit '+) #'lr-test-fact)
-       (conc #'lr-test-rule (lit '-) #'lr-test-fact)
-       #'lr-test-fact))
-
-(defvar- lr-test-rule #'lr-test-term)
-
-(set-test lr-test-term
-  (let [mock (mock-state '[0])]
-    (is (= ['0 (mock 1)] (lr-test-term (mock 0)))))
-  (let [mock (mock-state '[0 * 0])]
-    (is (= ['[0 * 0] (mock 3)] (lr-test-term (mock 0)))))
-  (let [mock (mock-state '[0 + 0 * 0 - 0 / 0])]
-    (is (= ['[[0 + [0 * 0]] - [0 / 0]] (mock 9)] (lr-test-term (mock 0))))))
- 
 (defn opt
   "Creates a rule that is the optional form
   of the subrule. It always succeeds. Its result
@@ -662,13 +578,6 @@
           (let [[subproduct substate] subresult]
             (recur (conj! cur-product subproduct) substate))
           [(persistent! cur-product) cur-state])))))
-
-(set-test rep*
-  (let [rule (rep* (lit 'a))]
-    (let [mock (mock-state '[a a a])]
-      (is (= ['[a a a] (mock 3)] (rule (mock 0)))))
-    (let [mock (mock-state '[b])]
-      (is (= ['[] (mock 0)] (rule (mock 0)))))))
 
 (defn rep-predicate
   "Like the rep* function, only that the number

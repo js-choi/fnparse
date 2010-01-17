@@ -54,18 +54,26 @@
 (defvar- keyword-r
   (prefix-conc keyword-indicator symbol-r))
 
-(defvar- natural-number
-  (cascading-rep+ decimal-digit identity #(+ (* 10 %1) %2)))
+(defrm- radix-natural-number [base]
+  (cascading-rep+ (radix-digit base) identity #(+ (* base %1) %2)))
+
+(defvar- decimal-natural-number
+  (radix-natural-number 10))
 
 (defvar- number-sign
   (template-alt [label token product]
     (with-label label (constant-semantics (lit token) product))
     "positive sign" \+ 1, "negative sign" \- -1))
 
+(defvar- no-number-tail
+  (constant-semantics emptiness identity))
+
 (defvar- fractional-part
   (prefix-conc (lit \.)
-    (semantics (cascading-rep+ decimal-digit #(/ % 10) #(/ (+ %1 %2) 10))
-      #(partial + %))))
+    (alt
+      (semantics (cascading-rep+ decimal-digit #(/ % 10) #(/ (+ %1 %2) 10))
+        #(partial + %))
+      no-number-tail)))
 
 (defn- expt-int [base pow]
   (loop [n pow, y 1, z base]
@@ -77,29 +85,35 @@
 
 (defvar- exponential-part
   (prefix-conc (alt (lit \e) (lit \E))
-    (semantics natural-number
+    (semantics decimal-natural-number
       #(partial * (expt-int 10 %)))))
 
 (defvar- fractional-exponential-part
-  (complex [frac-fn fractional-part, exp-fn (opt exponential-part)]
-    (if exp-fn (comp exp-fn frac-fn) frac-fn)))
+  (complex [frac-fn fractional-part
+            exp-fn (alt exponential-part no-number-tail)]
+    (comp exp-fn frac-fn)))
 
-(defvar- double-number-tail
+(defvar- noninteger-number-tail
   (complex [tail-fn (alt fractional-exponential-part exponential-part)
             big-dec? (opt (lit \M))]
     (comp (if big-dec? bigdec double) tail-fn)))
 
-(defvar- radix-coefficient-tail
-  (prefix-conc (lit \r)
+(defrm- radix-coefficient-tail [base]
+  (println base)
+  (if (and (integer? base) (<= 0 base 36))
+    (semantics
+      (prefix-conc (case-insensitive-lit \r) (radix-natural-number base))
+      constantly)
     nothing))
 
-(defvar- number-tail
-  (alt double-number-tail radix-coefficient-tail
-       (constant-semantics emptiness identity)))
+(defrm- number-tail [base]
+  (alt noninteger-number-tail (radix-coefficient-tail base) no-number-tail))
 
 (defvar- simple-integer
-  (complex [sign (opt number-sign), digits natural-number, tail number-tail]
-    (tail (* (or sign 1) digits))))
+  (complex [sign (opt number-sign)
+            prefix-number decimal-natural-number
+            tail-fn (number-tail prefix-number)]
+    (tail-fn (* (or sign 1) prefix-number))))
 
 (defvar- number-form
   simple-integer)
@@ -175,12 +189,17 @@
   (with-label "a form"
     (prefix-conc
       ws?
-      (alt list-r vector-r map-r dispatched-form string-r syntax-quoted-form unquote-spliced-form unquoted-form division-symbol character-form keyword-r peculiar-symbol symbol-r number-form))))
+      (alt list-r vector-r map-r dispatched-form string-r syntax-quoted-form
+           unquote-spliced-form unquoted-form division-symbol character-form
+           keyword-r peculiar-symbol symbol-r number-form))))
 
 (use 'clojure.test 'name.choi.joshua.fnparse.hound.test)
 
 (is (full-match? "55.2e2" number-form == 5520.))
 (is (full-match? "16rFF" number-form == 255))
+(is (full-match? "16" number-form == 16))
+(is (full-match? "16." number-form #(isa? (type %) %2) Double))
+(is (full-match? "16rAZ" (conc number-form ws) == 200))
 ; (-> "#^{} #{[a b;Comment\nc]}" make-state form prn)
 ; (-> "#_#_'a'b'c" make-state form prn)
 ; (-> "#^:monster #{a b c d}" (parse form vector nil) prn)

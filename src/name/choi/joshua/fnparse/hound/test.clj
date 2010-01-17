@@ -30,7 +30,10 @@
         (fn [expectation#]
           (let [unexpected-token# (:unexpected-token expectation#)]
             (report-this# :fail "%s at position %s"
-              (str/join " or " (:expected-rules expectation#))
+              (->> expectation# :descriptors
+                (map (fn [{kind# :kind, message# :message}]
+                       (format "%s (%s)" message# kind#)))
+                (str/join " or "))
               (if (= unexpected-token# :nothing)
                 "the end of the input (no more tokens)"
                 (str "a token " unexpected-token# " (of the type "

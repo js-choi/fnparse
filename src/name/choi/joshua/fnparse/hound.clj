@@ -36,12 +36,14 @@
 
 (deftype Reply [tokens-consumed? result] IPersistentMap)
 
-(deftype Expectation [position unexpected-token expected-rules] IPersistentMap)
+(deftype ErrorDescriptor [kind message] IPersistentMap)
 
-(deftype Failure [expectation] IPersistentMap)
+(deftype ParseError [position unexpected-token descriptors] IPersistentMap)
 
-(deftype Success [product state expectation]
-  ; The expectation is that of the error that would have
+(deftype Failure [error] IPersistentMap)
+
+(deftype Success [product state error]
+  ; :error is the error that would have
   ; occurred if this successful alternative wasn't taken.
   IPersistentMap)
 
@@ -55,30 +57,30 @@
   [input rule success-fn failure-fn]
   (let [result (-> input make-state rule :result force)]
     (if (failure? result)
-      (failure-fn (:expectation result))
+      (failure-fn (:error result))
       (success-fn (:product result) (-> result :state :remainder)))))
 
 (letfn [(reply-expected-rules [reply]
-          (-> reply :result :expectation :expected-rules))]
+          (-> reply :result :error :descriptors))]
   (defn merge-replies [mergee merger]
     (let [merger-rules (reply-expected-rules merger)
           mergee-rules (reply-expected-rules mergee)]
-      (assoc-in merger [:result :expectation :expected-rules]
+      (assoc-in merger [:result :error :descriptors]
         (concat mergee-rules merger-rules)))))
 
 (defmonad parser-m
   "The monad that FnParse uses."
   [m-zero
      (fn [state]
-       (Reply false (Failure (Expectation (:position state)
-                                          (first (:remainder state))
-                                          nil))))
+       (Reply false (Failure (ParseError (:position state)
+                                         (first (:remainder state))
+                                         nil))))
    m-result
      (fn [product]
        (fn [state]
          (Reply false
            (Success product state
-             (Expectation (:position state) nil nil)))))
+             (ParseError (:position state) nil nil)))))
    m-bind
      (fn [rule product-fn]
        (letfn [(apply-product-fn [result]
@@ -143,8 +145,8 @@
     (let [reply (rule state)]
       (if (:tokens-consumed? reply)
         reply
-        (assoc-in reply [:result :expectation :expected-rules]
-          (list label))))))
+        (assoc-in reply [:result :error :descriptors]
+          (list (ErrorDescriptor :expectation label)))))))
 
 (defn term [label predicate]
   (with-monad parser-m
@@ -159,10 +161,9 @@
                            (assoc state
                              :remainder (next remainder)
                              :position (inc position))
-                           (Expectation position nil nil))))
-                (Reply false (Failure (Expectation position
-                                        first-token nil)))))
-            (Reply false (Failure (Expectation position :nothing nil)))))))))
+                           (ParseError position nil nil))))
+                (Reply false (Failure (ParseError position first-token nil)))))
+            (Reply false (Failure (ParseError position :nothing nil)))))))))
 
 (defn antiterm [label pred]
   (term label (complement pred)))
@@ -279,13 +280,20 @@
   (alt (lit (Character/toLowerCase token))
        (lit (Character/toUpperCase token))))
 
+(defmacro defrm [& forms]
+  `(defn-memo ~@forms))
+
+(defmacro defrm- [& forms]
+  `(defrm ~@forms))
+
 (defvar ascii-digits "0123456789")
 (defvar lowercase-ascii-alphabet "abcdefghijklmnopqrstuvwxyz")
 (defvar base-36-digits (str ascii-digits lowercase-ascii-alphabet))
 
-(defn radix-digit
-  ([base] (radix-digit (format "a base %s digit" base) base))
+(defrm radix-digit
+  ([base] (radix-digit (format "a base-%s digit" base) base))
   ([label base]
+   {:pre #{(<= 0 base 36)}}
    (->> base-36-digits (take base) indexed
      (mapalt (fn [[index token]]
                (constant-semantics (case-insensitive-lit token) index)))
@@ -293,13 +301,9 @@
 
 (defvar decimal-digit
   (radix-digit "a decimal digit" 10))
-;   (with-label "a decimal digit"
-;     (mapalt #(constant-semantics (lit (first (str %))) %) (range 9))))
 
 (defvar hexadecimal-digit
   (radix-digit "a hexadecimal digit" 16))
-
-(-> "FA" make-state hexadecimal-digit prn)
 
 (defvar uppercase-ascii-letter
   (set-lit "an uppercase ASCII letter" "ABCDEFGHIJKLMNOPQRSTUVWXYZ"))

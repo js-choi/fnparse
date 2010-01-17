@@ -58,6 +58,7 @@
 
 (def expr addition-level-expr)
 
-(println (expr (make-state "3+1*cos(-(-5)+sin(2))" {} 0)))
+(prn (make-state "3+1*cos(-(-5)+sin(2))"))
+(prn (expr (make-state "3+1*cos(-(-5)+sin(2))")))
 ;(println (expr (make-state "1+3*2+2" {} 0)))
 ;(println (expr (make-state "2+3-2" {} 0)))
