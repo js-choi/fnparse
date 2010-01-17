@@ -1,17 +1,18 @@
 (ns name.choi.joshua.fnparse.math
-  (:use name.choi.joshua.fnparse.cat))
+  (:use clojure.template name.choi.joshua.fnparse.cat))
 
 (set! *warn-on-reflection* true)
 
-(def digit (term #(Character/isDigit (char %))))
+(def digit (term "a decimal digit" #(Character/isDigit (char %))))
 
-(deflits indicators
-  {positive-sign \+, negative-sign \-, addition-sign \+, minus-sign \-,
-   multiplication-sign \*, division-sign \/, opening-parenthesis \(,
-   closing-parenthesis \)})
+(do-template [rule-name token]
+  (def rule-name (lit token))
+  plus-sign \+, minus-sign \-, multiplication-sign \*, division-sign \/,
+  opening-parenthesis \(, closing-parenthesis \))
 
 (def indicator
-  (apply alt (vals indicators)))
+  (alt plus-sign minus-sign multiplication-sign division-sign
+       opening-parenthesis closing-parenthesis))
 
 (def number-level-expr
   (semantics (rep+ digit)
@@ -39,7 +40,7 @@
   (alt (vconc name-level-expr parenthesized-expr) parenthesized-level-expr))
 
 (def pos-neg-level-expr
-  (alt (vconc (alt positive-sign negative-sign) function-level-expr)
+  (alt (vconc (alt plus-sign minus-sign) function-level-expr)
        function-level-expr))
 
 (def multiplication-level-expr
@@ -52,14 +53,12 @@
 (def addition-level-expr
   (alt (vconc
          #'addition-level-expr
-         (alt addition-sign minus-sign)
+         (alt plus-sign minus-sign)
          multiplication-level-expr)
        multiplication-level-expr))
 
 (def expr addition-level-expr)
 
-;(prn (expr (make-state "3+1*cos(-(-5)+sin(2))")))
 (prn (expr (make-state "3+1*cos(-(-5)+sin(2))")))
-;(prn (expr (make-state ")3+1*cos(-(-5)+sin(2))")))
 ;(println (expr (make-state "1+3*2+2" {} 0)))
 ;(println (expr (make-state "2+3-2" {} 0)))

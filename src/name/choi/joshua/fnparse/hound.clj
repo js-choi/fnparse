@@ -160,11 +160,11 @@
             (let [first-token (first remainder)]
               (if (predicate first-token)
                 (Reply true
-                  (delay (Success first-token
-                           (assoc state
-                             :remainder (next remainder)
-                             :position (inc position))
-                           (ParseError position nil nil))))
+                  (delay
+                    (Success first-token
+                             (assoc state :remainder (next remainder)
+                                          :position (inc position))
+                             (ParseError position nil nil))))
                 (Reply false (Failure (ParseError position first-token nil)))))
             (Reply false (Failure (ParseError position :nothing nil)))))))))
 

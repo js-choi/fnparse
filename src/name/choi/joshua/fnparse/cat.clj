@@ -14,9 +14,14 @@
 
 (deftype State [tokens position] IPersistentMap)
 
-(deftype Success [product state] IPersistentMap)
+(deftype ErrorDescriptor [kind message] IPersistentMap)
 
-(deftype Failure [] IPersistentMap)
+(deftype ParseError [position descriptors] IPersistentMap)
+  ; TODO Add unexpected-token
+
+(deftype Success [product state error] IPersistentMap)
+
+(deftype Failure [error] IPersistentMap)
 
 (deftype Bank [memory lr-stack position-heads] IPersistentMap)
   ; memory: a nested map with function keys and map vals
@@ -56,17 +61,22 @@
   failure? ::Failure "Is the given result a Failure?"
   success? ::Success "Is the given result is a Success?")
 
-(defn failure? [result]
-  (-> result type (isa? ::Failure)))
-
-(defn success? [result]
-  (-> result type (isa? ::Success)))
-
 (defn make-state [input]
   (State input 0 (Bank {} [] {}) nil))
 
-(defn inc-position [state]
+(defn- inc-position [state]
   (update-in state [:position] inc))
+
+(defn merge-parse-errors
+  [{position-a :position, descriptors-a :descriptors :as error-a}
+   {position-b :position, descriptors-b :descriptors :as error-b}]
+  (cond
+    (or (> position-b position-a) (empty? descriptors-a))
+      error-a
+    (or (< position-b position-a) (empty? descriptors-b))
+      error-b
+    :else
+      (ParseError position-a (into descriptors-a descriptors-b))))
 
 ; (defn parse
 ;   [input rule success-fn failure-fn]
@@ -75,17 +85,9 @@
 ;       (failure-fn nil)
 ;       (success-fn (:product result) (-> result :state :remainder)))))
 
-(defn get-var-name [#^Var variable]
-  (symbol (str (.ns variable)) (name (.sym variable))))
-
-; (defmacro defrulemaker
-;   ([var-name args body]
-;    (defrulemaker var-name nil body))
-;   ([var-name doc-string args body]
-;    `(defn ~var-name ~doc-string ~args
-;       ~body)))
-
-(defvar- basic-failure (Failure))
+(defn nothing [state]
+  (set-bank (Failure (ParseError (:position state) nil))
+    (get-bank state)))
 
 (defn mock-state
   ([tokens] (mock-state tokens nil))
@@ -93,11 +95,11 @@
 
 (m/defmonad parser-m
   "The monad that FnParse uses."
-  [m-zero
-     (fn [state] (set-bank basic-failure (get-bank state)))
+  [m-zero nothing
    m-result
      (fn m-result-parser [product]
-       (fn [state] (Success product state)))
+       (fn product-rule [state]
+         (Success product state (ParseError (:position state) nil))))
    m-bind
      (fn m-bind-parser [rule product-fn]
        (fn [state]
@@ -112,23 +114,10 @@
           (let [results (rest (reductions #(%2 (set-bank state (get-bank %1)))
                                 state rules))]
             (or (find-first success? results)
-                (set-bank basic-failure (get-bank (last results))))))))])
+                (set-bank (m-zero state) (get-bank (last results))))))))])
 
 (defn with-product [product]
   (m/with-monad parser-m (m-result product)))
-
-(defn anything
-  "A rule that matches anything--that is, it matches
-  the first token of the tokens it is given.
-  This rule's product is the first token it receives.
-  It fails if there are no tokens left."
-  [state]
-  {:pre #{(isa? (type state) ::State)}}
-  (m/with-monad parser-m
-    (let [token (nth (:tokens state) (:position state) ::nothing)]
-      (if (not= token ::nothing)
-        (Success token (inc-position state))
-        (m/m-zero state)))))
 
 (defn- get-memory [bank subrule state-position]
   (-> bank :memory (get-in [subrule state-position])))
@@ -204,7 +193,7 @@
         (if-not (or memory
                     (-> lr-node :rule (= subrule))
                     (-> head :involved-rules (contains? subrule)))
-          (set-bank basic-failure bank)
+          (set-bank (nothing state) bank)
           (if (-> head :rules-to-be-evaluated (contains? subrule))
             (let [bank (update-in [:lr-stack node-index          
                                    :rules-to-be-evalated]
@@ -223,7 +212,7 @@
           (if (integer? found-memory-val)
             (let [bank (update-in bank [:lr-stack]
                          setup-lr found-memory-val)
-                  new-failure (set-bank basic-failure bank)]
+                  new-failure (set-bank (nothing state) bank)]
               new-failure)
             (set-bank found-memory-val bank)))
         (do
@@ -358,7 +347,15 @@
   [subrule validator]
   (complex [subproduct subrule, :when (validator subproduct)]
     subproduct))
- 
+
+(defn with-label [label rule]
+  (fn labelled-rule [state]
+    (let [result (rule state)
+          initial-position (:position state)]
+      (if-not (< initial-position (-> result :error :position))
+        (assoc result :error (ParseError initial-position [label]))
+        result))))
+
 (defn term
   "(term validator) is equivalent
   to (validate anything validator).
@@ -368,11 +365,27 @@
     a = ? (validator %) evaluates to true ?;
   The new rule's product would be the first token, if it fulfills the
   validator."
-  [validator]
-  (validate anything validator))
+  [label validator]
+  (m/with-monad parser-m
+    (with-label label
+      (fn terminal-rule [{:keys #{tokens position} :as state}]
+        (let [token (nth tokens position ::nothing)]
+          (if (not= token ::nothing)
+            (if (validator token)
+              (Success token
+                       (assoc state :position (inc position))
+                       (ParseError position nil))
+              (m/m-zero state))
+            (m/m-zero state)))))))
  
-(defvar lit
-  (comp term (partial partial =))
+(defvar anything
+  (term "anything" (constantly true))
+  "A rule that matches anything--that is, it matches
+  the first token of the tokens it is given.
+  This rule's product is the first token it receives.
+  It fails if there are no tokens left.")
+
+(defn lit
   "Equivalent to (comp term (partial partial =)).
   Creates a rule that is the terminal
   rule of the given literal token--that is,
@@ -381,31 +394,21 @@
   (def a (lit \"...\")) would be equivalent to the EBNF
     a = \"...\";
   The new rule's product would be the first
-  token, if it equals the given literal token.")
+  token, if it equals the given literal token."
+  [token]
+  (term token (partial = token)))
 
-(defvar re-term
-  (comp term (partial partial re-matches))
+(defn re-term
   "Equivalent to (comp term (partial partial re-matches)).
   Creates a rule that is the terminal rule of the given regex--that is, it
   accepts only tokens that match the given regex.
   (def a (re-term #\"...\")) would be equivalent to the EBNF
     a = ? (re-matches #\"...\" %) evaluates to true ?;
   The new rule's product would be the first token, if it matches the given
-  regex.")
-
-(defmacro deflits
-  "Intended for defining many literal rules at once."
-  [map-name name-token-map]
-  (letfn [(make-rule-def-form [name-token-entry]
-            (let [[rule-name token] name-token-entry]
-              `(def ~rule-name (lit ~token))))
-          (make-keyword-rule-entry [name]
-            [(keyword name) (first `(~name))])]
-    (let [rule-def-forms (map make-rule-def-form name-token-map)
-          keyword-rule-pairs (->> name-token-map keys
-                               (mapcat make-keyword-rule-entry))
-          rule-map-form `(def ~map-name (array-map ~@keyword-rule-pairs))]
-      `(do ~@rule-def-forms ~rule-map-form))))
+  regex."
+  [pattern]
+  (term (str "a token matching pattern " pattern)
+    (partial re-matches pattern)))
 
 (defn followed-by [rule]
   (fn [state]
@@ -423,7 +426,7 @@
   (m/with-monad parser-m
     (fn [state]
       (if (failure? (subrule state))
-        (Success true state)
+        (Success true state (ParseError nil nil))
         (m/m-zero state)))))
 
 (defn semantics
@@ -579,7 +582,8 @@
       (let [subresult (subrule cur-state)]
         (if (success? subresult)
           (recur (conj! cur-product (:product subresult)) (:state subresult))
-          (Success (persistent! cur-product) cur-state))))))
+          (Success (persistent! cur-product) cur-state
+                   (ParseError nil nil)))))))
 
 (defn rep-predicate
   "Like the rep* function, only that the number
