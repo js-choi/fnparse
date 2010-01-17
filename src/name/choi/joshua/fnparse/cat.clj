@@ -1,5 +1,5 @@
 (ns name.choi.joshua.fnparse.cat
-  (:use clojure.contrib.except clojure.contrib.def clojure.contrib.seq-utils)
+  (:use clojure.template clojure.contrib.def clojure.contrib.seq-utils)
   (:require [clojure.contrib.monads :as m])
   (:import [clojure.lang Sequential IPersistentMap IPersistentVector Var]))
 
@@ -34,9 +34,6 @@
 
 (deftype Head [involved-rules rules-to-be-evaluated] IPersistentMap)
 
-(defn vary-state [success f & args]
-  (assoc success :state (apply f (:state success) args)))
-
 (extend ::State ABankable
   {:get-bank meta
    :set-bank with-meta})
@@ -53,10 +50,17 @@
   {:get-bank meta
    :set-bank with-meta})
 
+(do-template [fn-name type-name doc-string]
+  (defn fn-name doc-string [result]
+    (-> result type (isa? type-name)))
+  failure? ::Failure "Is the given result a Failure?"
+  success? ::Success "Is the given result is a Success?")
+
 (defn failure? [result]
   (-> result type (isa? ::Failure)))
 
-(defvar success? (complement failure?))
+(defn success? [result]
+  (-> result type (isa? ::Success)))
 
 (defn make-state [input]
   (State input 0 (Bank {} [] {}) nil))

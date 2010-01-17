@@ -50,8 +50,11 @@
 (defn make-state [remainder]
   (State remainder 0))
 
-(defn failure? [result]
-  (isa? (type result) ::Failure))
+(do-template [fn-name type-name doc-string]
+  (defn fn-name doc-string [result]
+    (-> result type (isa? type-name)))
+  failure? ::Failure "Is the given result a Failure?"
+  success? ::Success "Is the given result is a Success?")
 
 (defn parse
   [input rule success-fn failure-fn]
