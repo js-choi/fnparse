@@ -12,8 +12,6 @@
 (defn- vary-bank [bankable f & args]
   (set-bank bankable (apply f (get-bank bankable) args)))
 
-(deftype StateMeta [bank] IPersistentMap)
-
 (deftype State [tokens position] IPersistentMap)
 
 (deftype Failure [] IPersistentMap)
@@ -40,13 +38,9 @@
 (defn vary-state [success f & args]
   (assoc success 1 (apply f (get-state success) args)))
 
-(extend ::StateMeta ABankable
-  {:get-bank :bank
-   :set-bank (fn [this new-bank] (assoc this :bank new-bank))})
-
 (extend ::State ABankable
-  {:get-bank (comp get-bank meta)
-   :set-bank (fn [this new-bank] (vary-meta this set-bank new-bank))})
+  {:get-bank meta
+   :set-bank with-meta})
 
 (extend IPersistentVector ABankable
   {:get-bank (comp get-bank get-state)
@@ -66,7 +60,7 @@
 (defvar success? (complement failure?))
 
 (defn make-state [input]
-  (State input 0 (StateMeta (Bank {} [] {})) nil))
+  (State input 0 (Bank {} [] {}) nil))
 
 (defn inc-position [state]
   (update-in state [:position] inc))
