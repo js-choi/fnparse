@@ -103,10 +103,15 @@
    m-bind
      (fn m-bind-parser [rule product-fn]
        (fn [state]
-         (let [result (rule state)]
-           (if (failure? result)
-             result
-             ((product-fn (:product result)) (:state result))))))
+         (let [{first-error :error, :as first-result} (rule state)]
+           (if (success? first-result)
+             (let [next-rule
+                     (-> first-result :product product-fn)
+                   {next-error :error, :as next-result}
+                     (-> first-result :state next-rule)]
+               (assoc next-result
+                 :error (merge-parse-errors first-error next-error)))
+             first-result))))
    m-plus
     (fn m-plus-parser [& rules]
       (remember
@@ -426,7 +431,7 @@
   (m/with-monad parser-m
     (fn [state]
       (if (failure? (subrule state))
-        (Success true state (ParseError nil nil))
+        (Success true state (ParseError (:position state) nil))
         (m/m-zero state)))))
 
 (defn semantics
@@ -583,7 +588,7 @@
         (if (success? subresult)
           (recur (conj! cur-product (:product subresult)) (:state subresult))
           (Success (persistent! cur-product) cur-state
-                   (ParseError nil nil)))))))
+                   (ParseError (:position state) nil)))))))
 
 (defn rep-predicate
   "Like the rep* function, only that the number
