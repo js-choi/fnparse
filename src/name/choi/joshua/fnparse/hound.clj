@@ -296,7 +296,7 @@
 (defrm radix-digit
   ([base] (radix-digit (format "a base-%s digit" base) base))
   ([label base]
-   {:pre #{(<= 0 base 36)}}
+   {:pre #{(integer? base) (<= 0 base 36)}}
    (->> base-36-digits (take base) indexed
      (mapalt (fn [[index token]]
                (constant-semantics (case-insensitive-lit token) index)))

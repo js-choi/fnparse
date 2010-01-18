@@ -3,7 +3,7 @@
   (:require [clojure.contrib.monads :as m])
   (:import [clojure.lang Sequential IPersistentMap IPersistentVector Var]))
 
-(declare remember lit rep* rep+)
+(declare remember emptiness lit rep* rep+)
 
 (defprotocol ABankable
   (get-bank [o])
@@ -71,12 +71,9 @@
   [{position-a :position, descriptors-a :descriptors :as error-a}
    {position-b :position, descriptors-b :descriptors :as error-b}]
   (cond
-    (or (> position-b position-a) (empty? descriptors-a))
-      error-a
-    (or (< position-b position-a) (empty? descriptors-b))
-      error-b
-    :else
-      (ParseError position-a (into descriptors-a descriptors-b))))
+    (or (> position-b position-a) (empty? descriptors-a)) error-b
+    (or (< position-b position-a) (empty? descriptors-b)) error-a
+    true (ParseError position-a (into descriptors-a descriptors-b))))
 
 ; (defn parse
 ;   [input rule success-fn failure-fn]
@@ -116,10 +113,18 @@
     (fn m-plus-parser [& rules]
       (remember
         (fn summed-rule [state]
-          (let [results (rest (reductions #(%2 (set-bank state (get-bank %1)))
-                                state rules))]
-            (or (find-first success? results)
-                (set-bank (m-zero state) (get-bank (last results))))))))])
+          (let [apply-next-rule
+                 (fn apply-next-rule [prev-result next-rule]
+                   (-> state
+                     (set-bank (get-bank prev-result))
+                     next-rule
+                     (update-in [:error]
+                       #(merge-parse-errors (:error prev-result) %))))
+                initial-result (emptiness state)
+                results (rest (reductions apply-next-rule
+                                initial-result rules))]
+            (str results) (prn "results" results)
+            (or (find-first success? results) (last results))))))])
 
 (defn with-product [product]
   (m/with-monad parser-m (m-result product)))
@@ -241,9 +246,6 @@
                 result (vary-bank result update-in [:lr-stack] pop)]
             result))))))
 
-(m/with-monad parser-m
-  (defvar nothing m/m-zero))
-
 (defmacro complex
   "Creates a complex rule in monadic
   form. It's a lot easier than it sounds.
@@ -353,13 +355,16 @@
   (complex [subproduct subrule, :when (validator subproduct)]
     subproduct))
 
-(defn with-label [label rule]
+(defn with-dynamic-label [label-fn rule]
   (fn labelled-rule [state]
-    (let [result (rule state)
-          initial-position (:position state)]
+    (let [result (rule state), initial-position (:position state)]
       (if-not (< initial-position (-> result :error :position))
-        (assoc result :error (ParseError initial-position [label]))
+        (->> result :error :descriptors label-fn list
+             (ParseError initial-position) (assoc result :error))
         result))))
+
+(defn with-label [label rule]
+  (with-dynamic-label (constantly label) rule))
 
 (defn term
   "(term validator) is equivalent
@@ -371,17 +376,16 @@
   The new rule's product would be the first token, if it fulfills the
   validator."
   [label validator]
-  (m/with-monad parser-m
-    (with-label label
-      (fn terminal-rule [{:keys #{tokens position} :as state}]
-        (let [token (nth tokens position ::nothing)]
-          (if (not= token ::nothing)
-            (if (validator token)
-              (Success token
-                       (assoc state :position (inc position))
-                       (ParseError position nil))
-              (m/m-zero state))
-            (m/m-zero state)))))))
+  (with-label label
+    (fn terminal-rule [{:keys #{tokens position} :as state}]
+      (let [token (nth tokens position ::nothing)]
+        (if (not= token ::nothing)
+          (if (validator token)
+            (Success token
+                     (assoc state :position (inc position))
+                     (ParseError position nil))
+            (nothing state))
+          (nothing state))))))
  
 (defvar anything
   (term "anything" (constantly true))
@@ -427,12 +431,13 @@
   any tokens, but fails when the given
   subrule succeeds. On success, the new
   rule's product is always true."
-  [subrule]
-  (m/with-monad parser-m
+  [rule]
+  (let [rule (with-dynamic-label (partial list "not ") rule)]
     (fn [state]
-      (if (failure? (subrule state))
-        (Success true state (ParseError (:position state) nil))
-        (m/m-zero state)))))
+      (let [result (rule state)]
+        (if (failure? result)
+          (Success true state (:error result))
+          (-> state nothing (assoc :error (:error result))))))))
 
 (defn semantics
   "Creates a rule with a semantic hook,
