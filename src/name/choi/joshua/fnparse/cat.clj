@@ -1,5 +1,6 @@
 (ns name.choi.joshua.fnparse.cat
-  (:use clojure.template clojure.contrib.def clojure.contrib.seq-utils)
+  (:use clojure.template clojure.set clojure.contrib.def
+        clojure.contrib.seq-utils)
   (:require [clojure.contrib.monads :as m])
   (:import [clojure.lang Sequential IPersistentMap IPersistentVector Var]))
 
@@ -73,7 +74,7 @@
   (cond
     (or (> position-b position-a) (empty? descriptors-a)) error-b
     (or (< position-b position-a) (empty? descriptors-b)) error-a
-    true (ParseError position-a (into descriptors-a descriptors-b))))
+    true (ParseError position-a (union descriptors-a descriptors-b))))
 
 ; (defn parse
 ;   [input rule success-fn failure-fn]
@@ -82,21 +83,23 @@
 ;       (failure-fn nil)
 ;       (success-fn (:product result) (-> result :state :remainder)))))
 
-(defn nothing [state]
-  (set-bank (Failure (ParseError (:position state) nil))
-    (get-bank state)))
+(defn blank-nothing
+  ([state] (blank-nothing state #{}))
+  ([state label]
+   (set-bank (Failure (ParseError (:position state) label))
+     (get-bank state))))
 
-(defn mock-state
-  ([tokens] (mock-state tokens nil))
-  ([tokens context] (partial make-state tokens context)))
+(defn with-product [product]
+  (fn product-rule [state]
+    (Success product state (ParseError (:position state) #{}))))
 
 (m/defmonad parser-m
   "The monad that FnParse uses."
-  [m-zero nothing
+  [m-zero blank-nothing
    m-result
      (fn m-result-parser [product]
        (fn product-rule [state]
-         (Success product state (ParseError (:position state) nil))))
+         (Success product state (ParseError (:position state) #{}))))
    m-bind
      (fn m-bind-parser [rule product-fn]
        (fn [state]
@@ -123,7 +126,7 @@
                 initial-result (emptiness state)
                 results (rest (reductions apply-next-rule
                                 initial-result rules))]
-            (str results) (prn "results" results)
+            #_ (str results) #_ (prn "results" results)
             (or (find-first success? results) (last results))))))])
 
 (defn with-product [product]
@@ -144,22 +147,19 @@
 (defn- grow-lr [subrule state node-index]
   (let [state-0 state
         position-0 (:position state-0)
-        bank-0 (assoc-in (get-bank state-0)
-                 [:position-heads position-0]
+        bank-0 (assoc-in (get-bank state-0) [:position-heads position-0]
                  node-index)]
     (loop [cur-bank bank-0]
       (let [cur-bank (update-in cur-bank [:lr-stack node-index]
                        #(assoc % :rules-to-be-evaluated
                           (:involved-rules %)))
             cur-result (subrule (set-bank state-0 cur-bank))
-            cur-result-state (:state cur-result)
             cur-result-bank (get-bank cur-result)
             cur-memory-val (get-memory cur-result-bank subrule position-0)]
         (if (or (failure? cur-result)
                 (<= (-> cur-result :state :position)
                     (-> cur-memory-val :state :position)))
-          (let [cur-result-bank (update-in cur-result-bank
-                                  [:position-heads]
+          (let [cur-result-bank (update-in cur-result-bank [:position-heads]
                                   dissoc node-index)]
             (set-bank cur-memory-val cur-result-bank))
           (let [new-bank (store-memory cur-result-bank subrule
@@ -186,8 +186,7 @@
         node-seed (:seed lr-node)]
     (if (-> lr-node :rule (not= subrule))
       node-seed
-      (let [bank (store-memory bank subrule (:position state)
-                   node-seed)]
+      (let [bank (store-memory bank subrule (:position state) node-seed)]
         (if (failure? node-seed)
           (set-bank node-seed bank)
           (grow-lr subrule (set-bank state bank) node-index))))))
@@ -203,10 +202,9 @@
         (if-not (or memory
                     (-> lr-node :rule (= subrule))
                     (-> head :involved-rules (contains? subrule)))
-          (set-bank (nothing state) bank)
+          (set-bank (blank-nothing state) bank)
           (if (-> head :rules-to-be-evaluated (contains? subrule))
-            (let [bank (update-in [:lr-stack node-index          
-                                   :rules-to-be-evalated]
+            (let [bank (update-in [:lr-stack node-index :rules-to-be-evalated]
                          disj subrule)
                   result (-> state (set-bank bank) subrule)]
               (vary-bank result store-memory subrule position result))
@@ -222,7 +220,7 @@
           (if (integer? found-memory-val)
             (let [bank (update-in bank [:lr-stack]
                          setup-lr found-memory-val)
-                  new-failure (set-bank (nothing state) bank)]
+                  new-failure (set-bank (blank-nothing state) bank)]
               new-failure)
             (set-bank found-memory-val bank)))
         (do
@@ -278,7 +276,7 @@
 ;   is the entire current state.
 ;   [Equivalent to the result of fetch-state
 ;   from clojure.contrib.monads.]")
-; 
+;
 ; (defn- set-state [state]
 ;   (m/set-state state))
 
@@ -303,7 +301,7 @@
 ;   (is (= ((complex [remainder (fetch-remainder)] remainder)
 ;           (make-cf-state ["hi" "THEN"]))
 ;          [["hi" "THEN"] (make-cf-state ["hi" "THEN"])])))
- 
+
 ; (defn set-info
 ;   "Creates a rule that consumes no tokens.
 ;   The new rule directly changes the
@@ -314,7 +312,7 @@
 ;   clojure.contrib.monads.]"
 ;   [key value]
 ;   (m/set-val key value))
-;  
+; 
 ; (with-test
 ;   (defn update-info
 ;     "Creates a rule that consumes no tokens.
@@ -331,7 +329,7 @@
 ;     (is (= [#{} (mock 1 {:variables #{'foo}})]
 ;             ((update-info :variables conj 'foo)
 ;              (mock 0 {:variables #{}}))))))
- 
+
 (m/with-monad parser-m
   (defvar emptiness
     (m-result nil)
@@ -359,7 +357,7 @@
   (fn labelled-rule [state]
     (let [result (rule state), initial-position (:position state)]
       (if-not (< initial-position (-> result :error :position))
-        (->> result :error :descriptors label-fn list
+        (->> result :error :descriptors (map label-fn) set
              (ParseError initial-position) (assoc result :error))
         result))))
 
@@ -376,17 +374,15 @@
   The new rule's product would be the first token, if it fulfills the
   validator."
   [label validator]
-  (with-label label
-    (fn terminal-rule [{:keys #{tokens position} :as state}]
-      (let [token (nth tokens position ::nothing)]
-        (if (not= token ::nothing)
-          (if (validator token)
-            (Success token
-                     (assoc state :position (inc position))
-                     (ParseError position nil))
-            (nothing state))
-          (nothing state))))))
- 
+  (fn terminal-rule [{:keys #{tokens position} :as state}]
+    (let [token (nth tokens position ::blank-nothing)]
+      (if (not= token ::blank-nothing)
+        (if (validator token)
+          (Success token (assoc state :position (inc position))
+                         (ParseError position #{label}))
+          (blank-nothing state #{label}))
+        (blank-nothing state #{label})))))
+
 (defvar anything
   (term "anything" (constantly true))
   "A rule that matches anything--that is, it matches
@@ -405,7 +401,7 @@
   The new rule's product would be the first
   token, if it equals the given literal token."
   [token]
-  (term token (partial = token)))
+  (term (format "\"%s\"" token) (partial = token)))
 
 (defn re-term
   "Equivalent to (comp term (partial partial re-matches)).
@@ -432,12 +428,12 @@
   subrule succeeds. On success, the new
   rule's product is always true."
   [rule]
-  (let [rule (with-dynamic-label (partial list "not ") rule)]
+  (let [rule (with-dynamic-label (partial format "not %s") rule)]
     (fn [state]
       (let [result (rule state)]
         (if (failure? result)
           (Success true state (:error result))
-          (-> state nothing (assoc :error (:error result))))))))
+          (-> state blank-nothing (assoc :error (:error result))))))))
 
 (defn semantics
   "Creates a rule with a semantic hook,
@@ -456,7 +452,7 @@
   [subrule semantic-value]
   (complex [subproduct subrule]
     semantic-value))
- 
+
 ; (def remainder-peek
 ;   "A rule whose product is the very next
 ;   token in the remainder of any given state.
@@ -526,7 +522,7 @@
   with set-info or update-info's products."
   [first-subrule & rest-subrules]
   `(semantics (conc ~first-subrule ~@rest-subrules) first))
- 
+
 (defn lit-conc-seq
   "A convenience function: it creates a rule
   that is the concatenation of the literals
@@ -570,375 +566,3 @@
   (complex [_ (not-followed-by subtrahend), product minuend]
     product))
 
-(defn rep*
-  "Creates a rule that is the zero-or-more
-  greedy repetition of the given subrule. It
-  always succeeds. It consumes tokens with
-  its subrule until its subrule fails.
-  Its result is the sequence of results from
-  the subrule's repetitions, (or nil if the
-  subrule fails immediately).
-  (def a (rep* b)) is equivalent to the EBNF:
-    a = {b};
-  The new rule's products would be either the
-  vector [b-product ...] for how many matches
-  of b were found, or nil if there was no
-  match. (Note that this means that, in the latter
-  case, the result would be [nil given-state].)
-  The new rule can never simply return nil."
-  [subrule]
-  (fn [state]
-    (loop [cur-product (transient []), cur-state state]
-      (let [subresult (subrule cur-state)]
-        (if (success? subresult)
-          (recur (conj! cur-product (:product subresult)) (:state subresult))
-          (Success (persistent! cur-product) cur-state
-                   (ParseError (:position state) nil)))))))
-
-(defn rep-predicate
-  "Like the rep* function, only that the number
-  of times that the subrule is fulfilled must
-  fulfill the given factor-predicate function."
-  [factor-predicate subrule]
-  (validate (rep* subrule) (comp factor-predicate count)))
-
-(defn rep+
-  "Creates a rule that is the zero-or-more
-  greedy repetition of the given subrule. It
-  fails only when its subrule fails immediately.
-  It consumes tokens with its subrule until
-  its subrule fails. Its result is the sequence
-  of results from the subrule's repetitions.
-  (def a (rep* b)) is equivalent to the EBNF:
-    a = {b}-;
-  The new rule's products would be the vector
-  [b-product ...] for how many matches
-  of b were found. If there was no match, then
-  the rule fails."
-  [subrule]
-  (rep-predicate pos? subrule))
-
-(defn rep=
-  "Creates a rule that is the greedy repetition
-  of the given subrule by the given factor (a
-  positive integer)--that is, it eats up all the
-  tokens that fulfill the subrule, and it then
-  succeeds only if the number of times the subrule
-  was fulfilled is equal to the given factor, no
-  more and no less.
-  (rep= 3 :a) would eat the first three tokens of [:a :a :a :b] and return:
-    [[:a :a :a] (list :a :b)].
-  (rep= 3 :a) would eat the first four tokens of [:a :a :a :a :b] and fail."
-  [factor subrule]
-  (rep-predicate (partial = factor) subrule))
-
-(defn rep<
-  "A similiar function to rep=, only that the
-  instead the new rule succeeds if the number
-  of times that the subrule is fulfilled is
-  less than and not equal to the given factor."
-  [factor subrule]
-  (rep-predicate (partial > factor) subrule))
-
-(defn rep<=
-  "A similiar function to rep=, only that the
-  instead the new rule succeeds if the number
-  of times that the subrule is fulfilled is
-  less than or equal to the given factor."
-  [factor subrule]
-  (rep-predicate (partial >= factor) subrule))
-
-(defn factor=
-  "Creates a rule that is the syntactic factor
-  (that is, a non-greedy repetition) of the
-  given subrule by a given integer--that is, it
-  is equivalent to the subrule replicated by
-  1, 2, etc. times and then concatenated.
-  (def a (factor= n b)) would be equivalent to the EBNF
-    a = n * b;
-  The new rule's products would be b-product.
-  If b fails below n times, then nil is simply
-  returned.
-  (factor= 3 :a) would eat the first three
-  tokens [:a :a :a :a :b] and return:
-    [[:a :a :a] (list :a :b)].
-  (factor= 3 :a) would eat the first three
-  tokens [:a :a :b] and fail."
-  [factor subrule]
-  (apply conc (replicate factor subrule)))
-
-; (with-test
-;   (defn factor<
-;     "Same as the factor= function, except that the
-;     new rule eats up tokens only until the
-;     given subrule is fulfilled one less times than
-;     the factor. The new rule would never fail.
-;     (factor< 3 :a) would eat the first two tokens [:a :a :a :a :b] and return:
-;       [[:a :a] (list :a :a :b)].
-;     (factor< 3 :a) would eat the first three tokens [:b] and return:
-;       [nil (list :b)]"
-;     [factor subrule]
-;     (alt (factor= (dec factor) subrule) (rep< factor subrule)))
-;   (let [tested-rule (factor< 3 (lit \A))]
-;     (is (= (tested-rule (make-cf-state (seq "AAAAC")))
-;            [[\A \A] (make-cf-state (seq "AAC"))])
-;         (str "created factor< rule works when symbol fulfills all subrule multiples and"
-;              "leaves strict remainder"))
-;     (is (= (tested-rule (make-cf-state (seq "AAAC")))
-;            [[\A \A] (make-cf-state (seq "AC"))])
-;         "created factor< rule works when symbol fulfills all subrule multiples only")
-;     (is (= (tested-rule (make-cf-state (seq "AAC"))) [[\A \A] (make-cf-state (seq "C"))])
-;         "created factor< rule works when symbol does not fulfill all subrule multiples")
-;     (is (= (tested-rule (make-cf-state (seq "DAB")))
-;            [nil (make-cf-state (seq "DAB"))])
-;         "created factor< rule works when symbol does not fulfill subrule at all")))
-;  
-; (defn factor<=
-;   "Same as the factor= function, except that
-;   the new rule always succeeds, consuming tokens
-;   until the subrule is fulfilled the same amount
-;   of times as the given factor. The new rule
-;   would never fail.
-;   (factor<= 3 :a) would eat the first two tokens [:a :a :a :a :b] and return:
-;     [[:a :a :a] (list :a :b)].
-;   (factor<= 3 :a) would eat the first three tokens [:b] and return:
-;     [nil (list :b)]"
-;   [factor subrule]
-;   (alt (factor= factor subrule) (rep< factor subrule)))
-;  
-; (with-test
-;   (defn failpoint
-;     "Creates a rule that applies a failpoint to
-;     a subrule. When the subrule fails—i.e., it
-;     returns nil—then the failure hook function
-;     is called with one argument, the state at time
-;     of failure."
-;     [subrule failure-hook]
-;     (fn [state]
-;       (let [result (subrule state)]
-;         (if (success? result)
-;           result
-;           (failure-hook (get-remainder state) state)))))
-;   (let [exception-rule (failpoint (lit "A")
-;                           (fn [remainder state]
-;                             (throw-arg "ERROR %s at line %s"
-;                               (first remainder) (:line state))))]
-;     (is (= (exception-rule (-> ["A"] make-cf-state (assoc :line 3)))
-;            ["A" (-> nil make-cf-state (assoc :line 3))])
-;         "failing rules succeed when their subrules are fulfilled")
-;     (is (thrown-with-msg? IllegalArgumentException
-;           #"ERROR B at line 3"
-;           (exception-rule (-> ["B"] make-cf-state (assoc :line 3)))
-;         "failing rules fail with given exceptions when their subrules fail"))))
-;  
-; (with-test
-;   (defmacro effects
-;     "Creates a rule that calls the lists given
-;     in its body for side effects. It does not
-;     consume any tokens or modify the state in
-;     any other way."
-;     [& effect-body]
-;     `(fn [state#]
-;        [((fn [] ~@effect-body)) state#])))
-;  
-; (set-test effects
-;   (let [rule
-;          (complex [subproduct (lit "A")
-;                    line-number (fetch-info :line)
-;                    effects (effects (println "!" subproduct)
-;                                     (println "YES" line-number))]
-;            subproduct)]
-;     (is (= (with-out-str
-;              (is (= (rule (-> ["A" "B"] make-cf-state (assoc :line 3)))
-;                     ["A" (-> (list "B") make-cf-state (assoc :line 3))])
-;                  "pre-effect rules succeed when their subrules are fulfilled"))
-;            "! A\nYES 3\n")
-;         "effect rule should call their effect and return the same state")))
-; 
-; (with-test
-;   (defn intercept
-;     "This rule is intended for intercepting
-;     and continuing exceptions and errors.
-;     It creates a rule that calls the intercept
-;     hook. The intercept hook is a function that
-;     receives only one argument: a function to be
-;     called with no arguments that calls the
-;     subrule with the current state. If you don't
-;     call this argument in the intercept hook, the
-;     subrule will not be called at all. The result
-;     of the whole rule will be directly what the
-;     product of the intercept-hook is. Here's an
-;     example of intended usage:
-;       (intercept subrule-that-can-throw-an-exception
-;         (fn [rule-call]
-;           (try (rule-call)
-;             (catch Exception e (throw another-exception)))))"
-;     [subrule intercept-hook]
-;     (fn [state] (intercept-hook (partial subrule state))))
-;   (let [parse-error-rule
-;           (semantics (lit \A) (fn [_] (throw (Exception.))))
-;         intercept-rule
-;           (intercept parse-error-rule
-;             (fn [rule-call]
-;               (try (rule-call)
-;                 (catch Exception e :error))))]
-;     (is (= (intercept-rule (make-cf-state "ABC")) :error))))
-;  
-; (defn validate-state
-;   "Creates a rule from attaching a
-;   state-validating function to the given
-;   subrule--that
-;   is, any products of the subrule must fulfill
-;   the validator function.
-;   (def a (validate-state b validator)) says
-;   that the rule a succeeds only when b succeeds
-;   and also when the evaluated value of
-;   (validator b-state) is true. The new rule's
-;   product would be b-product."
-;   [subrule validator]
-;   (complex [subproduct subrule
-;             substate fetch-state
-;             :when (validator substate)]
-;     subproduct))
-;  
-; (defn validate-remainder
-;   "Creates a rule from attaching a
-;   remainder-validating function to the given
-;   subrule--that is, any products of the subrule
-;   must fulfill the validator function.
-;   (def a (validate-remainder b validator)) says
-;   that the rule a succeeds only when b succeeds
-;   and also when the evaluated value of
-;   (validator b-remainder) is true. The new rule's
-;   product would be b-product."
-;   [subrule validator]
-;   (complex [subproduct subrule
-;             subremainder (fetch-remainder)
-;             :when (validator subremainder)]
-;     subproduct))
-; 
-; ; ; (defvar- constantly-nil
-; ; ;   (constantly nil))
-; ; ; 
-; ; ; (with-test
-; ; ;   (defnk match-rule
-; ; ;     "Creates a function that tries to completely
-; ; ;     match the given rule to the given state,
-; ; ;     with no remainder left over after the match.
-; ; ;     - If (rule state-0) fails, then
-; ; ;       (failure state-0) is called.
-; ; ;     - If the remainder of the state in the result of
-; ; ;       (rule state-0) is not empty, then...
-; ; ;         (incomplete
-; ; ;           product-from-consumed-tokens
-; ; ;           new-state-after-rule
-; ; ;           initial-state)
-; ; ;       ...is called.
-; ; ;     - If the new remainder is empty, then the
-; ; ;       product of the rule is returned.
-; ; ;     - The failure and incomplete functions are by
-; ; ;       default (constantly nil)."
-; ; ;     [state-0 rule :failure constantly-nil, :incomplete constantly-nil]
-; ; ;     (if-let [[product state-1] (rule state-0)]
-; ; ;       (if (empty? (get-remainder state-1))
-; ; ;         product
-; ; ;         (incomplete product state-1 state-0))
-; ; ;       (failure state-0)))
-; ; ;   (let [rule (lit "A")
-; ; ;         matcher #(match-rule % rule
-; ; ;                    :failure identity, :incomplete vector)]
-; ; ;     (is (= (matcher (make-cf-state ["A"])) "A"))
-; ; ;     (is (= (matcher (make-cf-state ["B"])) (make-cf-state ["B"])))
-; ; ;     (is (= (matcher (make-cf-state ["A" "B"]))
-; ; ;            ["A" (make-cf-state ["B"]) (make-cf-state ["A" "B"])]))))
-; ; ; 
-; ; ; ; (defmacro memoize-rules
-; ; ; ;   "Turns the subrules contained in the vars
-; ; ; ;   referred to by the given symbols
-; ; ; ;   into memoizing rules that caches
-; ; ; ;   their results in atoms. In effect, memoize
-; ; ; ;   is called on all of the rules.
-; ; ; ;   Whenever the new mem rule is called,
-; ; ; ;   it checks the cache to see if there is an
-; ; ; ;   existing match; otherwise, the subrule is called.
-; ; ; ;  
-; ; ; ;   Why didn't I just implement this as a
-; ; ; ;   regular rule-making function? Because this
-; ; ; ;   is truly only useful for optimization.
-; ; ; ;   It is better to separate this non-essential
-; ; ; ;   complexity from the actual definition of
-; ; ; ;   your rules. It also makes it easier to
-; ; ; ;   change which rules are optimized.
-; ; ; ;   Thanks to Chouser for how to do this
-; ; ; ;   with a variable.
-; ; ; ;   
-; ; ; ;   Running (test memoize-rules), which repeats a bunch of
-; ; ; ;   calls on mem-test-rule two hundred times, takes about
-; ; ; ;   160 ms on my computer, which uses an 2.2 GHz Intel Core
-; ; ; ;   Duo and 2 GB of RAM.
-; ; ; ;   Omitting the memoize-rules form above causes the same test
-; ; ; ;   to take 430 ms, a very high 92% difference."
-; ; ; ;   [& subrule-names]
-; ; ; ;   (let [subrule-vars (vec (for [nm subrule-names] `(var ~nm)))]
-; ; ; ;     `(doseq [subrule-var# ~subrule-vars]
-; ; ; ;        (alter-var-root subrule-var# memoize))))
-; ; ; ;  
-; ; ; ; (defvar- mem-test-rule
-; ; ; ;   (alt (conc (lit 'a) (opt (lit 'b))) (lit 'c)))
-; ; ; ;  
-; ; ; ; (memoize-rules mem-test-rule)
-; ; ; ;   ; Running (test memoize-rules), which repeats a bunch of
-; ; ; ;   ; calls on mem-test-rule two hundred times, takes about
-; ; ; ;   ; 160 ms on my computer, which uses an 2.2 GHz Intel Core
-; ; ; ;   ; Duo and 2 GB of RAM.
-; ; ; ;   ; Omitting the memoize-rules form above causes the same test
-; ; ; ;   ; to take 430 ms, a very high 92% difference.
-; ; ; ;  
-; ; ; ; (set-test memoize-rules
-; ; ; ;   (dotimes [n 200]
-; ; ; ;     (is (= (mem-test-rule (make-cf-state '[a c]))
-; ; ; ;            [['a nil] (make-cf-state '[c])]))
-; ; ; ;     (is (= (mem-test-rule (make-cf-state '[a b c]))
-; ; ; ;            ['[a b] (make-cf-state '[c])]))
-; ; ; ;     (is (= (mem-test-rule (make-cf-state '[a b c]))
-; ; ; ;            ['[a b] (make-cf-state '[c])]))
-; ; ; ;     (is (= (mem-test-rule (make-cf-state '[c s a])) ['c (make-cf-state '[s a])]))
-; ; ; ;     (let [result (mem-test-rule (make-cf-state '(c)))]
-; ; ; ;       (is (= (first result) 'c))
-; ; ; ;       (is (empty? (seq (get-remainder (second result))))))
-; ; ; ;     (is (failure? (mem-test-rule (make-cf-state '[s a]))))
-; ; ; ;     (is (failure? (mem-test-rule (make-cf-state '[s a]))))))
-; ; ; ;  
-; ; ; ; (defn- testing-rule-maker
-; ; ; ;   [arg1 arg2]
-; ; ; ;   (conc (opt arg1) (opt arg2)))
-; ; ; ;  
-; ; ; ; (state-context std-template
-; ; ; ;   (defvar- testing-rm-rule
-; ; ; ;     (testing-rule-maker (lit \a) (lit \b))))
-; ; ; ;  
-; ; ; ; (deftest test-rule-makers
-; ; ; ;   (let [state-0 (state-context std-template (make-cf-state "ab"))
-; ; ; ;         state-1 (state-context std-template (make-cf-state nil))]
-; ; ; ;     (is (thrown? RuntimeException
-; ; ; ;           (testing-rm-rule (make-cf-state "abc"))))
-; ; ; ;     (is (= (testing-rm-rule state-0) [[\a \b] state-1]))))
-; ; ; ; 
-; ; ; ; (defn inc-column
-; ; ; ;   "Meant to be used only with std-bundle states, or other states with an
-; ; ; ;   integer :column val.
-; ; ; ;  
-; ; ; ;   Creates a new rule that calls the subrule, and then increments the column.
-; ; ; ;   Meant to be called on literal rules of one non-break character."
-; ; ; ;   [subrule]
-; ; ; ;   (invisi-conc subrule (update-info :column inc)))
-; ; ; ;  
-; ; ; ; (defn inc-line
-; ; ; ;   "Meant to be used only with std-bundle states, or other states with an
-; ; ; ;   integer :column val and an integer :line val.
-; ; ; ;  
-; ; ; ;   Creates a new rule that calls the subrule, and then increments the line and
-; ; ; ;   sets the column to zero."
-; ; ; ;   [subrule]
-; ; ; ;   (invisi-conc subrule
-; ; ; ;     (update-info :line inc) (set-info :column 0)))
