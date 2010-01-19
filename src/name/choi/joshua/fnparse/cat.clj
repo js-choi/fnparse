@@ -4,8 +4,6 @@
   (:require [clojure.contrib.monads :as m])
   (:import [clojure.lang Sequential IPersistentMap IPersistentVector Var]))
 
-(declare remember emptiness lit rep* rep+)
-
 (defprotocol ABankable
   (get-bank [o])
   (set-bank [o new-bank]))
@@ -76,61 +74,48 @@
     (or (< position-b position-a) (empty? descriptors-b)) error-a
     true (ParseError position-a (union descriptors-a descriptors-b))))
 
-; (defn parse
-;   [input rule success-fn failure-fn]
-;   (let [result (-> input make-state rule)]
-;     (if (failure? result)
-;       (failure-fn nil)
-;       (success-fn (:product result) (-> result :state :remainder)))))
+(defn parse
+  [input rule success-fn failure-fn]
+  (let [result (-> input make-state rule)]
+    (if (failure? result)
+      (failure-fn (:error result))
+      (success-fn (:product result) (-> result :state :remainder)))))
 
-(defn blank-nothing
-  ([state] (blank-nothing state #{}))
-  ([state label]
-   (set-bank (Failure (ParseError (:position state) label))
-     (get-bank state))))
+(defn nothing [label]
+  (fn nothing-rule [state]
+    (set-bank (Failure (ParseError (:position state) #{label}))
+      (get-bank state))))
+
+(defn blank-nothing [state]
+  (set-bank (Failure (ParseError (:position state) #{}))
+    (get-bank state)))
 
 (defn with-product [product]
   (fn product-rule [state]
     (Success product state (ParseError (:position state) #{}))))
 
-(m/defmonad parser-m
-  "The monad that FnParse uses."
-  [m-zero blank-nothing
-   m-result
-     (fn m-result-parser [product]
-       (fn product-rule [state]
-         (Success product state (ParseError (:position state) #{}))))
-   m-bind
-     (fn m-bind-parser [rule product-fn]
-       (fn [state]
-         (let [{first-error :error, :as first-result} (rule state)]
-           (if (success? first-result)
-             (let [next-rule
-                     (-> first-result :product product-fn)
-                   {next-error :error, :as next-result}
-                     (-> first-result :state next-rule)]
-               (assoc next-result
-                 :error (merge-parse-errors first-error next-error)))
-             first-result))))
-   m-plus
-    (fn m-plus-parser [& rules]
-      (remember
-        (fn summed-rule [state]
-          (let [apply-next-rule
-                 (fn apply-next-rule [prev-result next-rule]
-                   (-> state
-                     (set-bank (get-bank prev-result))
-                     next-rule
-                     (update-in [:error]
-                       #(merge-parse-errors (:error prev-result) %))))
-                initial-result (emptiness state)
-                results (rest (reductions apply-next-rule
-                                initial-result rules))]
-            #_ (str results) #_ (prn "results" results)
-            (or (find-first success? results) (last results))))))])
+(defvar emptiness
+  (with-product nil)
+  "A rule that matches emptiness--that
+  is, it always matches with every given
+  token sequence, and it always returns
+  [nil given-state].
+  (def a emptiness) would be equivalent
+  to the EBNF a = ; This rule's product
+  is always nil, and it therefore always
+  returns [nil given-state].")
 
-(defn with-product [product]
-  (m/with-monad parser-m (m-result product)))
+(defn sequence-rule [rule product-fn]
+  (fn [state]
+    (let [{first-error :error, :as first-result} (rule state)]
+      (if (success? first-result)
+        (let [next-rule
+                (-> first-result :product product-fn)
+              {next-error :error, :as next-result}
+                (-> first-result :state next-rule)]
+          (assoc next-result
+            :error (merge-parse-errors first-error next-error)))
+        first-result))))
 
 (defn- get-memory [bank subrule state-position]
   (-> bank :memory (get-in [subrule state-position])))
@@ -244,6 +229,29 @@
                 result (vary-bank result update-in [:lr-stack] pop)]
             result))))))
 
+(defn alt [& rules]
+  (remember
+    (fn summed-rule [state]
+      (let [apply-next-rule
+             (fn apply-next-rule [prev-result next-rule]
+               (-> state
+                 (set-bank (get-bank prev-result))
+                 next-rule
+                 (update-in [:error]
+                   #(merge-parse-errors (:error prev-result) %))))
+            initial-result (emptiness state)
+            results (rest (reductions apply-next-rule
+                            initial-result rules))]
+        #_ (str results) #_ (prn "results" results)
+        (or (find-first success? results) (last results))))))
+
+(m/defmonad parser-m
+  "The monad that FnParse uses."
+  [m-zero blank-nothing
+   m-result with-product
+   m-bind sequence-rule
+   m-plus alt])
+
 (defmacro complex
   "Creates a complex rule in monadic
   form. It's a lot easier than it sounds.
@@ -269,78 +277,6 @@
   monad. Very useful!"
   [steps & product-expr]
   `(m/domonad parser-m ~steps ~@product-expr))
-
-; (defvar- fetch-state
-;   (m/fetch-state)
-;   "A rule that consumes no tokens. Its product
-;   is the entire current state.
-;   [Equivalent to the result of fetch-state
-;   from clojure.contrib.monads.]")
-;
-; (defn- set-state [state]
-;   (m/set-state state))
-
-; (defn fetch-info
-;   "Creates a rule that consumes no tokens.
-;   The new rule's product is the value
-;   of the given key in the current state.
-;   [Equivalent to fetch-val from clojure.contrib.monads.]"
-;   [key]
-;   (m/fetch-val key))
-
-; (with-test
-;   (defn fetch-remainder
-;     "Generates a rule whose product is the
-;     sequence of the remaining tokens of any states
-;     that it is given. It consumes no tokens.
-;     [(fetch-remainder) is equivalent to
-;     (fetch-val get-remainder) from
-;     clojure.contrib.monads.]"
-;     []
-;     (m/fetch-val get-remainder))
-;   (is (= ((complex [remainder (fetch-remainder)] remainder)
-;           (make-cf-state ["hi" "THEN"]))
-;          [["hi" "THEN"] (make-cf-state ["hi" "THEN"])])))
-
-; (defn set-info
-;   "Creates a rule that consumes no tokens.
-;   The new rule directly changes the
-;   current state by associating the given
-;   key with the given value. The product
-;   is the old value of the changed key.
-;   [Equivalent to set-val from
-;   clojure.contrib.monads.]"
-;   [key value]
-;   (m/set-val key value))
-; 
-; (with-test
-;   (defn update-info
-;     "Creates a rule that consumes no tokens.
-;     The new rule changes the current state
-;     by associating the given key with the
-;     evaluated result of applying the given
-;     updating function to the key's current
-;     value. The product is the old value of
-;     the changed key.
-;     [Equivalent to update-val from clojure.contrib.monads.]"
-;     [key val-update-fn & args]
-;     (m/update-val key #(apply val-update-fn % args)))
-;   (let [mock (partial make-state '(A))]
-;     (is (= [#{} (mock 1 {:variables #{'foo}})]
-;             ((update-info :variables conj 'foo)
-;              (mock 0 {:variables #{}}))))))
-
-(m/with-monad parser-m
-  (defvar emptiness
-    (m-result nil)
-    "A rule that matches emptiness--that
-    is, it always matches with every given
-    token sequence, and it always returns
-    [nil given-state].
-    (def a emptiness) would be equivalent
-    to the EBNF a = ; This rule's product
-    is always nil, and it therefore always
-    returns [nil given-state]."))
 
 (defn validate
   "Creates a rule from attaching a product-validating function to the given
@@ -374,14 +310,15 @@
   The new rule's product would be the first token, if it fulfills the
   validator."
   [label validator]
-  (fn terminal-rule [{:keys #{tokens position} :as state}]
-    (let [token (nth tokens position ::blank-nothing)]
-      (if (not= token ::blank-nothing)
-        (if (validator token)
-          (Success token (assoc state :position (inc position))
-                         (ParseError position #{label}))
-          (blank-nothing state #{label}))
-        (blank-nothing state #{label})))))
+  (let [nothing-rule (nothing label)]
+    (fn terminal-rule [{:keys #{tokens position} :as state}]
+      (let [token (nth tokens position ::nothing)]
+        (if (not= token ::nothing)
+          (if (validator token)
+            (Success token (assoc state :position (inc position))
+                           (ParseError position #{label}))
+            (nothing-rule state))
+          (nothing-rule state))))))
 
 (defvar anything
   (term "anything" (constantly true))
@@ -481,23 +418,6 @@
 (defn vconc [& subrules]
   (semantics (apply conc subrules) vec))
 
-(defn alt
-  "Creates a rule that is the alternation
-  of the given subrules. It succeeds when
-  any of its subrules succeed, and fails
-  when none do. Its result is that of the first
-  subrule that succeeds, so the order of the
-  subrules that this function receives matters.
-  (def a (alt b c d)) would be equivalent to the EBNF:
-   a = b | c | d;
-  This macro is almost equivalent to m-plus for
-  the parser-m monad. The difference is that
-  it defers evaluation of whatever variables it
-  receives, so that it accepts expressions containing
-  unbound variables that are defined later."
-  [& subrules]
-  (m/with-monad parser-m (apply m/m-plus subrules)))
-
 (defn opt
   "Creates a rule that is the optional form
   of the subrule. It always succeeds. Its result
@@ -507,8 +427,7 @@
   (def a (opt b)) would be equivalent to the EBNF:
     a = b?;"
   [subrule]
-  (m/with-monad parser-m
-    (m-plus subrule emptiness)))
+  (alt subrule emptiness))
 
 (defmacro invisi-conc
   "Like conc, only that the product is the
@@ -562,7 +481,8 @@
     a = b - c;
   The new rule's products would be b-product. If
   b fails or c succeeds, then nil is simply returned."
-  [minuend subtrahend]
-  (complex [_ (not-followed-by subtrahend), product minuend]
-    product))
+  [label minuend subtrahend]
+  (with-label label
+    (complex [_ (not-followed-by subtrahend), product minuend]
+      product)))
 
