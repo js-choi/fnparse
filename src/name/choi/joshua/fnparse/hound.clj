@@ -24,63 +24,73 @@
     (update-in (-> merger :result force) [:error]
       c/merge-parse-errors (-> mergee :result force :error))))
 
+(defn- base-nothing [state unexpected-token descriptor]
+  (Reply false
+    (c/Failure
+      (c/ParseError (:position state) (first (:remainder state)) descriptor))))
+
+(defn nothing [state]
+  (base-nothing state nil nil))
+
+(defn with-error [message]
+  (fn with-error-rule [state]
+    (base-nothing state nil (c/ErrorDescriptor #{message} #{}))))
+
+(defn with-product [product]
+  (fn with-product-rule [state]
+    (Reply false
+      (c/Success product state
+        (c/ParseError (:position state) nil nil)))))
+
+(defvar emptiness (with-product nil))
+
+(defn combine [rule product-fn]
+  (letfn [(apply-product-fn [result]
+            ((product-fn (:product result)) (:state result)))]
+    (fn [state]
+      (let [first-reply (rule state)]
+        (if (:tokens-consumed? first-reply)
+          (assoc first-reply :result
+            (delay
+              (let [{first-error :error, :as first-result}
+                      (-> first-reply :result force)]
+                (if (c/success? first-result)
+                  (let [{next-error :error, :as next-result}
+                         (-> first-result apply-product-fn :result force)]
+                    (assoc next-result :error
+                      (c/merge-parse-errors first-error next-error)))
+                  first-result))))
+          (let [first-result (-> first-reply :result force)]
+            (if (c/success? first-result)
+              (let [first-error (:error first-result)
+                    next-reply (apply-product-fn first-result)]
+                (assoc next-reply :result
+                  (delay
+                    (let [next-result (-> next-reply :result force)
+                          next-error (:error next-result)]
+                      (assoc next-result :error
+                        (c/merge-parse-errors first-error next-error))))))
+              (Reply false first-result))))))))
+
+(defn alt [& rules]
+  (fn summed-rule [state]
+    (let [[consuming-replies empty-replies]
+            (->> rules (map #(% state)) (separate :tokens-consumed?))]
+      (if (empty? consuming-replies)
+        (if (empty? empty-replies)
+          (m-zero state)
+          (let [empty-replies (reductions merge-replies empty-replies)]
+            (or (first (drop-while #(-> % :result force c/failure?)
+                         empty-replies))
+                (last empty-replies))))
+        (first consuming-replies)))))
+
 (defmonad parser-m
   "The monad that FnParse uses."
-  [m-zero
-     (fn [state]
-       (Reply false
-         (c/Failure
-           (c/ParseError (:position state)
-             (first (:remainder state)) nil))))
-   m-result
-     (fn [product]
-       (fn [state]
-         (Reply false
-           (c/Success product state
-             (c/ParseError (:position state) nil nil)))))
-   m-bind
-     (fn [rule product-fn]
-       (letfn [(apply-product-fn [result]
-                 ((product-fn (:product result)) (:state result)))]
-         (fn [state]
-           (let [first-reply (rule state)]
-             (if (:tokens-consumed? first-reply)
-               (assoc first-reply :result
-                 (delay
-                   (let [{first-error :error, :as first-result}
-                           (-> first-reply :result force)]
-                     (if (c/success? first-result)
-                       (let [{next-error :error, :as next-result}
-                              (-> first-result apply-product-fn :result force)]
-                         (assoc next-result :error
-                           (c/merge-parse-errors first-error next-error)))
-                       first-result))))
-               (let [first-result (-> first-reply :result force)]
-                 (if (c/success? first-result)
-                   (let [first-error (:error first-result)
-                         next-reply (apply-product-fn first-result)]
-                     (assoc next-reply :result
-                       (delay
-                         (let [next-result (-> next-reply :result force)
-                               next-error (:error next-result)]
-                           (assoc next-result :error
-                             (c/merge-parse-errors first-error next-error))))))
-                   (Reply false first-result))))))))
-   m-plus
-     (letfn [(result-failure? [reply]
-               (-> reply :result force c/failure?))]
-       (fn [& rules]
-         (fn [state]
-           (let [[consuming-replies empty-replies]
-                   (->> rules (map #(% state)) (separate :tokens-consumed?))]
-             (if (empty? consuming-replies)
-               (if (empty? empty-replies)
-                 (m-zero state)
-                 (let [empty-replies (reductions merge-replies empty-replies)]
-                   (or (first (drop-while #(-> % :result force c/failure?)
-                                empty-replies))
-                       (last empty-replies))))
-               (first consuming-replies))))))])
+  [m-zero nothing
+   m-result with-product
+   m-bind combine
+   m-plus alt])
 
 (defmacro complex
   "Creates a complex rule in monadic
@@ -112,30 +122,25 @@
   (fn labelled-rule [state]
     (let [reply (rule state)]
       (if-not (:tokens-consumed? reply)
-        (assoc-in reply [:result :error :descriptors]
-          #{(c/Expectation label)})
+        (assoc-in reply [:result :error :descriptor]
+          (c/ErrorDescriptor #{} #{label}))
         reply))))
 
 (defn term [label predicate]
-  (with-monad parser-m
-    (with-label label
-      (fn terminal-rule [state]
-        (let [position (:position state)]
-          (if-let [remainder (-> state :remainder seq)]
-            (let [first-token (first remainder)]
-              (if (predicate first-token)
-                (Reply true
-                  (delay
-                    (c/Success first-token
-                      (assoc state :remainder (next remainder)
-                                   :position (inc position))
-                      (c/ParseError position nil nil))))
-                (Reply false
-                  (c/Failure
-                    (c/ParseError position first-token nil)))))
-            (Reply false
-              (c/Failure
-                (c/ParseError position :nothing nil)))))))))
+  (with-label label
+    (fn terminal-rule [state]
+      (let [position (:position state)]
+        (if-let [remainder (-> state :remainder seq)]
+          (let [first-token (first remainder)]
+            (if (predicate first-token)
+              (Reply true
+                (delay
+                  (c/Success first-token
+                    (assoc state :remainder (next remainder)
+                                 :position (inc position))
+                    (c/ParseError position nil nil))))
+              (base-nothing state first-token nil)))
+          (base-nothing state ::end-of-input nil))))))
 
 (defn antiterm [label pred]
   (term label (complement pred)))
@@ -148,14 +153,6 @@
 
 (defn constant-semantics [subrule product]
   (complex [_ subrule] product))
-
-(defn with-product [product]
-  (with-monad parser-m (m-result product)))
-
-(defvar emptiness (with-product nil))
-
-(defvar nothing
-  (with-monad parser-m m-zero))
 
 (defvar end-of-input
   (with-label "end of input"
@@ -179,10 +176,6 @@
 
 (defn anti-set-lit [label tokens]
   (antiterm label (tokens set)))
-
-(defn alt [& subrules]
-  (with-monad parser-m
-    (apply m-plus subrules)))
 
 (defn conc [& subrules]
   (with-monad parser-m

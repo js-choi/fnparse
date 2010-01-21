@@ -39,10 +39,7 @@
   (alt number-expr symbol-expr))
 
 (def parenthesized-expr
-  (complex [_ opening-parenthesis
-            content #'expr
-            _ closing-parenthesis]
-    content))
+  (circumfix-conc opening-parenthesis #'expr closing-parenthesis))
 
 (def function-expr (vconc symbol-expr parenthesized-expr))
 

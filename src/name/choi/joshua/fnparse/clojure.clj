@@ -68,7 +68,7 @@
 (defvar- no-number-tail
   (constant-semantics emptiness identity))
 
-(defvar- fractional-part
+(defvar- imprecise-fractional-part
   (prefix-conc (lit \.)
     (alt
       (semantics (cascading-rep+ decimal-digit #(/ % 10) #(/ (+ %1 %2) 10))
@@ -89,17 +89,22 @@
       #(partial * (expt-int 10 %)))))
 
 (defvar- fractional-exponential-part
-  (complex [frac-fn fractional-part
+  (complex [frac-fn imprecise-fractional-part
             exp-fn (alt exponential-part no-number-tail)]
     (comp exp-fn frac-fn)))
 
-(defvar- noninteger-number-tail
+(defvar- imprecise-number-tail
   (complex [tail-fn (alt fractional-exponential-part exponential-part)
             big-dec? (opt (lit \M))]
     (comp (if big-dec? bigdec double) tail-fn)))
 
+(defvar- fraction-denominator-tail
+  (prefix-conc (lit \/)
+    (complex [denominator decimal-natural-number
+              _ (with-error "a fraction's denominator cannot be zero")]
+      (fn [numerator] (/ numerator denominator)))))
+
 (defrm- radix-coefficient-tail [base]
-  (println base)
   (if (and (integer? base) (<= 0 base 36))
     (semantics
       (prefix-conc (case-insensitive-lit \r) (radix-natural-number base))
@@ -107,16 +112,14 @@
     nothing))
 
 (defrm- number-tail [base]
-  (alt noninteger-number-tail (radix-coefficient-tail base) no-number-tail))
+  (alt imprecise-number-tail fraction-denominator-tail
+       (radix-coefficient-tail base) no-number-tail))
 
-(defvar- simple-integer
+(defvar- number-form
   (complex [sign (opt number-sign)
             prefix-number decimal-natural-number
             tail-fn (number-tail prefix-number)]
     (tail-fn (* (or sign 1) prefix-number))))
-
-(defvar- number-form
-  simple-integer)
 
 (defvar- string-delimiter (lit \"))
 (defvar- escape-sequence-map
@@ -199,8 +202,9 @@
 (is (full-match? "16rFF" number-form == 255))
 (is (full-match? "16" number-form == 16))
 (is (full-match? "16." number-form #(isa? (type %) %2) Double))
-(is (full-match? "~@a" form = (list `unquote-splicing (`symbol 'a))))
-(is (full-match? "16rAZ" (conc number-form ws) == 200))
+;(is (full-match? "~@a" form = (list `unquote-splicing (`symbol 'a))))
+(is (full-match? "3/0" form == 2/3))
+;(is (full-match? "16rAZ" (conc number-form ws) == 200))
 ; (-> "#^{} #{[a b;Comment\nc]}" make-state form prn)
 ; (-> "#_#_'a'b'c" make-state form prn)
 ; (-> "#^:monster #{a b c d}" (parse form vector nil) prn)

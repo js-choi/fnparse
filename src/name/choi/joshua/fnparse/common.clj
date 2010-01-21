@@ -1,24 +1,16 @@
 (ns name.choi.joshua.fnparse.common
   (:use clojure.template clojure.set clojure.contrib.def
         clojure.contrib.seq-utils)
-  (:require [clojure.contrib.monads :as m])
+  (:require [clojure.contrib.str-utils2 :as str])
   (:import [clojure.lang Sequential IPersistentMap IPersistentVector Var]))
 
 (defprotocol AState
   (remainder [state])
   (position [state]))
 
-(deftype Bulletin [message] IPersistentMap)
+(deftype ErrorDescriptor [messages labels] IPersistentMap)
 
-(defprotocol AnErrorDescriptor
-  (communique [descriptor]))
-
-(deftype Expectation [label]
-  AnErrorDescriptor
-    (communique [] label)
-  IPersistentMap)
-
-(deftype ParseError [position unexpected-token descriptors] IPersistentMap)
+(deftype ParseError [position unexpected-token descriptor] IPersistentMap)
 
 (defprotocol AParseAnswer
   (answer-result [answer]))
@@ -45,9 +37,23 @@
       (success-fn (:product result) (-> result :state remainder)))))
 
 (defn merge-parse-errors
-  [{position-a :position, descriptors-a :descriptors :as error-a}
-   {position-b :position, descriptors-b :descriptors :as error-b}]
+  [{position-a :position, descriptor-a :descriptor :as error-a}
+   {position-b :position, descriptor-b :descriptor :as error-b}]
   (cond
-    (or (> position-b position-a) (empty? descriptors-a)) error-b
-    (or (< position-b position-a) (empty? descriptors-b)) error-a
-    true (assoc error-a :descriptors (union descriptors-a descriptors-b))))
+    (or (> position-b position-a) (empty? descriptor-a)) error-b
+    (or (< position-b position-a) (empty? descriptor-b)) error-a
+    true (assoc error-a :descriptor (union descriptor-a descriptor-b))))
+
+(defn- format-expectations [labels]
+  (if-not (empty? labels)
+    (->> labels (str/join " or ") (str "expected "))))
+
+(defn- cons-expectations-to-messages [expectations labels]
+  (if expectations (cons expectations labels) labels))
+
+(defn format-parse-error [{:keys #{position descriptor}}]
+  (let [expectations (->> descriptor :labels format-expectations)]
+    (->> descriptor :messages
+      (cons-expectations-to-messages expectations)
+      (str/join "; ")
+      (format "parse error at position %s: %s" position))))

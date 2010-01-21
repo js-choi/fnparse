@@ -57,18 +57,19 @@
 (defn- inc-position [state]
   (update-in state [:position] inc))
 
-(defn- base-nothing [state unexpected-token descriptors]
+(defn- base-nothing [state unexpected-token descriptor]
   (set-bank
     (c/Failure
-      (c/ParseError (:position state) unexpected-token descriptors))
+      (c/ParseError (:position state) unexpected-token descriptor))
     (get-bank state)))
 
-(defvar- nothing #(base-nothing % nil #{}))
+(defn nothing [state]
+  (base-nothing state nil #{}))
 
 (defn with-product [product]
   (fn product-rule [state]
     (c/Success product state
-      (c/ParseError (:position state) ::impossible #{}))))
+      (c/ParseError (:position state) nil nil))))
 
 (defvar emptiness
   (with-product nil)
@@ -81,7 +82,7 @@
   is always nil, and it therefore always
   returns [nil given-state].")
 
-(defn sequence-rule [rule product-fn]
+(defn combine [rule product-fn]
   (fn [state]
     (let [{first-error :error, :as first-result} (rule state)]
       (if (c/success? first-result)
@@ -225,7 +226,7 @@
   "The monad that FnParse uses."
   [m-zero nothing
    m-result with-product
-   m-bind sequence-rule
+   m-bind combine
    m-plus alt])
 
 (defmacro complex
@@ -269,7 +270,7 @@
   (fn labelled-rule [state]
     (let [result (rule state), initial-position (:position state)]
       (if-not (< initial-position (-> result :error :position))
-        (assoc-in result [:error :descriptors] #{(c/Expectation label)})
+        (assoc-in result [:error :descriptor] (c/ErrorDescriptor #{} #{label}))
         result))))
 
 (defn term
@@ -283,18 +284,14 @@
   validator."
   [label validator]
   (with-label label
-    (letfn [(invalid-token-pseudo-rule [state unexpected-token]
-              (base-nothing state unexpected-token nil))
-          (input-end-rule [state]
-            (base-nothing state (constantly ::end-of-input) nil))]
-      (fn terminal-rule [{:keys #{tokens position} :as state}]
-        (let [token (nth tokens position ::nothing)]
-          (if (not= token ::nothing)
-            (if (validator token)
-              (c/Success token (assoc state :position (inc position))
-                (c/ParseError position token nil))
-              (invalid-token-pseudo-rule state token))
-            (input-end-rule state)))))))
+    (fn terminal-rule [{:keys #{tokens position} :as state}]
+      (let [token (nth tokens position ::nothing)]
+        (if (not= token ::nothing)
+          (if (validator token)
+            (c/Success token (assoc state :position (inc position))
+              (c/ParseError position token nil))
+            (base-nothing state token nil))
+          (base-nothing state ::end-of-input nil))))))
 
 (defvar anything
   (term "anything" (constantly true))
@@ -454,3 +451,74 @@
   (with-label label
     (complex [_ (not-followed-by nil subtrahend), product minuend]
       product)))
+
+(defn antiterm [label pred]
+  (term label (complement pred)))
+
+(defn antilit [token]
+  (term (str "anything except " token) #(not= token %)))
+
+(defn set-lit [label tokens]
+  (term label (set tokens)))
+
+(defn anti-set-lit [label tokens]
+  (antiterm label (tokens set)))
+
+(defn mapconc [tokens]
+  (apply conc (map lit tokens)))
+
+(defn mapalt [f coll]
+  (apply alt (map f coll)))
+
+(defn prefix-conc [prefix body]
+  (complex [_ prefix, content body] content))
+
+(defn suffix-conc [body suffix]
+  (complex [content body, _ suffix] content))
+
+(defn circumfix-conc [prefix body suffix]
+  (prefix-conc prefix (suffix-conc body suffix)))
+
+(defmacro template-alt [argv expr & values]
+  (let [c (count argv)]
+    `(alt ~@(map (fn [a] (apply-template argv expr a)) 
+              (partition c values)))))
+
+(defn case-insensitive-lit [#^Character token]
+  (alt (lit (Character/toLowerCase token))
+       (lit (Character/toUpperCase token))))
+
+(defmacro defrm [& forms]
+  `(defn-memo ~@forms))
+
+(defmacro defrm- [& forms]
+  `(defrm ~@forms))
+
+(defvar ascii-digits "0123456789")
+(defvar lowercase-ascii-alphabet "abcdefghijklmnopqrstuvwxyz")
+(defvar base-36-digits (str ascii-digits lowercase-ascii-alphabet))
+
+(defrm radix-digit
+  ([base] (radix-digit (format "a base-%s digit" base) base))
+  ([label base]
+   {:pre #{(integer? base) (<= 0 base 36)}}
+   (->> base-36-digits (take base) indexed
+     (mapalt (fn [[index token]]
+               (constant-semantics (case-insensitive-lit token) index)))
+     (with-label label))))
+
+(defvar decimal-digit
+  (radix-digit "a decimal digit" 10))
+
+(defvar hexadecimal-digit
+  (radix-digit "a hexadecimal digit" 16))
+
+(defvar uppercase-ascii-letter
+  (set-lit "an uppercase ASCII letter" "ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
+
+(defvar lowercase-ascii-letter
+  (set-lit "a lowercase ASCII letter" "abcdefghijklmnopqrstuvwxyz"))
+
+(defvar ascii-letter
+  (with-label "an ASCII letter"
+    (alt uppercase-ascii-letter lowercase-ascii-letter)))
