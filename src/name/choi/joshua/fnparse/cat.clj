@@ -15,7 +15,7 @@
 
 (deftype ErrorDescriptor [kind message] IPersistentMap)
 
-(deftype ParseError [position descriptors] IPersistentMap)
+(deftype ParseError [position unexpected-token descriptors] IPersistentMap)
   ; TODO Add unexpected-token
 
 (deftype Success [product state error] IPersistentMap)
@@ -72,27 +72,30 @@
   (cond
     (or (> position-b position-a) (empty? descriptors-a)) error-b
     (or (< position-b position-a) (empty? descriptors-b)) error-a
-    true (ParseError position-a (union descriptors-a descriptors-b))))
+    true (assoc error-a :descriptors (union descriptors-a descriptors-b))))
 
 (defn parse
   [input rule success-fn failure-fn]
   (let [result (-> input make-state rule)]
     (if (failure? result)
       (failure-fn (:error result))
-      (success-fn (:product result) (-> result :state :remainder)))))
+      (success-fn (:product result)
+                  (-> result :state :position (drop input))))))
 
-(defn nothing [label]
-  (fn nothing-rule [state]
-    (set-bank (Failure (ParseError (:position state) #{label}))
-      (get-bank state))))
+(defn- base-nothing [state unexpected-token descriptors]
+  (set-bank
+    (Failure (ParseError (:position state) unexpected-token descriptors))
+    (get-bank state)))
 
-(defn blank-nothing [state]
-  (set-bank (Failure (ParseError (:position state) #{}))
+(defvar- nothing #(base-nothing % nil #{}))
+
+#_(defn nothing [state]
+  (set-bank (Failure (ParseError (:position state) ::impossible #{}))
     (get-bank state)))
 
 (defn with-product [product]
   (fn product-rule [state]
-    (Success product state (ParseError (:position state) #{}))))
+    (Success product state (ParseError (:position state) ::impossible #{}))))
 
 (defvar emptiness
   (with-product nil)
@@ -187,7 +190,7 @@
         (if-not (or memory
                     (-> lr-node :rule (= subrule))
                     (-> head :involved-rules (contains? subrule)))
-          (set-bank (blank-nothing state) bank)
+          (set-bank (nothing state) bank)
           (if (-> head :rules-to-be-evaluated (contains? subrule))
             (let [bank (update-in [:lr-stack node-index :rules-to-be-evalated]
                          disj subrule)
@@ -205,7 +208,7 @@
           (if (integer? found-memory-val)
             (let [bank (update-in bank [:lr-stack]
                          setup-lr found-memory-val)
-                  new-failure (set-bank (blank-nothing state) bank)]
+                  new-failure (set-bank (nothing state) bank)]
               new-failure)
             (set-bank found-memory-val bank)))
         (do
@@ -247,7 +250,7 @@
 
 (m/defmonad parser-m
   "The monad that FnParse uses."
-  [m-zero blank-nothing
+  [m-zero nothing
    m-result with-product
    m-bind sequence-rule
    m-plus alt])
@@ -293,8 +296,8 @@
   (fn labelled-rule [state]
     (let [result (rule state), initial-position (:position state)]
       (if-not (< initial-position (-> result :error :position))
-        (->> result :error :descriptors (map label-fn) set
-             (ParseError initial-position) (assoc result :error))
+        (update-in result [:error :descriptors]
+          #(->> % (map label-fn) set))
         result))))
 
 (defn with-label [label rule]
@@ -310,15 +313,18 @@
   The new rule's product would be the first token, if it fulfills the
   validator."
   [label validator]
-  (let [nothing-rule (nothing label)]
+  (let [descriptors #{label}
+        invalid-token-pseudo-rule #(base-nothing %1 %2 descriptors)
+        with-input-end-rule #(base-nothing % (constantly ::end-of-input)
+                               descriptors)]
     (fn terminal-rule [{:keys #{tokens position} :as state}]
       (let [token (nth tokens position ::nothing)]
         (if (not= token ::nothing)
           (if (validator token)
             (Success token (assoc state :position (inc position))
-                           (ParseError position #{label}))
-            (nothing-rule state))
-          (nothing-rule state))))))
+                           (ParseError position token #{label}))
+            (invalid-token-pseudo-rule state token))
+          (with-input-end-rule state))))))
 
 (defvar anything
   (term "anything" (constantly true))
@@ -370,7 +376,7 @@
       (let [result (rule state)]
         (if (failure? result)
           (Success true state (:error result))
-          (-> state blank-nothing (assoc :error (:error result))))))))
+          (-> state nothing (assoc :error (:error result))))))))
 
 (defn semantics
   "Creates a rule with a semantic hook,

@@ -72,9 +72,14 @@
 
 (def expr addition-level-expr)
 
-(parse "3+1*cos(-(-5)+sin(2))" expr
-  #(print 
-(prn (expr (make-state "3+1*cos(-(-5)+sin(2))")))
+(do-template [tokens]
+  (parse tokens expr
+    #(if (empty? %2)
+       (println "SUCCESS!" %1)
+       (println "Partial success." %1 %2))
+    #(println "ERROR!" %))
+  "*3+1*cos(-(-5)+sin(2))" "3+1*cos(-(-5)+sin(2))")
+;(prn (expr (make-state "3+1*cos(-(-5)+sin(2))")))
 ;(prn ((conc (opt digit) symbol-char) (make-state "+1*cos(-(-5)+sin(2))")))
 ;(println (expr (make-state "1+3*2+2" {} 0)))
 ;(println (expr (make-state "2+3-2" {} 0)))
