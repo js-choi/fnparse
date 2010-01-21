@@ -13,7 +13,9 @@
 
 (deftype State [tokens position] IPersistentMap)
 
-(deftype ErrorDescriptor [kind message] IPersistentMap)
+(deftype Bulletin [message] IPersistentMap)
+
+(deftype Expectation [label] IPersistentMap)
 
 (deftype ParseError [position unexpected-token descriptors] IPersistentMap)
   ; TODO Add unexpected-token
@@ -292,16 +294,12 @@
   (complex [subproduct subrule, :when (validator subproduct)]
     subproduct))
 
-(defn with-dynamic-label [label-fn rule]
+(defn with-label [label rule]
   (fn labelled-rule [state]
     (let [result (rule state), initial-position (:position state)]
       (if-not (< initial-position (-> result :error :position))
-        (update-in result [:error :descriptors]
-          #(->> % (map label-fn) set))
+        (assoc-in result [:error :descriptors] #{label})
         result))))
-
-(defn with-label [label rule]
-  (with-dynamic-label (constantly label) rule))
 
 (defn term
   "(term validator) is equivalent
@@ -313,7 +311,7 @@
   The new rule's product would be the first token, if it fulfills the
   validator."
   [label validator]
-  (let [descriptors #{label}
+  (let [descriptors #{(Expectation label)}
         invalid-token-pseudo-rule #(base-nothing %1 %2 descriptors)
         with-input-end-rule #(base-nothing % (constantly ::end-of-input)
                                descriptors)]
@@ -322,7 +320,7 @@
         (if (not= token ::nothing)
           (if (validator token)
             (Success token (assoc state :position (inc position))
-                           (ParseError position token #{label}))
+                           (ParseError position token descriptors))
             (invalid-token-pseudo-rule state token))
           (with-input-end-rule state))))))
 
@@ -361,18 +359,18 @@
 (defn followed-by [rule]
   (fn [state]
     (let [result (rule state)]
-      (if (failure? result)
-        result
-        ((with-product (:product result)) state)))))
+      (if (success? result)
+        ((with-product (:product result)) state)
+        result))))
 
 (defn not-followed-by
   "Creates a rule that does not consume
   any tokens, but fails when the given
   subrule succeeds. On success, the new
   rule's product is always true."
-  [rule]
-  (let [rule (with-dynamic-label (partial format "not %s") rule)]
-    (fn [state]
+  [label rule]
+  (with-label label
+    (fn not-followed-by-rule [state]
       (let [result (rule state)]
         (if (failure? result)
           (Success true state (:error result))
@@ -395,13 +393,6 @@
   [subrule semantic-value]
   (complex [subproduct subrule]
     semantic-value))
-
-; (def remainder-peek
-;   "A rule whose product is the very next
-;   token in the remainder of any given state.
-;   The new rule does not consume any tokens."
-;   (complex [remainder (fetch-remainder)]
-;     (first remainder)))
 
 (defn conc
   "Creates a rule that is the concatenation
@@ -489,6 +480,5 @@
   b fails or c succeeds, then nil is simply returned."
   [label minuend subtrahend]
   (with-label label
-    (complex [_ (not-followed-by subtrahend), product minuend]
+    (complex [_ (not-followed-by nil subtrahend), product minuend]
       product)))
-
