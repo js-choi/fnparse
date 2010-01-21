@@ -100,9 +100,10 @@
 
 (defvar- fraction-denominator-tail
   (prefix-conc (lit \/)
-    (complex [denominator decimal-natural-number
-              _ (with-error "a fraction's denominator cannot be zero")]
-      (fn [numerator] (/ numerator denominator)))))
+    (semantics
+      (anti-validate decimal-natural-number zero?
+        "a fraction's denominator cannot be zero")
+      (fn [denominator] #(/ % denominator)))))
 
 (defrm- radix-coefficient-tail [base]
   (if (and (integer? base) (<= 0 base 36))

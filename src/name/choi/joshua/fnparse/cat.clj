@@ -57,15 +57,6 @@
 (defn- inc-position [state]
   (update-in state [:position] inc))
 
-(defn- base-nothing [state unexpected-token descriptor]
-  (set-bank
-    (c/Failure
-      (c/ParseError (:position state) unexpected-token descriptor))
-    (get-bank state)))
-
-(defn nothing [state]
-  (base-nothing state nil #{}))
-
 (defn with-product [product]
   (fn product-rule [state]
     (c/Success product state
@@ -81,6 +72,22 @@
   to the EBNF a = ; This rule's product
   is always nil, and it therefore always
   returns [nil given-state].")
+
+(defn- base-nothing [state unexpected-token descriptor]
+  (set-bank
+    (c/Failure
+      (c/ParseError (:position state) unexpected-token descriptor))
+    (get-bank state)))
+
+(defn nothing [state]
+  (base-nothing state nil #{}))
+
+(defn with-error [message]
+  (fn with-error-rule [state]
+    (base-nothing state nil (c/ErrorDescriptor #{message} #{}))))
+
+(defn only-when [valid? message]
+  (if-not valid? (with-error message) emptiness))
 
 (defn combine [rule product-fn]
   (fn [state]
@@ -255,23 +262,25 @@
   [steps & product-expr]
   `(m/domonad parser-m ~steps ~@product-expr))
 
-(defn validate
-  "Creates a rule from attaching a product-validating function to the given
-  subrule--that is, any products of the subrule must fulfill the validator
-  function.
-  (def a (validate b validator)) says that the rule a succeeds only when b
-  succeeds and also when the evaluated value of (validator b-product) is true.
-  The new rule's product would be b-product."
-  [subrule validator]
-  (complex [subproduct subrule, :when (validator subproduct)]
-    subproduct))
-
 (defn with-label [label rule]
   (fn labelled-rule [state]
     (let [result (rule state), initial-position (:position state)]
-      (if-not (< initial-position (-> result :error :position))
-        (assoc-in result [:error :descriptor] (c/ErrorDescriptor #{} #{label}))
+      (if-not (-> result :error :position (> initial-position))
+        (assoc-in result [:error :descriptor]
+          (c/ErrorDescriptor #{} #{label}))
         result))))
+
+(defn- base-nothing [state unexpected-token descriptor]
+  (set-bank
+    (c/Failure
+      (c/ParseError (:position state) unexpected-token descriptor))
+    (get-bank state)))
+
+(defn nothing [state]
+  (base-nothing state nil #{}))
+
+(defn only-when [valid? message]
+  (if-not valid? (with-error message) emptiness))
 
 (defn term
   "(term validator) is equivalent

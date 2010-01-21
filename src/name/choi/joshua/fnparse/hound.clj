@@ -24,6 +24,14 @@
     (update-in (-> merger :result force) [:error]
       c/merge-parse-errors (-> mergee :result force :error))))
 
+(defn with-product [product]
+  (fn with-product-rule [state]
+    (Reply false
+      (c/Success product state
+        (c/ParseError (:position state) nil nil)))))
+
+(defvar emptiness (with-product nil))
+
 (defn- base-nothing [state unexpected-token descriptor]
   (Reply false
     (c/Failure
@@ -36,13 +44,8 @@
   (fn with-error-rule [state]
     (base-nothing state nil (c/ErrorDescriptor #{message} #{}))))
 
-(defn with-product [product]
-  (fn with-product-rule [state]
-    (Reply false
-      (c/Success product state
-        (c/ParseError (:position state) nil nil)))))
-
-(defvar emptiness (with-product nil))
+(defn only-when [valid? message]
+  (if-not valid? (with-error message) emptiness))
 
 (defn combine [rule product-fn]
   (letfn [(apply-product-fn [result]
@@ -125,6 +128,13 @@
         (assoc-in reply [:result :error :descriptor]
           (c/ErrorDescriptor #{} #{label}))
         reply))))
+
+(defn validate [rule pred message]
+  (complex [product rule, _ (only-when (pred product) message)]
+    product))
+
+(defn anti-validate [rule pred message]
+  (validate rule (complement pred) message))
 
 (defn term [label predicate]
   (with-label label
