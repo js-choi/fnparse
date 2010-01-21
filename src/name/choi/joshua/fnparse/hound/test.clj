@@ -31,7 +31,8 @@
           (let [unexpected-token# (:unexpected-token expectation#)]
             (report-this# :fail "%s at position %s"
               (->> expectation# :descriptors
-                (map (fn [{kind# :kind, message# :message}]
+                (map str
+                    #_(fn [{kind# :kind, message# :message}]
                        (format "%s (%s)" message# kind#)))
                 (str/join " or "))
               (if (= unexpected-token# :nothing)

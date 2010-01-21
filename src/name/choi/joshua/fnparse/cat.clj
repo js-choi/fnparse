@@ -2,7 +2,7 @@
   (:use clojure.template clojure.set clojure.contrib.def
         clojure.contrib.seq-utils)
   (:require [clojure.contrib.monads :as m]
-            [name.choi.joshua.fnparse.common :as common])
+            [name.choi.joshua.fnparse.common :as c])
   (:import [clojure.lang Sequential IPersistentMap IPersistentVector Var]))
 
 (defprotocol ABankable
@@ -13,10 +13,6 @@
   (set-bank bankable (apply f (get-bank bankable) args)))
 
 (deftype State [tokens position] IPersistentMap)
-
-(deftype Success [product state error] IPersistentMap)
-
-(deftype Failure [error] IPersistentMap)
 
 (deftype Bank [memory lr-stack position-heads] IPersistentMap)
   ; memory: a nested map with function keys and map vals
@@ -38,23 +34,17 @@
   {:get-bank meta
    :set-bank with-meta})
 
-(extend ::Success ABankable
+(extend ::c/Success ABankable
   {:get-bank (comp get-bank :state)
    :set-bank #(update-in %1 [:state] set-bank %2)})
 
-(extend ::Failure ABankable
+(extend ::c/Failure ABankable
   {:get-bank meta
    :set-bank with-meta})
 
 (extend ::LRNode ABankable
   {:get-bank meta
    :set-bank with-meta})
-
-(do-template [fn-name type-name doc-string]
-  (defn fn-name doc-string [result]
-    (-> result type (isa? type-name)))
-  failure? ::Failure "Is the given result a Failure?"
-  success? ::Success "Is the given result is a Success?")
 
 (defn make-state [input]
   (State input 0 (Bank {} [] {}) nil))
@@ -73,22 +63,23 @@
 (defn parse
   [input rule success-fn failure-fn]
   (let [result (-> input make-state rule)]
-    (if (failure? result)
+    (if (c/failure? result)
       (failure-fn (:error result))
       (success-fn (:product result)
                   (-> result :state :position (drop input))))))
 
 (defn- base-nothing [state unexpected-token descriptors]
-  (set-bank (Failure (common/ParseError (:position state)
-                       unexpected-token descriptors))
+  (set-bank
+    (c/Failure
+      (c/ParseError (:position state) unexpected-token descriptors))
     (get-bank state)))
 
 (defvar- nothing #(base-nothing % nil #{}))
 
 (defn with-product [product]
   (fn product-rule [state]
-    (Success product state (common/ParseError (:position state)
-                             ::impossible #{}))))
+    (c/Success product state
+      (c/ParseError (:position state) ::impossible #{}))))
 
 (defvar emptiness
   (with-product nil)
@@ -104,7 +95,7 @@
 (defn sequence-rule [rule product-fn]
   (fn [state]
     (let [{first-error :error, :as first-result} (rule state)]
-      (if (success? first-result)
+      (if (c/success? first-result)
         (let [next-rule
                 (-> first-result :product product-fn)
               {next-error :error, :as next-result}
@@ -137,7 +128,7 @@
             cur-result (subrule (set-bank state-0 cur-bank))
             cur-result-bank (get-bank cur-result)
             cur-memory-val (get-memory cur-result-bank subrule position-0)]
-        (if (or (failure? cur-result)
+        (if (or (c/failure? cur-result)
                 (<= (-> cur-result :state :position)
                     (-> cur-memory-val :state :position)))
           (let [cur-result-bank (update-in cur-result-bank [:position-heads]
@@ -168,7 +159,7 @@
     (if (-> lr-node :rule (not= subrule))
       node-seed
       (let [bank (store-memory bank subrule (:position state) node-seed)]
-        (if (failure? node-seed)
+        (if (c/failure? node-seed)
           (set-bank node-seed bank)
           (grow-lr subrule (set-bank state bank) node-index))))))
 
@@ -239,7 +230,7 @@
             results (rest (reductions apply-next-rule
                             initial-result rules))]
         #_ (str results) #_ (prn "results" results)
-        (or (find-first success? results) (last results))))))
+        (or (find-first c/success? results) (last results))))))
 
 (m/defmonad parser-m
   "The monad that FnParse uses."
@@ -289,7 +280,7 @@
   (fn labelled-rule [state]
     (let [result (rule state), initial-position (:position state)]
       (if-not (< initial-position (-> result :error :position))
-        (assoc-in result [:error :descriptors] #{(common/Expectation label)})
+        (assoc-in result [:error :descriptors] #{(c/Expectation label)})
         result))))
 
 (defn term
@@ -311,8 +302,8 @@
         (let [token (nth tokens position ::nothing)]
           (if (not= token ::nothing)
             (if (validator token)
-              (Success token (assoc state :position (inc position))
-                             (common/ParseError position token nil))
+              (c/Success token (assoc state :position (inc position))
+                (c/ParseError position token nil))
               (invalid-token-pseudo-rule state token))
             (input-end-rule state)))))))
 
@@ -351,7 +342,7 @@
 (defn followed-by [rule]
   (fn [state]
     (let [result (rule state)]
-      (if (success? result)
+      (if (c/success? result)
         ((with-product (:product result)) state)
         result))))
 
@@ -364,8 +355,8 @@
   (with-label label
     (fn not-followed-by-rule [state]
       (let [result (rule state)]
-        (if (failure? result)
-          (Success true state (:error result))
+        (if (c/failure? result)
+          (c/Success true state (:error result))
           (-> state nothing (assoc :error (:error result))))))))
 
 (defn semantics

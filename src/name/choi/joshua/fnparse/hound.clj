@@ -1,65 +1,20 @@
 (ns name.choi.joshua.fnparse.hound
   (:use clojure.contrib.seq-utils clojure.contrib.def clojure.test
         clojure.set clojure.contrib.monads clojure.template)
+  (:require [name.choi.joshua.fnparse.common :as c])
   (:import [clojure.lang Sequential IPersistentMap IPersistentVector Var]))
-
-(set! *warn-on-reflection* true)
-
-; A RULE is a a function that:
-; - Takes a state and returns either nil
-;   or a vector pair.
-;   - A STATE is a struct map that contains
-;     a remainder and maybe info.
-;     You create states using the make-cf-state function.
-;   - A REMAINDER is a sequence or
-;     seqable collection of tokens.
-;     It is contained in the
-;     :name.choi.joshua.fnparse/remainder key.
-;   - A state can also contain INFO, which are
-;     any other attributes in the state. Common
-;     examples include current line and column numbers
-;     and a set of current warnings.
-; - If the remainder is VALID under the rule,
-;   it CONSUMES any valid tokens and returns a RESULT.
-;   - A RESULT is a vector pair containing
-;     a product and a new state.
-;   - The PRODUCT is the semantic data generated
-;     by the rule that corresponds to the
-;     information represented by the consumed tokens.
-;     It can be any object.
-;   - The new state is what the old state now looks like,
-;     after its first few tokens are consumed.
-; - If the given token sequence is INVALID, then
-;   the rule FAILS, meaning that it simply returns NIL.
 
 (deftype State [remainder position] IPersistentMap)
 
 (deftype Reply [tokens-consumed? result] IPersistentMap)
 
-(deftype ErrorDescriptor [kind message] IPersistentMap)
-
-(deftype ParseError [position unexpected-token descriptors] IPersistentMap)
-
-(deftype Failure [error] IPersistentMap)
-
-(deftype Success [product state error]
-  ; :error is the error that would have
-  ; occurred if this successful alternative wasn't taken.
-  IPersistentMap)
-
 (defn make-state [remainder]
   (State remainder 0))
-
-(do-template [fn-name type-name doc-string]
-  (defn fn-name doc-string [result]
-    (-> result type (isa? type-name)))
-  failure? ::Failure "Is the given result a Failure?"
-  success? ::Success "Is the given result is a Success?")
 
 (defn parse
   [input rule success-fn failure-fn]
   (let [result (-> input make-state rule :result force)]
-    (if (failure? result)
+    (if (c/failure? result)
       (failure-fn (:error result))
       (success-fn (:product result) (-> result :state :remainder)))))
 
@@ -75,15 +30,16 @@
   "The monad that FnParse uses."
   [m-zero
      (fn [state]
-       (Reply false (Failure (ParseError (:position state)
-                                         (first (:remainder state))
-                                         nil))))
+       (Reply false
+         (c/Failure
+           (c/ParseError (:position state)
+             (first (:remainder state)) nil))))
    m-result
      (fn [product]
        (fn [state]
          (Reply false
-           (Success product state
-             (ParseError (:position state) nil nil)))))
+           (c/Success product state
+             (c/ParseError (:position state) nil nil)))))
    m-bind
      (fn [rule product-fn]
        (letfn [(apply-product-fn [result]
@@ -94,16 +50,16 @@
                (assoc reply :result
                  (delay
                    (let [result (-> reply :result force)]
-                     (if (failure? result)
+                     (if (c/failure? result)
                        result
                        (-> result apply-product-fn :result force)))))
                (let [result (-> reply :result force)]
-                 (if (failure? result)
+                 (if (c/failure? result)
                    (Reply false result)
                    (apply-product-fn result))))))))
    m-plus
      (letfn [(result-failure? [reply]
-               (-> reply :result force failure?))]
+               (-> reply :result force c/failure?))]
        (fn [& rules]
          (fn [state]
            (let [[consuming-replies empty-replies]
@@ -112,7 +68,7 @@
                (if (empty? empty-replies)
                  (m-zero state)
                  (let [empty-replies (reductions merge-replies empty-replies)]
-                   (or (first (drop-while #(-> % :result force failure?)
+                   (or (first (drop-while #(-> % :result force c/failure?)
                                 empty-replies))
                        (last empty-replies))))
                (first consuming-replies))))))])
@@ -144,29 +100,33 @@
   `(domonad parser-m ~steps ~@product-expr))
 
 (defn with-label [label rule]
-  (fn [state]
+  (fn labelled-rule [state]
     (let [reply (rule state)]
-      (if (:tokens-consumed? reply)
-        reply
+      (if-not (:tokens-consumed? reply)
         (assoc-in reply [:result :error :descriptors]
-          (list (ErrorDescriptor :expectation label)))))))
+          #{(c/Expectation label)})
+        reply))))
 
 (defn term [label predicate]
   (with-monad parser-m
     (with-label label
-      (fn [state]
+      (fn terminal-rule [state]
         (let [position (:position state)]
           (if-let [remainder (-> state :remainder seq)]
             (let [first-token (first remainder)]
               (if (predicate first-token)
                 (Reply true
                   (delay
-                    (Success first-token
-                             (assoc state :remainder (next remainder)
-                                          :position (inc position))
-                             (ParseError position nil nil))))
-                (Reply false (Failure (ParseError position first-token nil)))))
-            (Reply false (Failure (ParseError position :nothing nil)))))))))
+                    (c/Success first-token
+                      (assoc state :remainder (next remainder)
+                                   :position (inc position))
+                      (c/ParseError position nil nil))))
+                (Reply false
+                  (c/Failure
+                    (c/ParseError position first-token nil)))))
+            (Reply false
+              (c/Failure
+                (c/ParseError position :nothing nil)))))))))
 
 (defn antiterm [label pred]
   (term label (complement pred)))
@@ -191,7 +151,7 @@
 (defvar end-of-input
   (with-label "end of input"
     (fn [state]
-      (if (-> state anything :result failure?)
+      (if (-> state anything :result c/failure?)
         (emptiness state)
         (nothing state))))
   "WARNING: Because this is an always succeeding,
@@ -256,7 +216,7 @@
 (defn followed-by [rule]
   (fn [state]
     (let [result (-> state rule :result force)]
-      (if (failure? result)
+      (if (c/failure? result)
         (Reply false result)
         ((with-product (:product result)) state)))))
 
