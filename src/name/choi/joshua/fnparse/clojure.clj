@@ -33,7 +33,7 @@
 (defvar- normal-symbol
   (complex [first-letter ascii-letter, other-chars (rep* symbol-char)]
     (->> other-chars
-      (cons first-letter) (apply str) (list `symbol))))
+      (cons first-letter) (apply str) symbol)))
 
 (defvar- symbol-r (alt division-symbol normal-symbol))
 
@@ -199,6 +199,7 @@
 (is (full-match? "16rFF" number-form == 255))
 (is (full-match? "16" number-form == 16))
 (is (full-match? "16." number-form #(isa? (type %) %2) Double))
+(is (full-match? "~@a" form = (list `unquote-splicing (`symbol 'a))))
 (is (full-match? "16rAZ" (conc number-form ws) == 200))
 ; (-> "#^{} #{[a b;Comment\nc]}" make-state form prn)
 ; (-> "#_#_'a'b'c" make-state form prn)

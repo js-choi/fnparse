@@ -14,7 +14,7 @@
   IPersistentMap
   c/AParseAnswer (answer-result [] (-> this :result force)))
 
-(defn make-state [remainder]
+(defn- make-state [remainder]
   (State remainder 0))
 
 (defvar parse (partial c/parse make-state))
@@ -43,18 +43,29 @@
        (letfn [(apply-product-fn [result]
                  ((product-fn (:product result)) (:state result)))]
          (fn [state]
-           (let [reply (rule state)]
-             (if (:tokens-consumed? reply)
-               (assoc reply :result
+           (let [first-reply (rule state)]
+             (if (:tokens-consumed? first-reply)
+               (assoc first-reply :result
                  (delay
-                   (let [result (-> reply :result force)]
-                     (if (c/failure? result)
-                       result
-                       (-> result apply-product-fn :result force)))))
-               (let [result (-> reply :result force)]
-                 (if (c/failure? result)
-                   (Reply false result)
-                   (apply-product-fn result))))))))
+                   (let [{first-error :error, :as first-result}
+                           (-> first-reply :result force)]
+                     (if (c/success? first-result)
+                       (let [{next-error :error, :as next-result}
+                              (-> first-result apply-product-fn :result force)]
+                         (assoc next-result :error
+                           (c/merge-parse-errors first-error next-error)))
+                       first-result))))
+               (let [first-result (-> first-reply :result force)]
+                 (if (c/success? first-result)
+                   (let [first-error (:error first-result)
+                         next-reply (apply-product-fn first-result)]
+                     (assoc next-reply :result
+                       (delay
+                         (let [next-result (-> next-reply :result force)
+                               next-error (:error next-result)]
+                           (assoc next-result :error
+                             (c/merge-parse-errors first-error next-error))))))
+                   (Reply false first-result))))))))
    m-plus
      (letfn [(result-failure? [reply]
                (-> reply :result force c/failure?))]
@@ -183,8 +194,7 @@
 (defn lex [subrule]
   (fn [state]
     (-> state subrule
-      (assoc :tokens-consumed? false)
-      (update-in [:result] force))))
+      (assoc :tokens-consumed? false))))
 
 (defn cascading-rep+ [rule unary-hook binary-hook]
   ; TODO: Rewrite to not blow up stack with many valid tokens

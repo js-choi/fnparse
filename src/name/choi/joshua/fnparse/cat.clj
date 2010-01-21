@@ -14,8 +14,8 @@
 
 (deftype State [tokens position] :as this
   c/AState
-    (remainder [] (drop (:position this) (:tokens this)))
-    (position [] (:position this))
+    (remainder [] (drop position tokens))
+    (position [] position)
   ABankable
     (get-bank [] (meta this))
     (set-bank [new-bank] (with-meta this new-bank))
@@ -49,7 +49,7 @@
   {:get-bank meta
    :set-bank with-meta})
 
-(defn make-state [input]
+(defn- make-state [input]
   (State input 0 (Bank {} [] {}) nil))
 
 (defvar parse (partial c/parse make-state))
