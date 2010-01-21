@@ -1,7 +1,8 @@
 (ns name.choi.joshua.fnparse.cat
   (:use clojure.template clojure.set clojure.contrib.def
         clojure.contrib.seq-utils)
-  (:require [clojure.contrib.monads :as m])
+  (:require [clojure.contrib.monads :as m]
+            [name.choi.joshua.fnparse.common :as common])
   (:import [clojure.lang Sequential IPersistentMap IPersistentVector Var]))
 
 (defprotocol ABankable
@@ -12,13 +13,6 @@
   (set-bank bankable (apply f (get-bank bankable) args)))
 
 (deftype State [tokens position] IPersistentMap)
-
-(deftype Bulletin [message] IPersistentMap)
-
-(deftype Expectation [label] IPersistentMap)
-
-(deftype ParseError [position unexpected-token descriptors] IPersistentMap)
-  ; TODO Add unexpected-token
 
 (deftype Success [product state error] IPersistentMap)
 
@@ -85,19 +79,16 @@
                   (-> result :state :position (drop input))))))
 
 (defn- base-nothing [state unexpected-token descriptors]
-  (set-bank
-    (Failure (ParseError (:position state) unexpected-token descriptors))
+  (set-bank (Failure (common/ParseError (:position state)
+                       unexpected-token descriptors))
     (get-bank state)))
 
 (defvar- nothing #(base-nothing % nil #{}))
 
-#_(defn nothing [state]
-  (set-bank (Failure (ParseError (:position state) ::impossible #{}))
-    (get-bank state)))
-
 (defn with-product [product]
   (fn product-rule [state]
-    (Success product state (ParseError (:position state) ::impossible #{}))))
+    (Success product state (common/ParseError (:position state)
+                             ::impossible #{}))))
 
 (defvar emptiness
   (with-product nil)
@@ -298,7 +289,7 @@
   (fn labelled-rule [state]
     (let [result (rule state), initial-position (:position state)]
       (if-not (< initial-position (-> result :error :position))
-        (assoc-in result [:error :descriptors] #{label})
+        (assoc-in result [:error :descriptors] #{(common/Expectation label)})
         result))))
 
 (defn term
@@ -311,18 +302,19 @@
   The new rule's product would be the first token, if it fulfills the
   validator."
   [label validator]
-  (let [descriptors #{(Expectation label)}
-        invalid-token-pseudo-rule #(base-nothing %1 %2 descriptors)
-        with-input-end-rule #(base-nothing % (constantly ::end-of-input)
-                               descriptors)]
-    (fn terminal-rule [{:keys #{tokens position} :as state}]
-      (let [token (nth tokens position ::nothing)]
-        (if (not= token ::nothing)
-          (if (validator token)
-            (Success token (assoc state :position (inc position))
-                           (ParseError position token descriptors))
-            (invalid-token-pseudo-rule state token))
-          (with-input-end-rule state))))))
+  (with-label label
+    (letfn [(invalid-token-pseudo-rule [state unexpected-token]
+              (base-nothing state unexpected-token nil))
+          (input-end-rule [state]
+            (base-nothing state (constantly ::end-of-input) nil))]
+      (fn terminal-rule [{:keys #{tokens position} :as state}]
+        (let [token (nth tokens position ::nothing)]
+          (if (not= token ::nothing)
+            (if (validator token)
+              (Success token (assoc state :position (inc position))
+                             (common/ParseError position token nil))
+              (invalid-token-pseudo-rule state token))
+            (input-end-rule state)))))))
 
 (defvar anything
   (term "anything" (constantly true))
