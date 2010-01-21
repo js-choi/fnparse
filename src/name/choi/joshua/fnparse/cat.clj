@@ -12,7 +12,14 @@
 (defn- vary-bank [bankable f & args]
   (set-bank bankable (apply f (get-bank bankable) args)))
 
-(deftype State [tokens position] IPersistentMap)
+(deftype State [tokens position] :as this
+  c/AState
+    (remainder [] (drop (:position this) (:tokens this)))
+    (position [] (:position this))
+  ABankable
+    (get-bank [] (meta this))
+    (set-bank [new-bank] (with-meta this new-bank))
+  IPersistentMap)
 
 (deftype Bank [memory lr-stack position-heads] IPersistentMap)
   ; memory: a nested map with function keys and map vals
@@ -26,13 +33,13 @@
     ; The keys correspond to token positions
     ; The vals correspond to LRNodes' indexes in the lr-stack
 
-(deftype LRNode [seed rule head] IPersistentMap)
+(deftype LRNode [seed rule head] :as this
+  ABankable
+    (get-bank [] (meta this))
+    (set-bank [new-bank] (with-meta this new-bank))
+  IPersistentMap)
 
 (deftype Head [involved-rules rules-to-be-evaluated] IPersistentMap)
-
-(extend ::State ABankable
-  {:get-bank meta
-   :set-bank with-meta})
 
 (extend ::c/Success ABankable
   {:get-bank (comp get-bank :state)
@@ -42,31 +49,13 @@
   {:get-bank meta
    :set-bank with-meta})
 
-(extend ::LRNode ABankable
-  {:get-bank meta
-   :set-bank with-meta})
-
 (defn make-state [input]
   (State input 0 (Bank {} [] {}) nil))
 
+(defvar parse (partial c/parse make-state))
+
 (defn- inc-position [state]
   (update-in state [:position] inc))
-
-(defn merge-parse-errors
-  [{position-a :position, descriptors-a :descriptors :as error-a}
-   {position-b :position, descriptors-b :descriptors :as error-b}]
-  (cond
-    (or (> position-b position-a) (empty? descriptors-a)) error-b
-    (or (< position-b position-a) (empty? descriptors-b)) error-a
-    true (assoc error-a :descriptors (union descriptors-a descriptors-b))))
-
-(defn parse
-  [input rule success-fn failure-fn]
-  (let [result (-> input make-state rule)]
-    (if (c/failure? result)
-      (failure-fn (:error result))
-      (success-fn (:product result)
-                  (-> result :state :position (drop input))))))
 
 (defn- base-nothing [state unexpected-token descriptors]
   (set-bank
@@ -101,7 +90,7 @@
               {next-error :error, :as next-result}
                 (-> first-result :state next-rule)]
           (assoc next-result
-            :error (merge-parse-errors first-error next-error)))
+            :error (c/merge-parse-errors first-error next-error)))
         first-result))))
 
 (defn- get-memory [bank subrule state-position]
@@ -225,7 +214,7 @@
                  (set-bank (get-bank prev-result))
                  next-rule
                  (update-in [:error]
-                   #(merge-parse-errors (:error prev-result) %))))
+                   #(c/merge-parse-errors (:error prev-result) %))))
             initial-result (emptiness state)
             results (rest (reductions apply-next-rule
                             initial-result rules))]

@@ -4,27 +4,25 @@
   (:require [name.choi.joshua.fnparse.common :as c])
   (:import [clojure.lang Sequential IPersistentMap IPersistentVector Var]))
 
-(deftype State [remainder position] IPersistentMap)
+(deftype State [remainder position] :as this
+  IPersistentMap
+  c/AState
+    (remainder [] (:remainder this))
+    (position [] (:position this)))
 
-(deftype Reply [tokens-consumed? result] IPersistentMap)
+(deftype Reply [tokens-consumed? result] :as this
+  IPersistentMap
+  c/AParseAnswer (answer-result [] (-> this :result force)))
 
 (defn make-state [remainder]
   (State remainder 0))
 
-(defn parse
-  [input rule success-fn failure-fn]
-  (let [result (-> input make-state rule :result force)]
-    (if (c/failure? result)
-      (failure-fn (:error result))
-      (success-fn (:product result) (-> result :state :remainder)))))
+(defvar parse (partial c/parse make-state))
 
-(letfn [(reply-expected-rules [reply]
-          (-> reply :result :error :descriptors))]
-  (defn merge-replies [mergee merger]
-    (let [merger-rules (reply-expected-rules merger)
-          mergee-rules (reply-expected-rules mergee)]
-      (assoc-in merger [:result :error :descriptors]
-        (concat mergee-rules merger-rules)))))
+(defn merge-replies [mergee merger]
+  (assoc merger :result
+    (update-in (-> merger :result force) [:error]
+      c/merge-parse-errors (-> mergee :result force :error))))
 
 (defmonad parser-m
   "The monad that FnParse uses."

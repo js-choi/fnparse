@@ -1,6 +1,7 @@
 (ns name.choi.joshua.fnparse.hound.test
   (:use name.choi.joshua.fnparse.hound clojure.test)
-  (:require [clojure.contrib.str-utils2 :as str]))
+  (:require [clojure.contrib.str-utils2 :as str]
+            [name.choi.joshua.fnparse.common :as c]))
 
 (defmethod assert-expr 'partial-match?
   [msg [_ input rule consumed-tokens-num product-pred & product-pred-args]]
@@ -31,7 +32,7 @@
           (let [unexpected-token# (:unexpected-token expectation#)]
             (report-this# :fail "%s at position %s"
               (->> expectation# :descriptors
-                (map str
+                (map c/communique
                     #_(fn [{kind# :kind, message# :message}]
                        (format "%s (%s)" message# kind#)))
                 (str/join " or "))
