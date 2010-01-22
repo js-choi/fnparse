@@ -1,5 +1,6 @@
 (ns name.choi.joshua.fnparse.math
-  (:use clojure.template name.choi.joshua.fnparse.cat))
+  (:use clojure.template name.choi.joshua.fnparse.cat clojure.test
+        name.choi.joshua.fnparse.cat.test))
 
 (set! *warn-on-reflection* true)
 
@@ -69,14 +70,15 @@
 
 (def expr addition-level-expr)
 
-(do-template [tokens]
-  (parse tokens expr
+(defn parse-expr [input]
+  (parse expr input
     #(if (empty? %2)
        (println "SUCCESS!" %1)
        (println "Partial success." %1 %2))
-    #(println "ERROR!" %))
-  "*3+1*cos(-(-5)+sin(2))" "3+1*cos(-(-5)+sin(2))")
-;(prn (expr (make-state "3+1*cos(-(-5)+sin(2))")))
-;(prn ((conc (opt digit) symbol-char) (make-state "+1*cos(-(-5)+sin(2))")))
-;(println (expr (make-state "1+3*2+2" {} 0)))
-;(println (expr (make-state "2+3-2" {} 0)))
+    #(println "ERROR!" %)))
+
+(deftest various-exprs
+  (is (full-match? expr "3+1*cos(-(-5)+sin(2))" =))
+  (is (full-match? expr "*3+1*cos(-(-5)+sin(2))" =)))
+
+(run-tests)

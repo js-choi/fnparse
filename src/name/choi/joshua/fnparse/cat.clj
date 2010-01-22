@@ -52,7 +52,8 @@
 (defn- make-state [input]
   (State input 0 (Bank {} [] {}) nil))
 
-(defvar parse (partial c/parse make-state))
+(defn parse [rule input success-fn failure-fn]
+  (c/parse make-state rule input success-fn failure-fn))
 
 (defn- inc-position [state]
   (update-in state [:position] inc))
@@ -73,10 +74,10 @@
   is always nil, and it therefore always
   returns [nil given-state].")
 
-(defn- base-nothing [state unexpected-token descriptor]
+(defn- base-nothing [state unexpected-token descriptors]
   (set-bank
     (c/Failure
-      (c/ParseError (:position state) unexpected-token descriptor))
+      (c/ParseError (:position state) unexpected-token descriptors))
     (get-bank state)))
 
 (defn nothing [state]
@@ -84,7 +85,7 @@
 
 (defn with-error [message]
   (fn with-error-rule [state]
-    (base-nothing state nil (c/ErrorDescriptor #{message} #{}))))
+    (base-nothing state nil #{(c/ErrorDescriptor :message message)})))
 
 (defn only-when [valid? message]
   (if-not valid? (with-error message) emptiness))
@@ -266,21 +267,28 @@
   (fn labelled-rule [state]
     (let [result (rule state), initial-position (:position state)]
       (if-not (-> result :error :position (> initial-position))
-        (assoc-in result [:error :descriptor]
-          (c/ErrorDescriptor #{} #{label}))
+        (assoc-in result [:error :descriptors]
+          #{(c/ErrorDescriptor :label label)})
         result))))
 
-(defn- base-nothing [state unexpected-token descriptor]
+(defn- base-nothing [state unexpected-token descriptors]
   (set-bank
     (c/Failure
-      (c/ParseError (:position state) unexpected-token descriptor))
+      (c/ParseError (:position state) unexpected-token descriptors))
     (get-bank state)))
 
 (defn nothing [state]
-  (base-nothing state nil #{}))
+  (base-nothing state nil nil))
 
 (defn only-when [valid? message]
   (if-not valid? (with-error message) emptiness))
+
+(defn validate [rule pred message]
+  (complex [product rule, _ (only-when (pred product) message)]
+    product))
+
+(defn anti-validate [rule pred message]
+  (validate rule (complement pred) message))
 
 (defn term
   "(term validator) is equivalent
@@ -320,7 +328,7 @@
   The new rule's product would be the first
   token, if it equals the given literal token."
   [token]
-  (term (format "\"%s\"" token) (partial = token)))
+  (term (format "'%s'" token) (partial = token)))
 
 (defn re-term
   "Equivalent to (comp term (partial partial re-matches)).

@@ -21,11 +21,11 @@
 (defvar- discarded-form (prefix-conc (lex (mapconc "#_")) #'form))
 (defvar- ws
   (with-label "whitespace"
-    (rep+ (alt (term "whitespace character" ws-set)
+    (rep+ (alt (term "a whitespace character" ws-set)
                comment-r discarded-form))))
 (defvar- ws? (opt ws))
-(defvar- indicator (term "indicator" indicator-set))
-(defvar- symbol-char (antiterm "symbol char" separator-set))
+(defvar- indicator (term "an indicator" indicator-set))
+(defvar- symbol-char (antiterm "a symbol character" separator-set))
 (defvar- form-end (alt (followed-by (alt ws indicator)) end-of-input))
 
 (defvar- division-symbol (constant-semantics (lit \/) '/))
@@ -119,7 +119,8 @@
 (defvar- number-form
   (complex [sign (opt number-sign)
             prefix-number decimal-natural-number
-            tail-fn (number-tail prefix-number)]
+            tail-fn (number-tail prefix-number)
+            _ form-end]
     (tail-fn (* (or sign 1) prefix-number))))
 
 (defvar- string-delimiter (lit \"))
@@ -191,26 +192,24 @@
 
 (defvar- form
   (with-label "a form"
-    (prefix-conc
-      ws?
+    (prefix-conc ws?
       (alt list-r vector-r map-r dispatched-form string-r syntax-quoted-form
            unquote-spliced-form unquoted-form division-symbol character-form
            keyword-r peculiar-symbol symbol-r number-form))))
 
+(defvar- document
+  (suffix-conc form-series end-of-input))
+
 (use 'clojure.test 'name.choi.joshua.fnparse.hound.test)
 
-(is (full-match? "55.2e2" number-form == 5520.))
-(is (full-match? "16rFF" number-form == 255))
-(is (full-match? "16" number-form == 16))
-(is (full-match? "16." number-form #(isa? (type %) %2) Double))
-;(is (full-match? "~@a" form = (list `unquote-splicing (`symbol 'a))))
-(is (full-match? "3/0" form == 2/3))
-;(is (full-match? "16rAZ" (conc number-form ws) == 200))
-; (-> "#^{} #{[a b;Comment\nc]}" make-state form prn)
-; (-> "#_#_'a'b'c" make-state form prn)
-; (-> "#^:monster #{a b c d}" (parse form vector nil) prn)
-; (-> "aa\" 2\"]" make-state form println)
-; (-> "\"a\\tb\"" make-state form prn)
-; (-> "\\t\"" make-state escape-sequence prn)
-; (-> "a b;Comment\nc" make-state form-series prn)
-; (-> "'a b;Comment\nc" make-state reader-macro prn)
+(deftest various-rules
+  (is (full-match? form "55.2e2" == 5520.))
+  (is (full-match? form "16rFF" == 255))
+  (is (full-match? form "16" == 16))
+  (is (full-match? form "16." #(isa? (type %) %2) Double))
+  (is (full-match? document "~@a" = [(list `unquote-splicing 'a)]))
+  (is (full-match? document "16rAZ" == 200))
+  (is (full-match? document "A" = 200))
+  (is (full-match? form "3/0" == 2/3)))
+
+(run-tests)

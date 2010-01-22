@@ -14,10 +14,11 @@
   IPersistentMap
   c/AParseAnswer (answer-result [] (-> this :result force)))
 
-(defn- make-state [remainder]
+(defn make-state [remainder]
   (State remainder 0))
 
-(defvar parse (partial c/parse make-state))
+(defn parse [rule input success-fn failure-fn]
+  (c/parse make-state rule input success-fn failure-fn))
 
 (defn merge-replies [mergee merger]
   (assoc merger :result
@@ -32,17 +33,19 @@
 
 (defvar emptiness (with-product nil))
 
-(defn- base-nothing [state unexpected-token descriptor]
+(defn- base-nothing [state unexpected-token descriptors]
   (Reply false
     (c/Failure
-      (c/ParseError (:position state) (first (:remainder state)) descriptor))))
+      (c/ParseError (:position state)
+                    (first (:remainder state))
+                    descriptors))))
 
 (defn nothing [state]
   (base-nothing state nil nil))
 
 (defn with-error [message]
   (fn with-error-rule [state]
-    (base-nothing state nil (c/ErrorDescriptor #{message} #{}))))
+    (base-nothing state nil #{(c/ErrorDescriptor :message message)})))
 
 (defn only-when [valid? message]
   (if-not valid? (with-error message) emptiness))
@@ -122,12 +125,16 @@
   `(domonad parser-m ~steps ~@product-expr))
 
 (defn with-label [label rule]
-  (fn labelled-rule [state]
-    (let [reply (rule state)]
-      (if-not (:tokens-consumed? reply)
-        (assoc-in reply [:result :error :descriptor]
-          (c/ErrorDescriptor #{} #{label}))
-        reply))))
+  (letfn [(assoc-label [result]
+            (-> result force
+              (assoc-in [:error :descriptors]
+                #{(c/ErrorDescriptor :label label)})
+              delay))]
+    (fn labelled-rule [state]
+      (let [reply (rule state)]
+        (if-not (:tokens-consumed? reply)
+          (update-in reply [:result] assoc-label)
+          reply)))))
 
 (defn validate [rule pred message]
   (complex [product rule, _ (only-when (pred product) message)]
@@ -164,19 +171,8 @@
 (defn constant-semantics [subrule product]
   (complex [_ subrule] product))
 
-(defvar end-of-input
-  (with-label "end of input"
-    (fn [state]
-      (if (-> state anything :result c/failure?)
-        (emptiness state)
-        (nothing state))))
-  "WARNING: Because this is an always succeeding,
-  always empty rule, putting this directly into a
-  rep*/rep+/etc.-type rule will result in an
-  infinite loop.")
-
 (defn lit [token]
-  (term token #(= token %)))
+  (term (format "'%s'" token) #(= token %)))
 
 (defn antilit [token]
   (term (str "anything except " token) #(not= token %)))
@@ -209,7 +205,7 @@
 
 (defn rep+ [rule]
   ; TODO: Rewrite to not blow up stack with many valid tokens
-  (cascading-rep+ rule cons cons))
+  (cascading-rep+ rule list cons))
 
 ; (defn rep* [rule]
 ;   (with-monad parser-m
@@ -230,6 +226,22 @@
       (if (c/failure? result)
         (Reply false result)
         ((with-product (:product result)) state)))))
+
+(defn not-followed-by
+  [label rule]
+  (with-label label
+    (fn not-followed-by-rule [state]
+      (let [result (-> state rule :result force)]
+        (if (c/failure? result)
+          (Reply false (c/Success true state (:error result)))
+          (-> state nothing (assoc :error (:error result))))))))
+
+(defvar end-of-input
+  (not-followed-by "the end of input" anything)
+  "WARNING: Because this is an always succeeding,
+  always empty rule, putting this directly into a
+  rep*/rep+/etc.-type rule will result in an
+  infinite loop.")
 
 (defn prefix-conc [prefix body]
   (complex [_ prefix, content body] content))
