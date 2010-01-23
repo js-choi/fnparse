@@ -300,6 +300,18 @@
    (except label minuend
      (apply alt (cons first-subtrahend rest-subtrahends)))))
 
+(defn annotate-error [rule message-fn]
+  (letfn [(annotate [result]
+            (delay (let [{error :error, :as forced-result} (force result)
+                         new-message (message-fn error)]
+                     (if new-message
+                       (update-in forced-result [:error :descriptors]
+                         conj (c/ErrorDescriptor :message new-message))
+                       forced-result))))]
+    (fn error-annotation-rule [state]
+      (let [reply (rule state)]
+        (update-in reply [:result] annotate)))))
+
 (defvar ascii-digits "0123456789")
 (defvar lowercase-ascii-alphabet "abcdefghijklmnopqrstuvwxyz")
 (defvar uppercase-ascii-alphabet "ABCDEFGHIJKLMNOPQRSTUVWXYZ")

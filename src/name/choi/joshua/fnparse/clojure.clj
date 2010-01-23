@@ -51,7 +51,9 @@
   (complex [first-letter ascii-letter
             other-prefix-chars (rep* symbol-char)
             suffix-chars (opt (prefix-conc ns-separator (rep+ symbol-char)))
-            _ form-end]
+            _ (annotate-error form-end
+               #(if (= (:unexpected-token %) \/)
+                  "multiple slashes aren't allowed in symbols"))]
     (let [prefix (->> other-prefix-chars (cons first-letter) apply-str)]
       (if (seq suffix-chars)
         (UnresolvedNSPrefixedForm `symbol prefix (apply-str suffix-chars))
@@ -247,7 +249,8 @@
   (is (non-match? form "([1 32]" 7
         {:label #{"a form" "')'" "whitespace"}}))
   (is (non-match? document "a/b/c" 3
-        {:label #{"an indicator" "the end of input"
+        {:message #{"multiple slashes aren't allowed in symbols"}
+         :label #{"an indicator" "the end of input"
                   "a symbol character" "whitespace"}}))
   #_(is (full-match? form ":a/b" = :a/b))
   (is (full-match? document "~@a ()" =

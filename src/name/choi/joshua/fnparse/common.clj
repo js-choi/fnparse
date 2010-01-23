@@ -46,7 +46,8 @@
 (defn format-parse-error-data [position descriptor-map]
   (let [{labels :label, messages :message} descriptor-map
         expectation-text (->> labels (str/join ", or ") (str "expected "))
-        message-text (->> messages (cons expectation-text) (str/join "; "))]
+        message-text (->> expectation-text list (concat messages)
+                          (str/join "; "))]
     (format "parse error at position %s: %s" position message-text)))
 
 (defn group-descriptors [descriptors]
