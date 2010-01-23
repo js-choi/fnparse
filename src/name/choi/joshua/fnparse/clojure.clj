@@ -3,14 +3,18 @@
         clojure.contrib.def clojure.contrib.seq-utils))
 
 ; TODO
-; Namespace-qualified symbols.
+; How does Clojure's reader figure out namespaces and namespace aliases?
 ; The qualified division symbol.
 ; Unicode character codes.
 ; Keyword-specific restrictions.
+; Namespace-qualified keywords.
 ; Anonymous functions.
 
 (defn- prefix-list-fn [prefix-form]
   #(list prefix-form %))
+
+(defn- apply-str [chars]
+  (apply str chars))
 
 (declare form)
 
@@ -25,15 +29,25 @@
                comment-r discarded-form))))
 (defvar- ws? (opt ws))
 (defvar- indicator (term "an indicator" indicator-set))
-(defvar- symbol-char (antiterm "a symbol character" separator-set))
-(defvar- form-end (alt (followed-by (alt ws indicator)) end-of-input))
+(defvar- separator (alt ws indicator))
+(defvar- symbol-char (anything-except "a symbol character" separator))
+(defvar- form-end (alt (followed-by separator) end-of-input))
+(defvar- ns-separator (lit \/))
+(defvar- ns-char (except "a namespace character" symbol-char ns-separator))
 
 (defvar- division-symbol (constant-semantics (lit \/) '/))
 
+(defvar- ns-qualified-symbol
+  (lex (complex [first-letter ascii-letter
+                 rest-prefix (rep* ns-char)
+                 _ ns-separator
+                 body (rep* symbol-char)]
+         (symbol (apply-str (cons first-letter rest-prefix))
+                 (apply-str body)))))
+
 (defvar- normal-symbol
   (complex [first-letter ascii-letter, other-chars (rep* symbol-char)]
-    (->> other-chars
-      (cons first-letter) (apply str) symbol)))
+    (->> other-chars (cons first-letter) apply-str symbol)))
 
 (defvar- symbol-r (alt division-symbol normal-symbol))
 
@@ -52,7 +66,8 @@
 (defvar- keyword-indicator (lit \:))
 
 (defvar- keyword-r
-  (prefix-conc keyword-indicator symbol-r))
+  (semantics (prefix-conc keyword-indicator symbol-r)
+    #(keyword (namespace %) (name %))))
 
 (defrm- radix-natural-number [base]
   (cascading-rep+ (radix-digit base) identity #(+ (* base %1) %2)))
@@ -221,6 +236,7 @@
   (is (full-match? form "16." == 16.))
   (is (full-match? form "^()" = (list `meta ())))
   (is (full-match? form "()" = ()))
+  (is (full-match? form ":a/b" = :a/b))
   (is (full-match? document "~@a ()" =
         [(list 'clojure.core/unquote-splicing 'a) ()]))
   (is (full-match? document "16rAZ" == 200))

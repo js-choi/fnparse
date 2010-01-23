@@ -283,6 +283,24 @@
     (apply f args)
     (emptiness state)))
 
+(defn except
+  "Creates a rule that is the exception from
+  the first given subrules with the second given
+  subrule--that is, it accepts only tokens that
+  fulfill the first subrule but fails the
+  second of the subrules.
+  (def a (except b c)) would be equivalent to the EBNF
+    a = b - c;
+  The new rule's products would be b-product. If
+  b fails or c succeeds, then nil is simply returned."
+  [label minuend subtrahend]
+  (with-label label
+    (complex [_ (not-followed-by nil subtrahend), product minuend]
+      product)))
+
+(defn anything-except [label rule]
+  (except label anything rule))
+
 (defvar ascii-digits "0123456789")
 (defvar lowercase-ascii-alphabet "abcdefghijklmnopqrstuvwxyz")
 (defvar base-36-digits (str ascii-digits lowercase-ascii-alphabet))

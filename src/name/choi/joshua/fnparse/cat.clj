@@ -469,6 +469,9 @@
     (complex [_ (not-followed-by nil subtrahend), product minuend]
       product)))
 
+(defn anything-except [label rule]
+  (except label anything rule))
+
 (defn antiterm [label pred]
   (term label (complement pred)))
 
