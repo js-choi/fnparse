@@ -293,16 +293,17 @@
     a = b - c;
   The new rule's products would be b-product. If
   b fails or c succeeds, then nil is simply returned."
-  [label minuend subtrahend]
-  (with-label label
-    (complex [_ (not-followed-by nil subtrahend), product minuend]
-      product)))
-
-(defn anything-except [label rule]
-  (except label anything rule))
+  ([label minuend subtrahend]
+   (with-label label
+     (complex [_ (not-followed-by nil subtrahend), product minuend]
+       product)))
+  ([label minuend first-subtrahend & rest-subtrahends]
+   (except label minuend
+     (apply alt (cons first-subtrahend rest-subtrahends)))))
 
 (defvar ascii-digits "0123456789")
 (defvar lowercase-ascii-alphabet "abcdefghijklmnopqrstuvwxyz")
+(defvar uppercase-ascii-alphabet "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 (defvar base-36-digits (str ascii-digits lowercase-ascii-alphabet))
 
 (defrm radix-digit
@@ -321,14 +322,18 @@
   (radix-digit "a hexadecimal digit" 16))
 
 (defvar uppercase-ascii-letter
-  (set-lit "an uppercase ASCII letter" "ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
+  (set-lit "an uppercase ASCII letter" uppercase-ascii-alphabet))
 
 (defvar lowercase-ascii-letter
-  (set-lit "a lowercase ASCII letter" "abcdefghijklmnopqrstuvwxyz"))
+  (set-lit "a lowercase ASCII letter" lowercase-ascii-alphabet))
 
 (defvar ascii-letter
   (with-label "an ASCII letter"
     (alt uppercase-ascii-letter lowercase-ascii-letter)))
+
+(defvar ascii-alphanumeric
+  (with-label "an alphanumeric ASCII character"
+    (alt ascii-letter decimal-digit)))
 
 ; (def rule (complex [a anything, b anything] [a b]))
 ; (def rule (validate anything (partial = 'a)))

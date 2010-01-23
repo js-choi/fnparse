@@ -1,6 +1,7 @@
 (ns name.choi.joshua.fnparse.clojure
   (:use name.choi.joshua.fnparse.hound clojure.set clojure.template
-        clojure.contrib.def clojure.contrib.seq-utils))
+        clojure.contrib.def clojure.contrib.seq-utils)
+  (:import [clojure.lang IPersistentMap]))
 
 ; TODO
 ; How does Clojure's reader figure out namespaces and namespace aliases?
@@ -10,11 +11,13 @@
 ; Namespace-qualified keywords.
 ; Anonymous functions.
 
-(defn- prefix-list-fn [prefix-form]
-  #(list prefix-form %))
+(defn- prefix-list-fn [prefix-r]
+  #(list prefix-r %))
 
 (defn- apply-str [chars]
   (apply str chars))
+
+(deftype UnresolvedNSPrefixedForm [f prefix name] IPersistentMap)
 
 (declare form)
 
@@ -22,46 +25,53 @@
 (defvar- indicator-set (set ";()[]{}\\\"'@^`#"))
 (defvar- separator-set (union ws-set indicator-set))
 (defvar- comment-r (conc (lit \;) (rep* (antilit \newline))))
-(defvar- discarded-form (prefix-conc (lex (mapconc "#_")) #'form))
+(defvar- discarded-r (prefix-conc (lex (mapconc "#_")) #'form))
 (defvar- ws
   (with-label "whitespace"
     (rep+ (alt (term "a whitespace character" ws-set)
-               comment-r discarded-form))))
+               comment-r discarded-r))))
 (defvar- ws? (opt ws))
 (defvar- indicator (term "an indicator" indicator-set))
 (defvar- separator (alt ws indicator))
-(defvar- symbol-char (anything-except "a symbol character" separator))
 (defvar- form-end (alt (followed-by separator) end-of-input))
 (defvar- ns-separator (lit \/))
-(defvar- ns-char (except "a namespace character" symbol-char ns-separator))
+(defvar- non-alphanumeric-symbol-char
+  (set-lit "a non-alphanumeric symbol character" "*+!-_?."))
+(defvar- symbol-char
+  (with-label "a symbol character"
+    (alt ascii-alphanumeric non-alphanumeric-symbol-char)))
 
-(defvar- division-symbol (constant-semantics (lit \/) '/))
+(defvar- division-symbol
+  (suffix-conc (constant-semantics (lit \/) '/)
+    form-end))
 
-(defvar- ns-qualified-symbol
-  (lex (complex [first-letter ascii-letter
-                 rest-prefix (rep* ns-char)
-                 _ ns-separator
-                 body (rep* symbol-char)]
-         (symbol (apply-str (cons first-letter rest-prefix))
-                 (apply-str body)))))
+(defvar- peculiar-symbols {"nil" nil, "true" true, "false" false})
 
 (defvar- normal-symbol
-  (complex [first-letter ascii-letter, other-chars (rep* symbol-char)]
-    (->> other-chars (cons first-letter) apply-str symbol)))
+  (complex [first-letter ascii-letter
+            other-prefix-chars (rep* symbol-char)
+            suffix-chars (opt (prefix-conc ns-separator (rep+ symbol-char)))
+            _ form-end]
+    (let [prefix (->> other-prefix-chars (cons first-letter) apply-str)]
+      (if (seq suffix-chars)
+        (UnresolvedNSPrefixedForm `symbol prefix (apply-str suffix-chars))
+        (if-let [peculiar-product (peculiar-symbols prefix)]
+          peculiar-product
+          (symbol prefix))))))
 
-(defvar- symbol-r (alt division-symbol normal-symbol))
+(defvar- symbol-r
+  (with-label "symbol"
+    (alt division-symbol normal-symbol)))
 
 (defvar- character-name
   (mapalt #(constant-semantics (mapconc (val %)) (key %))
     char-name-string))
 
-(defvar- character-form (prefix-conc (lit \\) character-name))
+(defvar- character-r (prefix-conc (lit \\) character-name))
 
-(defvar- peculiar-symbol
-  (lex (suffix-conc
-         (mapalt #(constant-semantics (mapconc (key %)) (val %))
-           {"nil" nil, "true" :true, "false" false})
-         form-end)))
+(do-template [name string product]
+  (defvar- name (constant-semantics (mapconc string) product))
+  nil-r "nil" nil, true-r "true" true, false-r "false" false)
 
 (defvar- keyword-indicator (lit \:))
 
@@ -136,7 +146,7 @@
   (alt imprecise-number-tail fraction-denominator-tail
        (radix-coefficient-tail base) no-number-tail))
 
-(defvar- number-form
+(defvar- number-r
   (complex [sign (opt number-sign)
             prefix-number decimal-natural-number
             tail-fn (number-tail prefix-number)
@@ -171,8 +181,7 @@
               _ (with-label (format "a %s or an form" end-token)
                   (lit end-token))]
       (product-fn contents)))
-  list-r \( \) #(if (seq %) (list* %) ())
-    ; (list ()) returns nil for some reason...
+  list-r \( \) #(apply list %)
   vector-r \[ \] vec
   map-r \{ \} #(apply hash-map %)
   set-inner-r \{ \} set)
@@ -186,16 +195,16 @@
       (prefix-conc (conc ((if prefix-is-rule? identity padded-lit) prefix) ws?)
                    #'form)
       (prefix-list-fn product-fn-symbol)))
-  quoted-form \' `quote false
-  syntax-quoted-form \` `syntax-quote false
-  unquote-spliced-form (lex (mapconc "~@")) `unquote-splicing true
-  unquoted-form \~ `unquote false
-  derefed-form \@ `deref false
+  quoted-r \' `quote false
+  syntax-quoted-r \` `syntax-quote false
+  unquote-spliced-r (lex (mapconc "~@")) `unquote-splicing true
+  unquoted-r \~ `unquote false
+  derefed-r \@ `deref false
   var-inner-r \' `var false
-  deprecated-meta-form \^ `meta false)
+  deprecated-meta-r \^ `meta false)
 
-(def deprecated-meta-form
-  (suffix-conc deprecated-meta-form
+(def deprecated-meta-r
+  (suffix-conc deprecated-meta-r
     (effects println
       "WARNING: The ^ indicator is deprecated (since Clojure 1.1).")))
 
@@ -212,18 +221,17 @@
     (complex [metadata metadata-r, _ ws?, content #'form]
       (list `with-meta content metadata))))
 
-(defvar- dispatched-form
+(defvar- dispatched-r
   (prefix-conc
     (lit \#)
     (alt set-inner-r fn-inner-r var-inner-r with-meta-inner-r)))
 
-(defvar- form
-  (with-label "a form"
-    (prefix-conc ws?
-      (alt list-r vector-r map-r dispatched-form string-r syntax-quoted-form
-           unquote-spliced-form unquoted-form division-symbol
-           deprecated-meta-form character-form
-           keyword-r peculiar-symbol symbol-r number-form))))
+(defvar- form-content
+  (alt list-r vector-r map-r dispatched-r string-r syntax-quoted-r
+       unquote-spliced-r unquoted-r division-symbol deprecated-meta-r
+       character-r keyword-r symbol-r number-r))
+
+(defvar- form (with-label "a form" (prefix-conc ws? form-content)))
 
 (defvar- document
   (suffix-conc form-series end-of-input))
@@ -234,9 +242,11 @@
   (is (full-match? form "55.2e2" == 5520.))
   (is (full-match? form "16rFF" == 255))
   (is (full-match? form "16." == 16.))
+  (is (full-match? form "true" true?))
   (is (full-match? form "^()" = (list `meta ())))
   (is (full-match? form "()" = ()))
-  (is (full-match? form ":a/b" = :a/b))
+  (is (full-match? document "a/b/c" = nil))
+  #_(is (full-match? form ":a/b" = :a/b))
   (is (full-match? document "~@a ()" =
         [(list 'clojure.core/unquote-splicing 'a) ()]))
   (is (full-match? document "16rAZ" == 200))

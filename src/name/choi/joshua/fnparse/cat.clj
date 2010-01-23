@@ -464,13 +464,13 @@
     a = b - c;
   The new rule's products would be b-product. If
   b fails or c succeeds, then nil is simply returned."
-  [label minuend subtrahend]
-  (with-label label
-    (complex [_ (not-followed-by nil subtrahend), product minuend]
-      product)))
-
-(defn anything-except [label rule]
-  (except label anything rule))
+  ([label minuend subtrahend]
+   (with-label label
+     (complex [_ (not-followed-by nil subtrahend), product minuend]
+       product)))
+  ([label minuend first-subtrahend & rest-subtrahends]
+   (except label minuend
+     (apply alt (cons first-subtrahend rest-subtrahends)))))
 
 (defn antiterm [label pred]
   (term label (complement pred)))
