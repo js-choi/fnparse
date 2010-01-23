@@ -5,7 +5,6 @@
   (:import [clojure.lang Sequential IPersistentMap IPersistentVector Var]))
 
 (defprotocol AState
-  (remainder [state])
   (position [state]))
 
 (deftype ErrorDescriptor [kind text] IPersistentMap)
@@ -34,7 +33,7 @@
   (let [result (-> input make-state rule answer-result)]
     (if (failure? result)
       (failure-fn (:error result))
-      (success-fn (:product result) (-> result :state remainder)))))
+      (success-fn (:product result) (-> result :state position)))))
 
 (defn merge-parse-errors
   [{position-a :position, descriptors-a :descriptors :as error-a}
@@ -44,13 +43,19 @@
     (or (< position-b position-a) (empty? descriptors-b)) error-a
     true (assoc error-a :descriptors (union descriptors-a descriptors-b))))
 
+(defn format-parse-error-data [position descriptor-map]
+  (let [{labels :label, messages :message} descriptor-map
+        expectation-text (->> labels (str/join ", or ") (str "expected "))
+        message-text (->> messages (cons expectation-text) (str/join "; "))]
+    (format "parse error at position %s: %s" position message-text)))
+
+(defn group-descriptors [descriptors]
+  (->> descriptors (group-by :kind)
+       (map #(vector (key %) (set (map :text (val %)))))
+       (into {})))
+
 (defn format-parse-error [{:keys #{position descriptors}}]
-  (let [{labels :label, messages :message} (group-by :kind descriptors)]
-    (format "parse error at position %s: %s"
-      position
-      (if (empty? messages)
-        (->> labels (map :text) (str/join ", or ") (str "expected "))
-        (->> messages (map :text) (str/join "; "))))))
+  (format-parse-error-data position (group-descriptors descriptors)))
 
 (defn match-assert-expr
   [parse-fn msg rule input given-consume-num product-pred product-pred-args]
@@ -62,19 +67,43 @@
     (let [input-size# (count ~input)
           consume-num# (or ~given-consume-num input-size#)]
       (~parse-fn ~rule ~input
-        (fn success-match [actual-product# actual-remainder#]
-          (let [actual-consume-num# (- input-size# (count actual-remainder#))]
-            (if (not= actual-consume-num# consume-num#)
+        (fn success-match [actual-product# actual-position#]
+          (if (not= actual-position# consume-num#)
+            (report-this# :fail
+              (format "%s tokens consumed by the rule" consume-num#)
+              (format "%s tokens actually consumed" actual-position#))
+            (if (not (~product-pred actual-product# ~@product-pred-args))
               (report-this# :fail
-                (format "%s tokens consumed by the rule" consume-num#)
-                (format "%s tokens actually consumed" actual-consume-num#))
-              (if (not (~product-pred actual-product# ~@product-pred-args))
-                (report-this# :fail
-                  (list '~product-pred '~'rule-product ~@product-pred-args)
-                  (list '~'not (list '~product-pred actual-product#
-                                      ~@product-pred-args)))
-                (report-this# :pass)))))
+                (list '~product-pred '~'rule-product ~@product-pred-args)
+                (list '~'not (list '~product-pred actual-product#
+                                    ~@product-pred-args)))
+              (report-this# :pass))))
         (fn failure-match [error#]
           (report-this# :fail
             (format "a valid input for the given rule '%s'" '~rule)
             (format-parse-error error#)))))))
+
+(defn non-match-assert-expr
+  [parse-fn msg rule input position descriptor-map]
+  {:pre #{(map? descriptor-map) (not (nil? position))}}
+ `(letfn [(report-this#
+            ([kind# expected-arg# actual-arg#]
+             (report {:type kind#, :message ~msg, :expected expected-arg#,
+                      :actual actual-arg#}))
+            ([kind#] (report {:type kind#, :message ~msg})))]
+    (let [expected-error-str# (format-parse-error-data 
+                                ~position ~descriptor-map)]
+      (~parse-fn ~rule ~input
+        (fn success-nonmatch [actual-product# actual-position#]
+          (report-this# :fail expected-error-str#
+            (format "successful parse up to %s with a product of %s"
+              actual-position# actual-product#)))
+        (fn failure-nonmatch
+          [{actual-position# :position, actual-descriptors# :descriptors}]
+          (let [actual-descriptor-map# (group-descriptors actual-descriptors#)]
+            (if (and (== ~position actual-position#)
+                     (= ~descriptor-map actual-descriptor-map#))
+              (report-this# :pass)
+              (report-this# :fail expected-error-str#
+                (format-parse-error-data
+                  actual-position# actual-descriptor-map#)))))))))

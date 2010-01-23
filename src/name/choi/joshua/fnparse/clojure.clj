@@ -178,8 +178,7 @@
   (defvar- rule-name
     (complex [_ (lit start-token)
               contents (opt form-series)
-              _ (with-label (format "a %s or an form" end-token)
-                  (lit end-token))]
+              _ (lit end-token)]
       (product-fn contents)))
   list-r \( \) #(apply list %)
   vector-r \[ \] vec
@@ -244,12 +243,20 @@
   (is (full-match? form "16." == 16.))
   (is (full-match? form "true" true?))
   (is (full-match? form "^()" = (list `meta ())))
-  (is (full-match? form "()" = ()))
-  (is (full-match? document "a/b/c" = nil))
+  (is (full-match? form "[()]" = [()]))
+  (is (non-match? form "([1 32]" 7
+        {:label #{"a form" "')'" "whitespace"}}))
+  (is (non-match? document "a/b/c" 3
+        {:label #{"an indicator" "the end of input"
+                  "a symbol character" "whitespace"}}))
   #_(is (full-match? form ":a/b" = :a/b))
   (is (full-match? document "~@a ()" =
         [(list 'clojure.core/unquote-splicing 'a) ()]))
-  (is (full-match? document "16rAZ" == 200))
-  (is (full-match? form "3/0" == 2/3)))
+  (is (non-match? document "17rAZ" 4
+        {:label #{"a base-17 digit" "an indicator"
+                  "whitespace" "the end of input"}}))
+  (is (non-match? document "3/0 3" 3
+        {:label #{"a base-10 digit"}
+         :message #{"a fraction's denominator cannot be zero"}})))
 
 (run-tests)

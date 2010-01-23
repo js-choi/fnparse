@@ -14,7 +14,6 @@
 
 (deftype State [tokens position] :as this
   c/AState
-    (remainder [] (drop position tokens))
     (position [] position)
   ABankable
     (get-bank [] (meta this))

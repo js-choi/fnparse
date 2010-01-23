@@ -11,3 +11,7 @@
   [msg [_ rule input product-pred & product-pred-args]]
   (c/match-assert-expr parse msg rule input nil product-pred
                        product-pred-args))
+
+(defmethod assert-expr 'non-match?
+  [msg [_ rule input position descriptor-map]]
+  (c/non-match-assert-expr parse msg rule input position descriptor-map))

@@ -7,7 +7,6 @@
 (deftype State [remainder position] :as this
   IPersistentMap
   c/AState
-    (remainder [] (:remainder this))
     (position [] (:position this)))
 
 (deftype Reply [tokens-consumed? result] :as this
