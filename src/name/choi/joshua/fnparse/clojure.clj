@@ -3,11 +3,11 @@
         clojure.contrib.def clojure.contrib.seq-utils))
 
 ; TODO
-; Radix bases and hexadecimal digits in integers.
 ; Namespace-qualified symbols.
 ; The qualified division symbol.
 ; Unicode character codes.
 ; Keyword-specific restrictions.
+; Anonymous functions.
 
 (defn- prefix-list-fn [prefix-form]
   #(list prefix-form %))
@@ -84,7 +84,9 @@
        :else (recur n (* z y) (* z z))))))
 
 (defvar- exponential-part
-  (prefix-conc (alt (lit \e) (lit \E))
+  (prefix-conc
+    #_(case-insensitive-lit \e)
+    (set-lit "exponent indicator" "eE")
     (semantics decimal-natural-number
       #(partial * (expt-int 10 %)))))
 
@@ -108,7 +110,10 @@
 (defrm- radix-coefficient-tail [base]
   (if (and (integer? base) (<= 0 base 36))
     (semantics
-      (prefix-conc (case-insensitive-lit \r) (radix-natural-number base))
+      (prefix-conc
+        #_(case-insensitive-lit \r)
+        (set-lit "radix indicator" "rR")
+        (radix-natural-number base))
       constantly)
     nothing))
 
@@ -151,7 +156,8 @@
               _ (with-label (format "a %s or an form" end-token)
                   (lit end-token))]
       (product-fn contents)))
-  list-r \( \) list*
+  list-r \( \) #(if (seq %) (list* %) ())
+    ; (list ()) returns nil for some reason...
   vector-r \[ \] vec
   map-r \{ \} #(apply hash-map %)
   set-inner-r \{ \} set)
@@ -170,7 +176,13 @@
   unquote-spliced-form (lex (mapconc "~@")) `unquote-splicing true
   unquoted-form \~ `unquote false
   derefed-form \@ `deref false
-  var-inner-r \' `var false)
+  var-inner-r \' `var false
+  deprecated-meta-form \^ `meta false)
+
+(def deprecated-meta-form
+  (suffix-conc deprecated-meta-form
+    (effects println
+      "WARNING: The ^ indicator is deprecated (since Clojure 1.1).")))
 
 (defvar- fn-inner-r
   (semantics (circumfix-conc (lit \() form-series (lit \)))
@@ -194,7 +206,8 @@
   (with-label "a form"
     (prefix-conc ws?
       (alt list-r vector-r map-r dispatched-form string-r syntax-quoted-form
-           unquote-spliced-form unquoted-form division-symbol character-form
+           unquote-spliced-form unquoted-form division-symbol
+           deprecated-meta-form character-form
            keyword-r peculiar-symbol symbol-r number-form))))
 
 (defvar- document
@@ -205,11 +218,12 @@
 (deftest various-rules
   (is (full-match? form "55.2e2" == 5520.))
   (is (full-match? form "16rFF" == 255))
-  (is (full-match? form "16" == 16))
-  (is (full-match? form "16." #(isa? (type %) %2) Double))
-  (is (full-match? document "~@a" = [(list `unquote-splicing 'a)]))
+  (is (full-match? form "16." == 16.))
+  (is (full-match? form "^()" = (list `meta ())))
+  (is (full-match? form "()" = ()))
+  (is (full-match? document "~@a ()" =
+        [(list 'clojure.core/unquote-splicing 'a) ()]))
   (is (full-match? document "16rAZ" == 200))
-  (is (full-match? document "A" = 200))
   (is (full-match? form "3/0" == 2/3)))
 
 (run-tests)

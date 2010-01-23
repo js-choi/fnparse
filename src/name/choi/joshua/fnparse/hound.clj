@@ -243,8 +243,14 @@
   rep*/rep+/etc.-type rule will result in an
   infinite loop.")
 
-(defn prefix-conc [prefix body]
-  (complex [_ prefix, content body] content))
+(defn prefix-conc
+  ([rule-0 rule-1 rule-2 & rest-rules]
+   (let [rest-rules (cons rule-2 rest-rules)
+         body (last rest-rules)
+         prefixes (concat [rule-0 rule-1] (drop-last rest-rules))]
+     (prefix-conc (apply conc prefixes) body)))
+  ([prefix body]
+   (complex [_ prefix, content body] content)))
 
 (defn suffix-conc [body suffix]
   (complex [content body, _ suffix] content))
@@ -271,6 +277,11 @@
 
 (defmacro defrm- [& forms]
   `(defrm ~@forms))
+
+(defn effects [f & args]
+  (fn effects-rule [state]
+    (apply f args)
+    (emptiness state)))
 
 (defvar ascii-digits "0123456789")
 (defvar lowercase-ascii-alphabet "abcdefghijklmnopqrstuvwxyz")

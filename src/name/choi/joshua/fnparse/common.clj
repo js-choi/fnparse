@@ -52,38 +52,30 @@
         (->> labels (map :text) (str/join ", or ") (str "expected "))
         (->> messages (map :text) (str/join "; "))))))
 
-(defn partial-match-assert-expr
-  [parse-fn msg [_ rule input consumed-tokens-num product-pred
-                 & product-pred-args]]
-  (let [input-count (count input)]
-   `(letfn [(report-this#
-              ([kind# expected-arg# actual-arg#]
-               (report {:type kind#, :message ~msg,
-                        :expected expected-arg#,
-                        :actual actual-arg#}))
-              ([kind#] (report {:type kind#, :message ~msg})))]
-      (~parse-fn ~rule ~input
-        (fn [actual-product# actual-remainder#]
-          (let [actual-consumed-tokens-num#
-                 (- ~input-count (count actual-remainder#))]
-            (if (not= actual-consumed-tokens-num# ~consumed-tokens-num)
-              (report-this# :fail
-                (format "%s tokens consumed by the rule" ~consumed-tokens-num)
-                (format "%s tokens actually consumed"
-                        actual-consumed-tokens-num#))
-              (if (not (~product-pred actual-product# ~@product-pred-args))
-                (report-this# :fail
-                  (list* '~product-pred '~'rule-product '~product-pred-args)
-                  (list '~'not (list* '~product-pred actual-product#
-                                      '~product-pred-args)))
-                (report-this# :pass)))))
-        (fn [error#]
-          (report-this# :fail
-            (format "a valid input for the given rule '%s'" '~rule)
-            (format-parse-error error#)))))))
+(defn report-this
+  ([msg kind expected-arg actual-arg]
+   (report {:type kind, :message msg, :expected expected-arg,
+            :actual actual-arg}))
+  ([msg kind] (report {:type kind, :message msg})))
 
-(defn full-match-assert-expr
-  [parse-fn msg [_ rule input product-pred & product-pred-args]]
-  (partial-match-assert-expr
-    parse-fn msg
-    (apply vector _ rule input (count input) product-pred product-pred-args)))
+(defn match-assert-expr
+  [parse-fn msg rule input given-consume-num product-pred product-pred-args]
+ `(let [input-size# (count ~input)
+        consume-num# (or ~given-consume-num input-size#)]
+    (~parse-fn ~rule ~input
+      (fn success-match [actual-product# actual-remainder#]
+        (let [actual-consume-num# (- input-size# (count actual-remainder#))]
+          (if (not= actual-consume-num# consume-num#)
+            (report-this ~msg :fail
+              (format "%s tokens consumed by the rule" consume-num#)
+              (format "%s tokens actually consumed" actual-consume-num#))
+            (if (not (~product-pred actual-product# ~@product-pred-args))
+              (report-this ~msg :fail
+                (list '~product-pred '~'rule-product ~@product-pred-args)
+                (list '~'not (list '~product-pred actual-product#
+                                    ~@product-pred-args)))
+              (report-this ~msg :pass)))))
+      (fn failure-match [error#]
+        (report-this ~msg :fail
+          (format "a valid input for the given rule '%s'" '~rule)
+          (format-parse-error error#))))))
