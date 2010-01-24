@@ -8,13 +8,12 @@
 ; The qualified division symbol.
 ; Unicode character codes.
 ; Keyword-specific restrictions.
-; Namespace-qualified keywords.
 ; Anonymous functions.
 
 (defn- prefix-list-fn [prefix-r]
   #(list prefix-r %))
 
-(defn- apply-str [chars]
+(defn- str* [chars]
   (apply str chars))
 
 (deftype UnresolvedNSPrefixedForm [f prefix name] IPersistentMap)
@@ -47,23 +46,27 @@
 
 (defvar- peculiar-symbols {"nil" nil, "true" true, "false" false})
 
-(defvar- normal-symbol
-  (complex [first-letter ascii-letter
-            other-prefix-chars (rep* symbol-char)
+(defrm- symbol-chars [first-rule process-chars]
+  (complex [first-chars first-rule
+            prefix-chars (rep* symbol-char)
             suffix-chars (opt (prefix-conc ns-separator (rep+ symbol-char)))
             _ (annotate-error form-end
-               #(if (= (:unexpected-token %) \/)
-                  "multiple slashes aren't allowed in symbols"))]
-    (let [prefix (->> other-prefix-chars (cons first-letter) apply-str)]
-      (if (seq suffix-chars)
-        (UnresolvedNSPrefixedForm `symbol prefix (apply-str suffix-chars))
-        (if-let [peculiar-product (peculiar-symbols prefix)]
-          peculiar-product
-          (symbol prefix))))))
+                (fn [error]
+                  (if (= (:unexpected-token error) \/)
+                    "multiple slashes aren't allowed in symbols")))]
+    (process-chars first-chars (str* prefix-chars) (str* suffix-chars))))
+
+(defvar- normal-symbol
+  (symbol-chars ascii-letter
+    (fn [first-chars rest-prefix suffix]
+      (let [prefix (str first-chars rest-prefix)]
+        (if-not (= suffix "")
+          (UnresolvedNSPrefixedForm `symbol prefix suffix)
+          (or (peculiar-symbols prefix) ; In case it's true, false, or nil
+              (symbol prefix)))))))
 
 (defvar- symbol-r
-  (with-label "symbol"
-    (alt division-symbol normal-symbol)))
+  (with-label "symbol" (alt division-symbol normal-symbol)))
 
 (do-template [name string product]
   (defvar- name (constant-semantics (mapconc string) product))
@@ -71,7 +74,21 @@
 
 (defvar- keyword-indicator (lit \:))
 
+(defvar- normal-keyword
+  (symbol-chars keyword-indicator
+    (fn [_ prefix suffix] (keyword prefix suffix))))
+
+(defvar- ns-resolved-keyword
+  (symbol-chars (lex (factor= 2 keyword-indicator))
+    (fn [_ prefix suffix]
+      (if (= suffix "")
+        (UnresolvedNSPrefixedForm `keyword nil prefix)
+        (UnresolvedNSPrefixedForm `keyword prefix suffix)))))
+
 (defvar- keyword-r
+  (with-label "keyword" (alt ns-resolved-keyword normal-keyword)))
+
+#_(defvar- keyword-r
   (semantics (prefix-conc keyword-indicator symbol-r)
     #(keyword (namespace %) (name %))))
 
@@ -260,7 +277,8 @@
         {:message #{"multiple slashes aren't allowed in symbols"}
          :label #{"an indicator" "the end of input"
                   "a symbol character" "whitespace"}}))
-  #_(is (full-match? form ":a/b" = :a/b))
+  (is (full-match? form ":a/b" = :a/b))
+  (is (full-match? form "::b" = (UnresolvedNSPrefixedForm `keyword nil "b")))
   (is (full-match? form "\"a\\n\"" = "a\n"))
   (is (full-match? document "~@a ()" =
         [(list 'clojure.core/unquote-splicing 'a) ()]))
