@@ -65,14 +65,16 @@
   it does not want to add a message.
       So it tests if the error's unexpected token was a slash. If it is, then
   we know that the user tried to put more than one slash into a symbol, so we
-  add the message."
+  add the message.
       (In actuality, however, multiple slashes *are* currently allowed by the
-  reader as of Clojure 1.1: 'a/b/c is read as (symbol \"a/b\" \"c\"). However, the meaning of 'a/b/c is not well-defined, as both (symbol \"a/b\" \"c\") and (symbol \"a\" \"b/c\") return 'a/b/c'. It's officially not allowed anyway
-  in the Clojure reader's web page.)")
+  reader as of Clojure 1.1: 'a/b/c is read as (symbol \"a/b\" \"c\"). However,
+  the meaning of 'a/b/c is not well-defined, as both (symbol \"a/b\" \"c\") and
+  (symbol \"a\" \"b/c\") return 'a/b/c'. It's officially not allowed anyway
+  according to http://clojure.org/reader.)")
 
 (defvar- division-symbol
   (suffix-conc
-    (constant-semantics (alt (lit \/) (mapconc "clojure.core//")) `/)
+    (constant-semantics (alt (lit \/) (lex (mapconc "clojure.core//"))) `/)
     symbol-end)
   "The slash symbol, both in its bare form and its namespace-delimited form,
   are hard-coded into Clojure's grammar. It is notable that it is grammatically
@@ -324,6 +326,8 @@
   (is (full-match? form ":a/b" = :a/b))
   (is (full-match? form "::b" = (UnresolvedNSPrefixedForm `keyword nil "b")))
   (is (full-match? form "clojure.core//" = `/))
+  (is (full-match? form "clojure.core/map" =
+        (UnresolvedNSPrefixedForm `symbol "clojure.core" "map")))
   (is (full-match? form "\"a\\n\"" = "a\n"))
   (is (full-match? document "~@a ()" =
         [(list 'clojure.core/unquote-splicing 'a) ()]))
