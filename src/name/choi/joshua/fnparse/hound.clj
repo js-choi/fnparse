@@ -312,6 +312,9 @@
       (let [reply (rule state)]
         (update-in reply [:result] annotate)))))
 
+(defn factor= [n rule]
+  (->> rule (replicate n) (apply conc)))
+
 (defvar ascii-digits "0123456789")
 (defvar lowercase-ascii-alphabet "abcdefghijklmnopqrstuvwxyz")
 (defvar uppercase-ascii-alphabet "ABCDEFGHIJKLMNOPQRSTUVWXYZ")

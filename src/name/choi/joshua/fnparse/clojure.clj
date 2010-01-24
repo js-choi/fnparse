@@ -65,12 +65,6 @@
   (with-label "symbol"
     (alt division-symbol normal-symbol)))
 
-(defvar- character-name
-  (mapalt #(constant-semantics (mapconc (val %)) (key %))
-    char-name-string))
-
-(defvar- character-r (prefix-conc (lit \\) character-name))
-
 (do-template [name string product]
   (defvar- name (constant-semantics (mapconc string) product))
   nil-r "nil" nil, true-r "true" true, false-r "false" false)
@@ -156,18 +150,31 @@
     (tail-fn (* (or sign 1) prefix-number))))
 
 (defvar- string-delimiter (lit \"))
-(defvar- escape-sequence-map
-  {\t \tab
-   \n \newline
-   \\ \\
-   \" \"})
 
-(defvar- escape-sequence
-  (semantics (prefix-conc (lit \\) (set-lit "valid escape sequence"
-                                     (keys escape-sequence-map)))
-    escape-sequence-map))
+(defn- reduce-hexadecimal-digits [digits]
+  (reduce #(+ (* 16 %1) %2) digits))
 
-(defvar- string-char (alt escape-sequence (antilit \")))
+(defvar- unicode-escape-sequence
+  (prefix-conc (lit \u)
+    (semantics (factor= 4 hexadecimal-digit)
+      (comp char reduce-hexadecimal-digits))))
+
+(defvar- character-name
+  (alt (mapalt #(constant-semantics (mapconc (val %)) (key %))
+         char-name-string)
+       unicode-escape-sequence))
+
+(defvar- character-r (prefix-conc (lit \\) character-name))
+
+(defvar- escaped-char
+  (prefix-conc (lit \\)
+    (with-label "a valid escape sequence"
+      (alt (template-alt [token character]
+             (constant-semantics (lit token) character)
+             \t \tab, \n \newline, \\ \\, \" \")
+           unicode-escape-sequence))))
+
+(defvar- string-char (alt escaped-char (antilit \")))
 
 (defvar- string-r
   (semantics
@@ -246,6 +253,7 @@
   (is (full-match? form "true" true?))
   (is (full-match? form "^()" = (list `meta ())))
   (is (full-match? form "[()]" = [()]))
+  (is (full-match? form "\"\\na\\u3333\"" = "\na\u3333"))
   (is (non-match? form "([1 32]" 7
         {:label #{"a form" "')'" "whitespace"}}))
   (is (non-match? document "a/b/c" 3
@@ -253,6 +261,7 @@
          :label #{"an indicator" "the end of input"
                   "a symbol character" "whitespace"}}))
   #_(is (full-match? form ":a/b" = :a/b))
+  (is (full-match? form "\"a\\n\"" = "a\n"))
   (is (full-match? document "~@a ()" =
         [(list 'clojure.core/unquote-splicing 'a) ()]))
   (is (non-match? document "17rAZ" 4
