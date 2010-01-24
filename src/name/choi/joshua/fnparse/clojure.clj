@@ -22,7 +22,6 @@
 
 (defvar- ws-set (set " ,\t\n"))
 (defvar- indicator-set (set ";()[]{}\\\"'@^`#"))
-(defvar- separator-set (union ws-set indicator-set))
 (defvar- comment-r (conc (lit \;) (rep* (antilit \newline))))
 (defvar- discarded-r (prefix-conc (lex (mapconc "#_")) #'form))
 (defvar- ws
@@ -40,20 +39,56 @@
   (with-label "a symbol character"
     (alt ascii-alphanumeric non-alphanumeric-symbol-char)))
 
-(defvar- division-symbol
-  (suffix-conc (constant-semantics (lit \/) '/)
-    form-end))
+(defvar- symbol-end
+  (annotate-error form-end
+    (fn [error]
+      (if (= (:unexpected-token error) \/)
+        "multiple slashes aren't allowed in symbols")))
+  "When a symbol is read, it must be ensured that the last valid symbol
+  character is followed by the actual *end* of the symbol, such as whitespace,
+  an indicator like ']', or the end of the entire input. This is done by the
+  lookahead rule form-end.
+      A common error may be that symbols contain more than one slash, which is
+  invalid under Clojure's official reader rules. By default, if the form-end
+  rule fails after a symbol's last valid symbol character, the user will get
+  an error like: \"parse error: expected a symbol character, whitespace, an
+  indicator, or the end of input\". Which is fine, but we can do better.
+      If a/b/c is parsed as a symbol, then the symbol rule, which allows one
+  slash, will stop at \"/c\". However, then form-end will fail, because the
+  slash is not a valid form end (i.e. not whitespace, an indicator, or the
+  end of input).
+      It would be more informative if the user was given a message like,
+  \"Multiple slashes aren't allowed in symbols.\" We can do that with the
+  annotate-error rule-maker. It captures any failure that its subrule returns,
+  and passes it to a message-creating function. That function can either return
+  a string, if it wants to add a message to the error's descriptors, or nil, if
+  it does not want to add a message.
+      So it tests if the error's unexpected token was a slash. If it is, then
+  we know that the user tried to put more than one slash into a symbol, so we
+  add the message."
+      (In actuality, however, multiple slashes *are* currently allowed by the
+  reader as of Clojure 1.1: 'a/b/c is read as (symbol \"a/b\" \"c\"). However, the meaning of 'a/b/c is not well-defined, as both (symbol \"a/b\" \"c\") and (symbol \"a\" \"b/c\") return 'a/b/c'. It's officially not allowed anyway
+  in the Clojure reader's web page.)")
 
-(defvar- peculiar-symbols {"nil" nil, "true" true, "false" false})
+(defvar- division-symbol
+  (suffix-conc
+    (constant-semantics (alt (lit \/) (mapconc "clojure.core//")) `/)
+    symbol-end)
+  "The slash symbol, both in its bare form and its namespace-delimited form,
+  are hard-coded into Clojure's grammar. It is notable that it is grammatically
+  impossible to refer to this symbol by any prefix other than 'clojure.core',
+  even if you alias the core namespace.")
+
+(defvar- peculiar-symbols {"nil" nil, "true" true, "false" false}
+  "This map contains the mappings of the 'peculiar' symbols—nil, true, and
+  false—from their strings to their Boolean values. This is used in the
+  'normal-symbol rule to determine if a symbol is actually one of these.")
 
 (defrm- symbol-chars [first-rule process-chars]
   (complex [first-chars first-rule
             prefix-chars (rep* symbol-char)
             suffix-chars (opt (prefix-conc ns-separator (rep+ symbol-char)))
-            _ (annotate-error form-end
-                (fn [error]
-                  (if (= (:unexpected-token error) \/)
-                    "multiple slashes aren't allowed in symbols")))]
+            _ symbol-end]
     (process-chars first-chars (str* prefix-chars) (str* suffix-chars))))
 
 (defvar- normal-symbol
@@ -67,10 +102,6 @@
 
 (defvar- symbol-r
   (with-label "symbol" (alt division-symbol normal-symbol)))
-
-(do-template [name string product]
-  (defvar- name (constant-semantics (mapconc string) product))
-  nil-r "nil" nil, true-r "true" true, false-r "false" false)
 
 (defvar- keyword-indicator (lit \:))
 
@@ -241,15 +272,28 @@
   (alt map-r (semantics (alt keyword-r symbol-r) #(hash-map :tag %))))
 
 (defvar- with-meta-inner-r
-  (prefix-conc
-    (padded-lit \^)
+  (prefix-conc (padded-lit \^)
     (complex [metadata metadata-r, _ ws?, content #'form]
       (list `with-meta content metadata))))
 
+; TODO Implement context
+
+(defvar anonymous-fn-parameter
+  (complex [_ (lit \%), number (opt decimal-natural-number)]
+    (or number 1)))
+
+(defvar anonymous-fn-interior
+  nothing)
+
+(defvar- anonymous-fn-r
+  (circumfix-conc
+    (lit \()
+    anonymous-fn-interior
+    (lit \))))
+
 (defvar- dispatched-r
-  (prefix-conc
-    (lit \#)
-    (alt set-inner-r fn-inner-r var-inner-r with-meta-inner-r)))
+  (prefix-conc (lit \#)
+    (alt anonymous-fn-r set-inner-r fn-inner-r var-inner-r with-meta-inner-r)))
 
 (defvar- form-content
   (alt list-r vector-r map-r dispatched-r string-r syntax-quoted-r
@@ -279,6 +323,7 @@
                   "a symbol character" "whitespace"}}))
   (is (full-match? form ":a/b" = :a/b))
   (is (full-match? form "::b" = (UnresolvedNSPrefixedForm `keyword nil "b")))
+  (is (full-match? form "clojure.core//" = `/))
   (is (full-match? form "\"a\\n\"" = "a\n"))
   (is (full-match? document "~@a ()" =
         [(list 'clojure.core/unquote-splicing 'a) ()]))
