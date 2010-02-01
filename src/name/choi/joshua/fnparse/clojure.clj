@@ -5,7 +5,6 @@
 
 ; TODO
 ; How does Clojure's reader figure out namespaces and namespace aliases?
-; The qualified division symbol.
 ; Unicode character codes.
 ; Keyword-specific restrictions.
 ; Anonymous functions.
@@ -72,38 +71,31 @@
   (symbol \"a\" \"b/c\") return 'a/b/c'. It's officially not allowed anyway
   according to http://clojure.org/reader.)")
 
-(defvar- division-symbol
-  (suffix-conc
-    (constant-semantics (alt (lit \/) (lex (mapconc "clojure.core//"))) `/)
-    symbol-end)
-  "The slash symbol, both in its bare form and its namespace-delimited form,
-  are hard-coded into Clojure's grammar. It is notable that it is grammatically
-  impossible to refer to this symbol by any prefix other than 'clojure.core',
-  even if you alias the core namespace.")
-
 (defvar- peculiar-symbols {"nil" nil, "true" true, "false" false}
   "This map contains the mappings of the 'peculiar' symbols—nil, true, and
   false—from their strings to their Boolean values. This is used in the
   'normal-symbol rule to determine if a symbol is actually one of these.")
 
+(defvar- symbol-suffix
+  (opt (prefix-conc ns-separator
+         (alt (rep+ symbol-char) (semantics ns-separator list)))))
+
 (defrm- symbol-chars [first-rule process-chars]
   (complex [first-chars first-rule
             prefix-chars (rep* symbol-char)
-            suffix-chars (opt (prefix-conc ns-separator (rep+ symbol-char)))
+            suffix-chars symbol-suffix
             _ symbol-end]
     (process-chars first-chars (str* prefix-chars) (str* suffix-chars))))
 
-(defvar- normal-symbol
-  (symbol-chars ascii-letter
-    (fn [first-chars rest-prefix suffix]
-      (let [prefix (str first-chars rest-prefix)]
-        (if-not (= suffix "")
-          (UnresolvedNSPrefixedForm `symbol prefix suffix)
-          (or (peculiar-symbols prefix) ; In case it's true, false, or nil
-              (symbol prefix)))))))
-
 (defvar- symbol-r
-  (with-label "symbol" (alt division-symbol normal-symbol)))
+  (with-label "symbol"
+    (symbol-chars ascii-letter
+      (fn [first-chars rest-prefix suffix]
+        (let [prefix (str first-chars rest-prefix)]
+          (if-not (= suffix "")
+            (UnresolvedNSPrefixedForm `symbol prefix suffix)
+            (or (peculiar-symbols prefix) ; In case it's true, false, or nil
+                (symbol prefix))))))))
 
 (defvar- keyword-indicator (lit \:))
 
@@ -299,8 +291,8 @@
 
 (defvar- form-content
   (alt list-r vector-r map-r dispatched-r string-r syntax-quoted-r
-       unquote-spliced-r unquoted-r division-symbol deprecated-meta-r
-       character-r keyword-r symbol-r number-r))
+       unquote-spliced-r unquoted-r deprecated-meta-r character-r keyword-r
+       symbol-r number-r))
 
 (defvar- form (with-label "a form" (prefix-conc ws? form-content)))
 
@@ -310,32 +302,34 @@
 (use 'clojure.test 'name.choi.joshua.fnparse.hound.test)
 
 (deftest various-rules
-  (is (full-match? form "55.2e2" == 5520.))
-  (is (full-match? form "16rFF" == 255))
-  (is (full-match? form "16." == 16.))
-  (is (full-match? form "true" true?))
-  (is (full-match? form "^()" = (list `meta ())))
-  (is (full-match? form "[()]" = [()]))
-  (is (full-match? form "\"\\na\\u3333\"" = "\na\u3333"))
-  (is (non-match? form "([1 32]" 7
-        {:label #{"a form" "')'" "whitespace"}}))
-  (is (non-match? document "a/b/c" 3
-        {:message #{"multiple slashes aren't allowed in symbols"}
-         :label #{"an indicator" "the end of input"
-                  "a symbol character" "whitespace"}}))
-  (is (full-match? form ":a/b" = :a/b))
-  (is (full-match? form "::b" = (UnresolvedNSPrefixedForm `keyword nil "b")))
-  (is (full-match? form "clojure.core//" = `/))
-  (is (full-match? form "clojure.core/map" =
-        (UnresolvedNSPrefixedForm `symbol "clojure.core" "map")))
-  (is (full-match? form "\"a\\n\"" = "a\n"))
-  (is (full-match? document "~@a ()" =
-        [(list 'clojure.core/unquote-splicing 'a) ()]))
-  (is (non-match? document "17rAZ" 4
-        {:label #{"a base-17 digit" "an indicator"
-                  "whitespace" "the end of input"}}))
-  (is (non-match? document "3/0 3" 3
-        {:label #{"a base-10 digit"}
-         :message #{"a fraction's denominator cannot be zero"}})))
+  (let [form form]
+    (is (full-match? form "55.2e2" == 5520.))
+    (is (full-match? form "16rFF" == 255))
+    (is (full-match? form "16." == 16.))
+    (is (full-match? form "true" true?))
+    (is (full-match? form "^()" = (list `meta ())))
+    (is (full-match? form "[()]" = [()]))
+    (is (full-match? form "\"\\na\\u3333\"" = "\na\u3333"))
+    (is (non-match? form "([1 32]" 7
+          {:label #{"a form" "')'" "whitespace"}}))
+    (is (non-match? document "a/b/c" 3
+          {:message #{"multiple slashes aren't allowed in symbols"}
+           :label #{"an indicator" "the end of input"
+                    "a symbol character" "whitespace"}}))
+    (is (full-match? form ":a/b" = :a/b))
+    (is (full-match? form "::b" = (UnresolvedNSPrefixedForm `keyword nil "b")))
+    (is (full-match? form "clojure.core//" =
+          (UnresolvedNSPrefixedForm `symbol "clojure.core" "/")))
+    (is (full-match? form "clojure.core/map" =
+          (UnresolvedNSPrefixedForm `symbol "clojure.core" "map")))
+    (is (full-match? form "\"a\\n\"" = "a\n"))
+    (is (full-match? document "~@a ()" =
+          [(list 'clojure.core/unquote-splicing 'a) ()]))
+    (is (non-match? document "17rAZ" 4
+          {:label #{"a base-17 digit" "an indicator"
+                    "whitespace" "the end of input"}}))
+    (is (non-match? document "3/0 3" 3
+          {:label #{"a base-10 digit"}
+           :message #{"a fraction's denominator cannot be zero"}}))))
 
 (run-tests)
