@@ -24,6 +24,9 @@
     (update-in (-> merger :result force) [:error]
       c/merge-parse-errors (-> mergee :result force :error))))
 
+(defn apply-rule [rule state]
+  (rule state))
+
 (defn with-product [product]
   (fn with-product-rule [state]
     (Reply false
@@ -46,14 +49,20 @@
   (fn with-error-rule [state]
     (base-nothing state nil #{(c/ErrorDescriptor :message message)})))
 
-(defn only-when [valid? message]
+(defmacro defrm [& forms]
+  `(defn-memo ~@forms))
+
+(defmacro defrm- [& forms]
+  `(defrm ~@forms))
+
+(defrm only-when [valid? message]
   (if-not valid? (with-error message) emptiness))
 
 (defn combine [rule product-fn]
   (letfn [(apply-product-fn [result]
-            ((product-fn (:product result)) (:state result)))]
+            (apply-rule (product-fn (:product result)) (:state result)))]
     (fn [state]
-      (let [first-reply (rule state)]
+      (let [first-reply (apply-rule rule state)]
         (if (:tokens-consumed? first-reply)
           (assoc first-reply :result
             (delay
@@ -80,7 +89,9 @@
 (defn alt [& rules]
   (fn summed-rule [state]
     (let [[consuming-replies empty-replies]
-            (->> rules (map #(% state)) (separate :tokens-consumed?))]
+            (->> rules
+              (map #(apply-rule % state))
+              (separate :tokens-consumed?))]
       (if (empty? consuming-replies)
         (if (empty? empty-replies)
           (m-zero state)
@@ -130,7 +141,7 @@
                 #{(c/ErrorDescriptor :label label)})
               delay))]
     (fn labelled-rule [state]
-      (let [reply (rule state)]
+      (let [reply (apply-rule rule state)]
         (if-not (:tokens-consumed? reply)
           (update-in reply [:result] assoc-label)
           reply)))))
@@ -221,7 +232,7 @@
 
 (defn followed-by [rule]
   (fn [state]
-    (let [result (-> state rule :result force)]
+    (let [result (->> state (apply-rule rule) :result force)]
       (if (c/failure? result)
         (Reply false result)
         ((with-product (:product result)) state)))))
@@ -230,7 +241,7 @@
   [label rule]
   (with-label label
     (fn not-followed-by-rule [state]
-      (let [result (-> state rule :result force)]
+      (let [result (->> state (apply-rule rule) :result force)]
         (if (c/failure? result)
           (Reply false (c/Success true state (:error result)))
           (-> state nothing (assoc :error (:error result))))))))
@@ -271,16 +282,10 @@
   (alt (lit (Character/toLowerCase token))
        (lit (Character/toUpperCase token))))
 
-(defmacro defrm [& forms]
-  `(defn-memo ~@forms))
-
-(defmacro defrm- [& forms]
-  `(defrm ~@forms))
-
 (defn effects [f & args]
   (fn effects-rule [state]
     (apply f args)
-    (emptiness state)))
+    (apply-rule emptiness state)))
 
 (defn except
   "Creates a rule that is the exception from
@@ -309,7 +314,7 @@
                          conj (c/ErrorDescriptor :message new-message))
                        forced-result))))]
     (fn error-annotation-rule [state]
-      (let [reply (rule state)]
+      (let [reply (apply-rule rule state)]
         (update-in reply [:result] annotate)))))
 
 (defn factor= [n rule]
