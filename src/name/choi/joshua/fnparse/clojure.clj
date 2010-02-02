@@ -307,7 +307,8 @@
     (is (full-match? form "16rFF" == 255))
     (is (full-match? form "16." == 16.))
     (is (full-match? form "true" true?))
-    (is (full-match? form "^()" = (list `meta ())))
+    (is (= (with-out-str (parse form "^()" list list))
+           "WARNING: The ^ indicator is deprecated (since Clojure 1.1).\n"))
     (is (full-match? form "[()]" = [()]))
     (is (full-match? form "\"\\na\\u3333\"" = "\na\u3333"))
     (is (non-match? form "([1 32]" 7
