@@ -15,6 +15,17 @@
 (defn- str* [chars]
   (apply str chars))
 
+(defn- expt-int [base pow]
+  (loop [n pow, y 1, z base]
+    (let [t (bit-and n 1), n (bit-shift-right n 1)]
+      (cond
+       (zero? t) (recur n y (* z z))
+       (zero? n) (* z y)
+       :else (recur n (* z y) (* z z))))))
+
+(defn- reduce-hexadecimal-digits [digits]
+  (reduce #(+ (* 16 %1) %2) digits))
+
 (deftype UnresolvedNSPrefixedForm [f prefix name] IPersistentMap)
 
 (declare form)
@@ -134,14 +145,6 @@
         #(partial + %))
       no-number-tail)))
 
-(defn- expt-int [base pow]
-  (loop [n pow, y 1, z base]
-    (let [t (bit-and n 1), n (bit-shift-right n 1)]
-      (cond
-       (zero? t) (recur n y (* z z))
-       (zero? n) (* z y)
-       :else (recur n (* z y) (* z z))))))
-
 (defvar- exponential-part
   (prefix-conc
     #_(case-insensitive-lit \e)
@@ -189,9 +192,6 @@
 
 (defvar- string-delimiter (lit \"))
 
-(defn- reduce-hexadecimal-digits [digits]
-  (reduce #(+ (* 16 %1) %2) digits))
-
 (defvar- unicode-escape-sequence
   (prefix-conc (lit \u)
     (semantics (factor= 4 hexadecimal-digit)
@@ -232,7 +232,7 @@
   map-r \{ \} #(apply hash-map %)
   set-inner-r \{ \} set)
 
-(defn- padded-lit [token]
+(defrm- padded-lit [token]
   (prefix-conc (lit token) ws?))
 
 (do-template [rule-name prefix product-fn-symbol prefix-is-rule?]

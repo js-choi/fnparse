@@ -16,16 +16,17 @@
 (defn make-state [remainder context]
   (State remainder 0 context))
 
+(defn apply-rule [rule state]
+  #_(prn ">" (force rule))
+  ((force rule) state))
+
 (defn parse [rule input success-fn failure-fn]
-  (c/parse make-state rule input success-fn failure-fn))
+  (c/parse make-state apply-rule rule input success-fn failure-fn))
 
 (defn merge-replies [mergee merger]
   (assoc merger :result
     (update-in (-> merger :result force) [:error]
       c/merge-parse-errors (-> mergee :result force :error))))
-
-(defn apply-rule [rule state]
-  (rule state))
 
 (defn with-product [product]
   (fn with-product-rule [state]
@@ -49,8 +50,12 @@
   (fn with-error-rule [state]
     (base-nothing state nil #{(c/ErrorDescriptor :message message)})))
 
-(defmacro defrm [& forms]
-  `(defn-memo ~@forms))
+(defmacro defrm [fn-name & forms]
+  (letfn [(delayify [f] (fn [& args] (let [a (apply f args)] #_(prn "+++" a) (if-not (delay? a) (delay a) a))))]
+   `(do
+      (defn-memo ~fn-name ~@forms)
+      (alter-var-root (var ~fn-name) ~delayify)
+      (var ~fn-name))))
 
 (defmacro defrm- [& forms]
   `(defrm ~@forms))
