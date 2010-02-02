@@ -4,7 +4,7 @@
   (:require [name.choi.joshua.fnparse.common :as c])
   (:import [clojure.lang Sequential IPersistentMap IPersistentVector Var]))
 
-(deftype State [remainder position] :as this
+(deftype State [remainder position context] :as this
   IPersistentMap
   c/AState
     (position [] (:position this)))
@@ -13,8 +13,8 @@
   IPersistentMap
   c/AParseAnswer (answer-result [] (-> this :result force)))
 
-(defn make-state [remainder]
-  (State remainder 0))
+(defn make-state [remainder context]
+  (State remainder 0 context))
 
 (defn parse [rule input success-fn failure-fn]
   (c/parse make-state rule input success-fn failure-fn))

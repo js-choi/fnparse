@@ -29,11 +29,13 @@
   success? ::Success "Is the given result is a Success?")
 
 (defn parse
-  [make-state rule input success-fn failure-fn]
-  (let [result (-> input make-state rule answer-result)]
-    (if (failure? result)
-      (failure-fn (:error result))
-      (success-fn (:product result) (-> result :state position)))))
+  ([make-state rule input success-fn failure-fn]
+   (parse make-state rule input {} success-fn failure-fn))
+  ([make-state rule input context success-fn failure-fn]
+   (let [result (-> input (make-state context) rule answer-result)]
+     (if (failure? result)
+       (failure-fn (:error result))
+       (success-fn (:product result) (-> result :state position))))))
 
 (defn merge-parse-errors
   [{position-a :position, descriptors-a :descriptors :as error-a}

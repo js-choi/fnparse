@@ -12,7 +12,7 @@
 (defn- vary-bank [bankable f & args]
   (set-bank bankable (apply f (get-bank bankable) args)))
 
-(deftype State [tokens position] :as this
+(deftype State [tokens position context] :as this
   c/AState
     (position [] position)
   ABankable
@@ -48,8 +48,8 @@
   {:get-bank meta
    :set-bank with-meta})
 
-(defn- make-state [input]
-  (State input 0 (Bank {} [] {}) nil))
+(defn- make-state [input context]
+  (State input 0 context (Bank {} [] {}) nil))
 
 (defn parse [rule input success-fn failure-fn]
   (c/parse make-state rule input success-fn failure-fn))
