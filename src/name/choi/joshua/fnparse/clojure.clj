@@ -103,19 +103,15 @@
   (symbol-chars keyword-indicator
     (fn [_ prefix suffix] (keyword prefix suffix))))
 
-(defvar- ns-resolved-keyword
+(defrm- ns-resolved-keyword [current-ns ns-aliases]
   (symbol-chars (lex (factor= 2 keyword-indicator))
     (fn [_ prefix suffix]
       (if (= suffix "")
-        (UnresolvedNSPrefixedForm `keyword nil prefix)
-        (UnresolvedNSPrefixedForm `keyword prefix suffix)))))
+        (keyword current-ns prefix)
+        (keyword (get ns-aliases prefix) suffix)))))
 
 (defvar- keyword-r
-  (with-label "keyword" (alt ns-resolved-keyword normal-keyword)))
-
-#_(defvar- keyword-r
-  (semantics (prefix-conc keyword-indicator symbol-r)
-    #(keyword (namespace %) (name %))))
+  (with-label "keyword" (alt (ns-resolved-keyword "user" nil) normal-keyword)))
 
 (defrm- radix-natural-number [base]
   (cascading-rep+ (radix-digit base) identity #(+ (* base %1) %2)))
@@ -318,7 +314,7 @@
            :label #{"an indicator" "the end of input"
                     "a symbol character" "whitespace"}}))
     (is (full-match? form ":a/b" = :a/b))
-    (is (full-match? form "::b" = (UnresolvedNSPrefixedForm `keyword nil "b")))
+    (is (full-match? form "::b" = :user/b))
     (is (full-match? form "clojure.core//" =
           (UnresolvedNSPrefixedForm `symbol "clojure.core" "/")))
     (is (full-match? form "clojure.core/map" =
