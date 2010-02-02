@@ -33,7 +33,7 @@
    (parse make-state apply-rule rule input {} success-fn failure-fn))
   ([make-state apply-rule rule input context success-fn failure-fn]
    (let [state (make-state input context)
-         result (->> state (apply-rule rule) answer-result)]
+         result (-> state (apply-rule rule) answer-result)]
      (if (failure? result)
        (failure-fn (:error result))
        (success-fn (:product result) (-> result :state position))))))
