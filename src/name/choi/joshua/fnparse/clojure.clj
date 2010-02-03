@@ -91,37 +91,35 @@
   (opt (prefix-conc ns-separator
          (alt (rep+ symbol-char) (semantics ns-separator list)))))
 
-(defn symbol-chars [first-rule process-chars]
+(defn symbol-chars [first-rule]
   (complex [first-chars first-rule
             prefix-chars (rep* symbol-char)
             suffix-chars symbol-suffix
             _ symbol-end]
-    (process-chars first-chars (str* prefix-chars) (str* suffix-chars))))
+    (list first-chars (str* prefix-chars) (str* suffix-chars))))
 
 (def symbol-r
   (with-label "symbol"
-    (symbol-chars ascii-letter
-      (fn [first-chars rest-prefix suffix]
-        (let [prefix (str first-chars rest-prefix)]
-          (if-not (= suffix "")
-            (symbol prefix suffix)
-            (or (peculiar-symbols prefix) ; In case it's true, false, or nil
-                (symbol prefix))))))))
+    (complex [[first-chars rest-prefix suffix] (symbol-chars ascii-letter)]
+      (let [prefix (str first-chars rest-prefix)]
+        (if-not (= suffix "")
+          (symbol prefix suffix)
+          (or (peculiar-symbols prefix) ; In case it's true, false, or nil
+              (symbol prefix)))))))
 
 (def keyword-indicator (lit \:))
+(def lexed-double-keyword-indicator (lex (factor= 2 keyword-indicator)))
 
 (def normal-keyword
-  (symbol-chars keyword-indicator
-    (fn [_ prefix suffix] (keyword prefix suffix))))
+  (complex [[_ prefix suffix] (symbol-chars keyword-indicator)]
+    (keyword prefix suffix)))
 
 (def ns-resolved-keyword
   (complex [context get-context
-            content (symbol-chars (lex (factor= 2 keyword-indicator))
-                      (fn [_ prefix suffix]
-                        (if (= suffix "")
-                          (keyword (:ns-name context) prefix)
-                          (keyword ((:ns-aliases context) prefix) suffix))))]
-    content))
+            [_ prefix suffix] (symbol-chars lexed-double-keyword-indicator)]
+    (if (= suffix "")
+      (keyword (:ns-name context) prefix)
+      (keyword ((:ns-aliases context) prefix) suffix))))
 
 (def keyword-r
   (with-label "keyword" (alt ns-resolved-keyword normal-keyword)))
