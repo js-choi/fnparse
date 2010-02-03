@@ -65,14 +65,14 @@
   (format-parse-error-data position (group-descriptors descriptors)))
 
 (defn match-assert-expr
-  [parse-fn msg rule input given-consume-num product-pred product-pred-args]
+  [parse-fn msg rule {:keys #{position}} input product-pred product-pred-args]
  `(letfn [(report-this#
             ([kind# expected-arg# actual-arg#]
              (report {:type kind#, :message ~msg, :expected expected-arg#,
                       :actual actual-arg#}))
             ([kind#] (report {:type kind#, :message ~msg})))]
     (let [input-size# (count ~input)
-          consume-num# (or ~given-consume-num input-size#)]
+          consume-num# (or ~position input-size#)]
       (~parse-fn ~rule ~input
         (fn success-match [actual-product# actual-position#]
           (if (not= actual-position# consume-num#)

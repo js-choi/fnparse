@@ -299,28 +299,28 @@
 
 (deftest various-rules
   (let [form form]
-    (is (full-match? form "55.2e2" == 5520.))
-    (is (full-match? form "16rFF" == 255))
-    (is (full-match? form "16." == 16.))
-    (is (full-match? form "true" true?))
+    (is (match? form {} "55.2e2" == 5520.))
+    (is (match? form {} "16rFF" == 255))
+    (is (match? form {} "16." == 16.))
+    (is (match? form {} "true" true?))
     (is (= (with-out-str (parse form "^()" list list))
            "WARNING: The ^ indicator is deprecated (since Clojure 1.1).\n"))
-    (is (full-match? form "[()]" = [()]))
-    (is (full-match? form "\"\\na\\u3333\"" = "\na\u3333"))
+    (is (match? form {} "[()]" = [()]))
+    (is (match? form {} "\"\\na\\u3333\"" = "\na\u3333"))
     (is (non-match? form "([1 32]" 7
           {:label #{"a form" "')'" "whitespace"}}))
     (is (non-match? document "a/b/c" 3
           {:message #{"multiple slashes aren't allowed in symbols"}
            :label #{"an indicator" "the end of input"
                     "a symbol character" "whitespace"}}))
-    (is (full-match? form ":a/b" = :a/b))
-    (is (full-match? form "::b" = :user/b))
-    (is (full-match? form "clojure.core//" =
+    (is (match? form {} ":a/b" = :a/b))
+    (is (match? form {} "::b" = :user/b))
+    (is (match? form {} "clojure.core//" =
           (UnresolvedNSPrefixedForm `symbol "clojure.core" "/")))
-    (is (full-match? form "clojure.core/map" =
+    (is (match? form {} "clojure.core/map" =
           (UnresolvedNSPrefixedForm `symbol "clojure.core" "map")))
-    (is (full-match? form "\"a\\n\"" = "a\n"))
-    (is (full-match? document "~@a ()" =
+    (is (match? form {} "\"a\\n\"" = "a\n"))
+    (is (match? document {} "~@a ()" =
           [(list 'clojure.core/unquote-splicing 'a) ()]))
     (is (non-match? document "17rAZ" 4
           {:label #{"a base-17 digit" "an indicator"
