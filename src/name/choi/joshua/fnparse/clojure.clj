@@ -59,74 +59,42 @@
       (if (= (:unexpected-token error) \/)
         "multiple slashes aren't allowed in symbols"))))
 
-(comment
- "On the symbol-end rule...
-      When a symbol is read, it must be ensured that the last valid symbol
-  character is followed by the actual *end* of the symbol, such as whitespace,
-  an indicator like ']', or the end of the entire input. This is done by the
-  lookahead rule form-end.
-      A common error may be that symbols contain more than one slash, which is
-  invalid under Clojure's official reader rules. By default, if the form-end
-  rule fails after a symbol's last valid symbol character, the user will get
-  an error like: \"parse error: expected a symbol character, whitespace, an
-  indicator, or the end of input\". Which is fine, but we can do better.
-      If a/b/c is parsed as a symbol, then the symbol rule, which allows one
-  slash, will stop at \"/c\". However, then form-end will fail, because the
-  slash is not a valid form end (i.e. not whitespace, an indicator, or the
-  end of input).
-      It would be more informative if the user was given a message like,
-  \"Multiple slashes aren't allowed in symbols.\" We can do that with the
-  annotate-error rule-maker. It captures any failure that its subrule returns,
-  and passes it to a message-creating function. That function can either return
-  a string, if it wants to add a message to the error's descriptors, or nil, if
-  it does not want to add a message.
-      So it tests if the error's unexpected token was a slash. If it is, then
-  we know that the user tried to put more than one slash into a symbol, so we
-  add the message.
-      (In actuality, however, multiple slashes *are* currently allowed by the
-  reader as of Clojure 1.1: 'a/b/c is read as (symbol \"a/b\" \"c\"). However,
-  the meaning of 'a/b/c is not well-defined, as both (symbol \"a/b\" \"c\") and
-  (symbol \"a\" \"b/c\") return 'a/b/c'. It's officially not allowed anyway
-  according to http://clojure.org/reader.)")
-
 (def symbol-suffix
-  (opt (prefix-conc ns-separator
-         (alt symbol-char-series (constant-semantics ns-separator "/")))))
-
-(defn symbol-chars [first-rule]
-  (complex [first-chars first-rule
-            prefix-chars (rep* symbol-char)
-            suffix-chars symbol-suffix
-            _ symbol-end]
-    (list first-chars (str* prefix-chars) (str* suffix-chars))))
+  (prefix-conc ns-separator
+    (alt symbol-char-series (constant-semantics ns-separator "/"))))
 
 (def symbol-r
   (with-label "symbol"
-    (complex [[first-chars rest-prefix suffix] (symbol-chars ascii-letter)]
-      (let [prefix (str first-chars rest-prefix)]
-        (if-not (= suffix "")
-          (symbol prefix suffix)
-          (or (peculiar-symbols prefix) ; In case it's true, false, or nil
-              (symbol prefix)))))))
+    (complex [first-char ascii-letter
+              rest-pre-slash (opt symbol-char-series)
+              post-slash (opt symbol-suffix)
+              _ symbol-end]
+      (let [pre-slash (str first-char rest-pre-slash)]
+        (if post-slash
+          (symbol pre-slash post-slash)
+          (or (peculiar-symbols pre-slash) ; In case it's true, false, or nil
+              (symbol pre-slash)))))))
 
 (def keyword-indicator (lit \:))
-(def lexed-double-keyword-indicator (lex (factor= 2 keyword-indicator)))
 
 (def normal-keyword
-  (complex [[_ prefix suffix] (symbol-chars keyword-indicator)]
-    (keyword prefix suffix)))
+  (complex [_ keyword-indicator
+            pre-slash (opt symbol-char-series)
+            post-slash (opt symbol-suffix)
+            _ symbol-end]
+    (if post-slash
+      (keyword pre-slash post-slash)
+      (keyword pre-slash))))
 
 (defrm ns-resolved-keyword-end [pre-slash]
-  (alt
-    (complex [_ (followed-by ns-separator)
-              context get-context
-              prefix (only-when (get-in context [:ns-aliases pre-slash])
-                       (format "no namespace with alias '%s'" pre-slash))
-              _ anything
-              suffix symbol-char-series]
-      [prefix suffix])
-    (complex [context get-context]
-      [(:ns-name context) pre-slash])))
+  (alt (complex [_ (followed-by ns-separator)
+                 context get-context
+                 prefix (only-when (get-in context [:ns-aliases pre-slash])
+                          (format "no namespace with alias '%s'" pre-slash))
+                 suffix symbol-suffix]
+         [prefix suffix])
+       (complex [context get-context]
+         [(:ns-name context) pre-slash])))
 
 (def ns-resolved-keyword
   (complex [_ (lex (factor= 2 keyword-indicator))
@@ -134,19 +102,6 @@
             [prefix suffix] (ns-resolved-keyword-end pre-slash)
             _ form-end]
     (keyword prefix suffix)))
-
-#_(def ns-resolved-keyword
-  (complex [context get-context
-            [_ prefix suffix] (symbol-chars lexed-double-keyword-indicator)
-            [resolved-prefix suffix]
-              (with-product
-                (if (= suffix "")
-                  [(:ns-name context) prefix]
-                  [(get-in context [:ns-aliases prefix])
-                   suffix]))
-            _ (only-when resolved-prefix
-                (format "no namespace with alias '%s'" prefix))]
-    (keyword resolved-prefix suffix)))
 
 (def keyword-r
   (with-label "keyword" (alt ns-resolved-keyword normal-keyword)))
