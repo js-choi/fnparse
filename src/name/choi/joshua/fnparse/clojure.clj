@@ -26,7 +26,7 @@
 (defn reduce-hexadecimal-digits [digits]
   (reduce #(+ (* 16 %1) %2) digits))
 
-#_(deftype UnresolvedNSPrefixedForm [f prefix name] IPersistentMap)
+(deftype ClojureContext [ns-name ns-aliases] IPersistentMap)
 
 (def peculiar-symbols {"nil" nil, "true" true, "false" false})
 
@@ -91,7 +91,7 @@
   (opt (prefix-conc ns-separator
          (alt (rep+ symbol-char) (semantics ns-separator list)))))
 
-(defrm symbol-chars [first-rule process-chars]
+(defn symbol-chars [first-rule process-chars]
   (complex [first-chars first-rule
             prefix-chars (rep* symbol-char)
             suffix-chars symbol-suffix
@@ -115,11 +115,13 @@
     (fn [_ prefix suffix] (keyword prefix suffix))))
 
 (defrm ns-resolved-keyword [current-ns ns-aliases]
-  (symbol-chars (lex (factor= 2 keyword-indicator))
-    (fn [_ prefix suffix]
-      (if (= suffix "")
-        (keyword current-ns prefix)
-        (keyword (get ns-aliases prefix) suffix)))))
+  (complex [context get-context
+            content (symbol-chars (lex (factor= 2 keyword-indicator))
+                      (fn [_ prefix suffix]
+                        (if (= suffix "")
+                          (keyword (:ns-name context) prefix)
+                          (keyword ((:ns-aliases context) prefix) suffix))))]
+    content))
 
 (def keyword-r
   (with-label "keyword" (alt (ns-resolved-keyword "user" nil) normal-keyword)))
@@ -314,7 +316,8 @@
            :label #{"an indicator" "the end of input"
                     "a symbol character" "whitespace"}}))
     (is (match? form {} ":a/b" = :a/b))
-    (is (match? form {} "::b" = :user/b))
+    (is (match? form {:context (ClojureContext "user" {})}
+          "::b" = :user/b))
     (is (match? form {} "clojure.core//" = 'clojure.core//))
     (is (match? form {} "\"a\\n\"" = "a\n"))
     (is (match? document {} "~@a ()" =

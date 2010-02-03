@@ -4,7 +4,7 @@
 
 (defmethod assert-expr 'match?
   [msg [_ rule opts input product-pred & product-pred-args]]
-  (c/match-assert-expr parse msg rule {} input product-pred
+  (c/match-assert-expr parse msg rule opts input product-pred
                        product-pred-args))
 
 (defmethod assert-expr 'non-match?

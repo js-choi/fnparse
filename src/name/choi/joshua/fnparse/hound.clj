@@ -321,6 +321,9 @@
 (defn factor= [n rule]
   (->> rule (replicate n) (apply conc)))
 
+(defn get-context [state]
+  (c/apply-rule state (with-product (:context state))))
+
 (defvar ascii-digits "0123456789")
 (defvar lowercase-ascii-alphabet "abcdefghijklmnopqrstuvwxyz")
 (defvar uppercase-ascii-alphabet "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
