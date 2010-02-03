@@ -51,11 +51,8 @@
 (defn- make-state [input context]
   (State input 0 context (Bank {} [] {}) nil))
 
-(defn- apply-rule [state rule]
-  ((force rule) state))
-
 (defn parse [rule input success-fn failure-fn]
-  (c/parse make-state apply-rule rule input success-fn failure-fn))
+  (c/parse make-state rule input success-fn failure-fn))
 
 (defn- inc-position [state]
   (update-in state [:position] inc))
@@ -100,12 +97,12 @@
 
 (defn combine [rule product-fn]
   (fn [state]
-    (let [{first-error :error, :as first-result} (apply-rule state rule)]
+    (let [{first-error :error, :as first-result} (c/apply-rule state rule)]
       (if (c/success? first-result)
         (let [next-rule
                 (-> first-result :product product-fn)
               {next-error :error, :as next-result}
-                (-> first-result :state (apply-rule next-rule))]
+                (-> first-result :state (c/apply-rule next-rule))]
           (assoc next-result
             :error (c/merge-parse-errors first-error next-error)))
         first-result))))
@@ -131,7 +128,7 @@
       (let [cur-bank (update-in cur-bank [:lr-stack node-index]
                        #(assoc % :rules-to-be-evaluated
                           (:involved-rules %)))
-            cur-result (apply-rule (set-bank state-0 cur-bank) subrule)
+            cur-result (c/apply-rule (set-bank state-0 cur-bank) subrule)
             cur-result-bank (get-bank cur-result)
             cur-memory-val (get-memory cur-result-bank subrule position-0)]
         (if (or (c/failure? cur-result)
@@ -184,7 +181,7 @@
           (if (-> head :rules-to-be-evaluated (contains? subrule))
             (let [bank (update-in [:lr-stack node-index :rules-to-be-evalated]
                          disj subrule)
-                  result (-> state (set-bank bank) (apply-rule subrule))]
+                  result (-> state (set-bank bank) (c/apply-rule subrule))]
               (vary-bank result store-memory subrule position result))
             memory))))))
 
@@ -207,7 +204,7 @@
                 bank (update-in bank [:lr-stack] conj
                        (LRNode nil subrule nil))
                 state-0b (set-bank state bank)
-                subresult (apply-rule  state-0b subrule)
+                subresult (c/apply-rule  state-0b subrule)
                 bank (get-bank subresult)
                 submemory (get-memory bank subrule state-position)
                 current-lr-node (-> bank :lr-stack peek)
@@ -229,7 +226,7 @@
              (fn apply-next-rule [prev-result next-rule]
                (-> state
                  (set-bank (get-bank prev-result))
-                 (apply-rule next-rule)
+                 (c/apply-rule next-rule)
                  (update-in [:error]
                    #(c/merge-parse-errors (:error prev-result) %))))
             initial-result (emptiness state)
@@ -273,7 +270,7 @@
 
 (defn with-label [label rule]
   (fn labelled-rule [state]
-    (let [result (apply-rule state rule), initial-position (:position state)]
+    (let [result (c/apply-rule state rule), initial-position (:position state)]
       (if-not (-> result :error :position (> initial-position))
         (assoc-in result [:error :descriptors]
           #{(c/ErrorDescriptor :label label)})
@@ -352,7 +349,7 @@
 
 (defn followed-by [rule]
   (fn [state]
-    (let [result (apply-rule state rule)]
+    (let [result (c/apply-rule state rule)]
       (if (c/success? result)
         ((with-product (:product result)) state)
         result))))
@@ -365,7 +362,7 @@
   [label rule]
   (with-label label
     (fn not-followed-by-rule [state]
-      (let [result (apply-rule state rule)]
+      (let [result (c/apply-rule state rule)]
         (if (c/failure? result)
           (c/Success true state (:error result))
           (-> state nothing (assoc :error (:error result))))))))

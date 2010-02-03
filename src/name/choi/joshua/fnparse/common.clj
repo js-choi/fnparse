@@ -28,10 +28,13 @@
   failure? ::Failure "Is the given result a Failure?"
   success? ::Success "Is the given result is a Success?")
 
+(defn apply-rule [state rule]
+  ((force rule) state))
+
 (defn parse
-  ([make-state apply-rule rule input success-fn failure-fn]
-   (parse make-state apply-rule rule input {} success-fn failure-fn))
-  ([make-state apply-rule rule input context success-fn failure-fn]
+  ([make-state rule input success-fn failure-fn]
+   (parse make-state rule input {} success-fn failure-fn))
+  ([make-state rule input context success-fn failure-fn]
    (let [state (make-state input context)
          result (-> state (apply-rule rule) answer-result)]
      (if (failure? result)
