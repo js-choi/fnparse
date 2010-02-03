@@ -119,7 +119,7 @@
             [_ prefix suffix] (symbol-chars lexed-double-keyword-indicator)]
     (if (= suffix "")
       (keyword (:ns-name context) prefix)
-      (if-let [aliased-ns-name ((:ns-aliases context) prefix)]
+      (if-let [aliased-ns-name (get-in context [:ns-aliases prefix])]
         (keyword aliased-ns-name suffix)))))
 
 (def keyword-r
@@ -308,22 +308,24 @@
            "WARNING: The ^ indicator is deprecated (since Clojure 1.1).\n"))
     (is (match? form {} "[()]" = [()]))
     (is (match? form {} "\"\\na\\u3333\"" = "\na\u3333"))
-    (is (non-match? form "([1 32]" {:position 7}
+    (is (non-match? form {:position 7} "([1 32]"
           {:label #{"a form" "')'" "whitespace"}}))
-    (is (non-match? document "a/b/c" {:position 3}
+    (is (non-match? document {:position 3} "a/b/c"
           {:message #{"multiple slashes aren't allowed in symbols"}
            :label #{"an indicator" "the end of input"
                     "a symbol character" "whitespace"}}))
     (is (match? form {} ":a/b" = :a/b))
     (is (match? form {:context (ClojureContext "user" {})} "::b" = :user/b))
+    (is (non-match? form {:position 4} "::z/a"
+          {:message #{"no namespace with alias 'z'"}}))
     (is (match? form {} "clojure.core//" = 'clojure.core//))
     (is (match? form {} "\"a\\n\"" = "a\n"))
     (is (match? document {} "~@a ()" =
           [(list 'clojure.core/unquote-splicing 'a) ()]))
-    (is (non-match? document "17rAZ" {:position 4}
+    (is (non-match? document {:position 4} "17rAZ"
           {:label #{"a base-17 digit" "an indicator"
                     "whitespace" "the end of input"}}))
-    (is (non-match? document "3/0 3" {:position 3}
+    (is (non-match? document {:position 3} "3/0 3"
           {:label #{"a base-10 digit"}
            :message #{"a fraction's denominator cannot be zero"}}))))
 

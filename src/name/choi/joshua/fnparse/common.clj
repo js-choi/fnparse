@@ -89,15 +89,15 @@
             (format-parse-error error#)))))))
 
 (defn non-match-assert-expr
-  [parse-fn msg rule input {:keys #{position context}} descriptor-map]
-  {:pre #{(map? descriptor-map) (not (nil? position))}}
+  [parse-fn msg rule {:keys #{position context}} input descriptor-map]
+  {:pre #{(map? descriptor-map) (or (nil? position) (integer? position))}}
  `(letfn [(report-this#
             ([kind# expected-arg# actual-arg#]
              (report {:type kind#, :message ~msg, :expected expected-arg#,
                       :actual actual-arg#}))
             ([kind#] (report {:type kind#, :message ~msg})))]
     (let [expected-error-str# (format-parse-error-data 
-                                ~position ~descriptor-map)]
+                                (or ~position "any") ~descriptor-map)]
       (~parse-fn ~rule ~input ~context
         (fn success-nonmatch [actual-product# actual-position#]
           (report-this# :fail expected-error-str#

@@ -8,6 +8,5 @@
                        product-pred-args))
 
 (defmethod assert-expr 'non-match?
-  [msg [_ rule input opts descriptor-map]]
-  (c/non-match-assert-expr parse msg rule input opts descriptor-map))
-
+  [msg [_ rule opts input descriptor-map]]
+  (c/non-match-assert-expr parse msg rule opts input descriptor-map))
