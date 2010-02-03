@@ -114,7 +114,7 @@
   (symbol-chars keyword-indicator
     (fn [_ prefix suffix] (keyword prefix suffix))))
 
-(defrm ns-resolved-keyword [current-ns ns-aliases]
+(def ns-resolved-keyword
   (complex [context get-context
             content (symbol-chars (lex (factor= 2 keyword-indicator))
                       (fn [_ prefix suffix]
@@ -124,7 +124,7 @@
     content))
 
 (def keyword-r
-  (with-label "keyword" (alt (ns-resolved-keyword "user" nil) normal-keyword)))
+  (with-label "keyword" (alt ns-resolved-keyword normal-keyword)))
 
 (defrm radix-natural-number [base]
   (cascading-rep+ (radix-digit base) identity #(+ (* base %1) %2)))
