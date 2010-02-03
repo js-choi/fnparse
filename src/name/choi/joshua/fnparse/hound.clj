@@ -16,8 +16,8 @@
 (defn make-state [remainder context]
   (State remainder 0 context))
 
-(defn parse [rule input success-fn failure-fn]
-  (c/parse make-state rule input success-fn failure-fn))
+(defn parse [rule input context success-fn failure-fn]
+  (c/parse make-state rule input context success-fn failure-fn))
 
 (defn merge-replies [mergee merger]
   (assoc merger :result

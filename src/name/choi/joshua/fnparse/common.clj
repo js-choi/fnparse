@@ -31,15 +31,12 @@
 (defn apply-rule [state rule]
   ((force rule) state))
 
-(defn parse
-  ([make-state rule input success-fn failure-fn]
-   (parse make-state rule input {} success-fn failure-fn))
-  ([make-state rule input context success-fn failure-fn]
-   (let [state (make-state input context)
-         result (-> state (apply-rule rule) answer-result)]
-     (if (failure? result)
-       (failure-fn (:error result))
-       (success-fn (:product result) (-> result :state position))))))
+(defn parse [make-state rule input context success-fn failure-fn]
+  (let [state (make-state input context)
+        result (-> state (apply-rule rule) answer-result)]
+    (if (failure? result)
+      (failure-fn (:error result))
+      (success-fn (:product result) (-> result :state position)))))
 
 (defn merge-parse-errors
   [{position-a :position, descriptors-a :descriptors :as error-a}
@@ -65,7 +62,8 @@
   (format-parse-error-data position (group-descriptors descriptors)))
 
 (defn match-assert-expr
-  [parse-fn msg rule {:keys #{position}} input product-pred product-pred-args]
+  [parse-fn msg rule {:keys #{position context}} input product-pred
+   product-pred-args]
  `(letfn [(report-this#
             ([kind# expected-arg# actual-arg#]
              (report {:type kind#, :message ~msg, :expected expected-arg#,
@@ -73,7 +71,7 @@
             ([kind#] (report {:type kind#, :message ~msg})))]
     (let [input-size# (count ~input)
           consume-num# (or ~position input-size#)]
-      (~parse-fn ~rule ~input
+      (~parse-fn ~rule ~input ~context
         (fn success-match [actual-product# actual-position#]
           (if (not= actual-position# consume-num#)
             (report-this# :fail
@@ -100,7 +98,7 @@
             ([kind#] (report {:type kind#, :message ~msg})))]
     (let [expected-error-str# (format-parse-error-data 
                                 ~position ~descriptor-map)]
-      (~parse-fn ~rule ~input
+      (~parse-fn ~rule ~input {}
         (fn success-nonmatch [actual-product# actual-position#]
           (report-this# :fail expected-error-str#
             (format "successful parse up to %s with a product of %s"

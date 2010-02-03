@@ -51,8 +51,8 @@
 (defn- make-state [input context]
   (State input 0 context (Bank {} [] {}) nil))
 
-(defn parse [rule input success-fn failure-fn]
-  (c/parse make-state rule input success-fn failure-fn))
+(defn parse [rule input context success-fn failure-fn]
+  (c/parse make-state rule input context success-fn failure-fn))
 
 (defn- inc-position [state]
   (update-in state [:position] inc))

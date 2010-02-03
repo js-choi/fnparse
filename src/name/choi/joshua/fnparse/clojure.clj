@@ -303,7 +303,7 @@
     (is (match? form {} "16rFF" == 255))
     (is (match? form {} "16." == 16.))
     (is (match? form {} "true" true?))
-    (is (= (with-out-str (parse form "^()" list list))
+    (is (= (with-out-str (parse form "^()" {} list list))
            "WARNING: The ^ indicator is deprecated (since Clojure 1.1).\n"))
     (is (match? form {} "[()]" = [()]))
     (is (match? form {} "\"\\na\\u3333\"" = "\na\u3333"))
