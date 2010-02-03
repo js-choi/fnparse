@@ -16,8 +16,7 @@
 (defn make-state [remainder context]
   (State remainder 0 context))
 
-(defn apply-rule [rule state]
-  #_(prn ">" (force rule))
+(defn apply-rule [state rule]
   ((force rule) state))
 
 (defn parse [rule input success-fn failure-fn]
@@ -65,9 +64,9 @@
 
 (defn combine [rule product-fn]
   (letfn [(apply-product-fn [result]
-            (apply-rule (product-fn (:product result)) (:state result)))]
+            (apply-rule (:state result) (product-fn (:product result))))]
     (fn [state]
-      (let [first-reply (apply-rule rule state)]
+      (let [first-reply (apply-rule state rule)]
         (if (:tokens-consumed? first-reply)
           (assoc first-reply :result
             (delay
@@ -95,7 +94,7 @@
   (fn summed-rule [state]
     (let [[consuming-replies empty-replies]
             (->> rules
-              (map #(apply-rule % state))
+              (map #(apply-rule state %))
               (separate :tokens-consumed?))]
       (if (empty? consuming-replies)
         (if (empty? empty-replies)
@@ -146,7 +145,7 @@
                 #{(c/ErrorDescriptor :label label)})
               delay))]
     (fn labelled-rule [state]
-      (let [reply (apply-rule rule state)]
+      (let [reply (apply-rule state rule)]
         (if-not (:tokens-consumed? reply)
           (update-in reply [:result] assoc-label)
           reply)))))
@@ -237,7 +236,7 @@
 
 (defn followed-by [rule]
   (fn [state]
-    (let [result (->> state (apply-rule rule) :result force)]
+    (let [result (-> state (apply-rule rule) :result force)]
       (if (c/failure? result)
         (Reply false result)
         ((with-product (:product result)) state)))))
@@ -246,7 +245,7 @@
   [label rule]
   (with-label label
     (fn not-followed-by-rule [state]
-      (let [result (->> state (apply-rule rule) :result force)]
+      (let [result (-> state (apply-rule rule) :result force)]
         (if (c/failure? result)
           (Reply false (c/Success true state (:error result)))
           (-> state nothing (assoc :error (:error result))))))))
@@ -290,7 +289,7 @@
 (defn effects [f & args]
   (fn effects-rule [state]
     (apply f args)
-    (apply-rule emptiness state)))
+    (apply-rule state emptiness)))
 
 (defn except
   "Creates a rule that is the exception from
@@ -319,7 +318,7 @@
                          conj (c/ErrorDescriptor :message new-message))
                        forced-result))))]
     (fn error-annotation-rule [state]
-      (let [reply (apply-rule rule state)]
+      (let [reply (apply-rule state rule)]
         (update-in reply [:result] annotate)))))
 
 (defn factor= [n rule]

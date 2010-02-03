@@ -52,7 +52,7 @@
   (State input 0 context (Bank {} [] {}) nil))
 
 (defn- apply-rule [state rule]
-  (rule state))
+  ((force rule) state))
 
 (defn parse [rule input success-fn failure-fn]
   (c/parse make-state apply-rule rule input success-fn failure-fn))
@@ -64,6 +64,12 @@
   (fn product-rule [state]
     (c/Success product state
       (c/ParseError (:position state) nil nil))))
+
+(defmacro defrm [& forms]
+  `(defn-memo ~@forms))
+
+(defmacro defrm- [& forms]
+  `(defrm ~@forms))
 
 (defvar emptiness
   (with-product nil)
@@ -509,12 +515,6 @@
 (defn case-insensitive-lit [#^Character token]
   (alt (lit (Character/toLowerCase token))
        (lit (Character/toUpperCase token))))
-
-(defmacro defrm [& forms]
-  `(defn-memo ~@forms))
-
-(defmacro defrm- [& forms]
-  `(defrm ~@forms))
 
 (defvar ascii-digits "0123456789")
 (defvar lowercase-ascii-alphabet "abcdefghijklmnopqrstuvwxyz")
