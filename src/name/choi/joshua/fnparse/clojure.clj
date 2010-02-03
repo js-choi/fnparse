@@ -50,6 +50,8 @@
 (def symbol-char
   (with-label "a symbol character"
     (alt ascii-alphanumeric non-alphanumeric-symbol-char)))
+(def symbol-char-series
+  (semantics (rep+ symbol-char) str*))
 
 (def symbol-end
   (annotate-error form-end
@@ -89,7 +91,7 @@
 
 (def symbol-suffix
   (opt (prefix-conc ns-separator
-         (alt (rep+ symbol-char) (semantics ns-separator list)))))
+         (alt symbol-char-series (constant-semantics ns-separator "/")))))
 
 (defn symbol-chars [first-rule]
   (complex [first-chars first-rule
@@ -114,7 +116,26 @@
   (complex [[_ prefix suffix] (symbol-chars keyword-indicator)]
     (keyword prefix suffix)))
 
+(defrm ns-resolved-keyword-end [pre-slash]
+  (alt
+    (complex [_ (followed-by ns-separator)
+              context get-context
+              prefix (only-when (get-in context [:ns-aliases pre-slash])
+                       (format "no namespace with alias '%s'" pre-slash))
+              _ anything
+              suffix symbol-char-series]
+      [prefix suffix])
+    (complex [context get-context]
+      [(:ns-name context) pre-slash])))
+
 (def ns-resolved-keyword
+  (complex [_ (lex (factor= 2 keyword-indicator))
+            pre-slash symbol-char-series
+            [prefix suffix] (ns-resolved-keyword-end pre-slash)
+            _ form-end]
+    (keyword prefix suffix)))
+
+#_(def ns-resolved-keyword
   (complex [context get-context
             [_ prefix suffix] (symbol-chars lexed-double-keyword-indicator)
             [resolved-prefix suffix]
@@ -321,9 +342,10 @@
                     "a symbol character" "whitespace"}}))
     (is (match? form {} ":a/b" = :a/b))
     (is (match? form {:context (ClojureContext "user" {})} "::b" = :user/b))
-    (is (non-match? form {:position 4} "::z/abc"
+    (is (non-match? form {:position 3} "::z/abc"
           {:message #{"no namespace with alias 'z'"}
-           :label #{"the end of input" "a symbol character"}}))
+           :label #{"the end of input" "a symbol character" "an indicator"
+                    "whitespace"}}))
     (is (match? form {} "clojure.core//" = 'clojure.core//))
     (is (match? form {} "\"a\\n\"" = "a\n"))
     (is (match? document {} "~@a ()" =

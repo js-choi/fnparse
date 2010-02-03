@@ -57,7 +57,7 @@
   `(defrm ~@forms))
 
 (defn only-when [valid? message]
-  (if-not valid? (with-error message) (with-product message)))
+  (if-not valid? (with-error message) (with-product valid?)))
 
 (defn combine [rule product-fn]
   (letfn [(apply-product-fn [result]
@@ -230,6 +230,9 @@
 
 (defn mapalt [f coll]
   (apply alt (map f coll)))
+
+(defn optconc [& rules]
+  (opt (apply conc rules)))
 
 (defn followed-by [rule]
   (fn [state]
