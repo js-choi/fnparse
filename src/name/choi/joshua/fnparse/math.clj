@@ -78,7 +78,8 @@
     #(println "ERROR!" %)))
 
 (deftest various-exprs
-  (is (full-match? expr "3+1*cos(-(-5)+sin(2))" =))
-  (is (full-match? expr "*3+1*cos(-(-5)+sin(2))" =)))
+  (is (match? expr {} "3+1*cos(-(-5)+sin(2))" =))
+  (is (non-match? expr "*3+1*cos(-(-5)+sin(2))" 0
+        {:label #{"a number" "a symbol" "'-'" "'+'" "'('"}})))
 
 (run-tests)
