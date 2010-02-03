@@ -26,7 +26,7 @@
 (defn reduce-hexadecimal-digits [digits]
   (reduce #(+ (* 16 %1) %2) digits))
 
-(deftype UnresolvedNSPrefixedForm [f prefix name] IPersistentMap)
+#_(deftype UnresolvedNSPrefixedForm [f prefix name] IPersistentMap)
 
 (def peculiar-symbols {"nil" nil, "true" true, "false" false})
 
@@ -104,7 +104,7 @@
       (fn [first-chars rest-prefix suffix]
         (let [prefix (str first-chars rest-prefix)]
           (if-not (= suffix "")
-            (UnresolvedNSPrefixedForm `symbol prefix suffix)
+            (symbol prefix suffix)
             (or (peculiar-symbols prefix) ; In case it's true, false, or nil
                 (symbol prefix))))))))
 
@@ -315,10 +315,7 @@
                     "a symbol character" "whitespace"}}))
     (is (match? form {} ":a/b" = :a/b))
     (is (match? form {} "::b" = :user/b))
-    (is (match? form {} "clojure.core//" =
-          (UnresolvedNSPrefixedForm `symbol "clojure.core" "/")))
-    (is (match? form {} "clojure.core/map" =
-          (UnresolvedNSPrefixedForm `symbol "clojure.core" "map")))
+    (is (match? form {} "clojure.core//" = 'clojure.core//))
     (is (match? form {} "\"a\\n\"" = "a\n"))
     (is (match? document {} "~@a ()" =
           [(list 'clojure.core/unquote-splicing 'a) ()]))
