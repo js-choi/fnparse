@@ -47,7 +47,7 @@
     (base-nothing state nil #{(c/ErrorDescriptor :message message)})))
 
 (defmacro defrm [fn-name & forms]
-  (letfn [(delayify [f] (fn [& args] (let [a (apply f args)] #_(prn "+++" a) (if-not (delay? a) (delay a) a))))]
+  (letfn [(delayify [f] (fn [& args] (delay (force (apply f args)))))]
    `(do
       (defn-memo ~fn-name ~@forms)
       (alter-var-root (var ~fn-name) ~delayify)
@@ -335,7 +335,7 @@
 (defrm radix-digit
   ([base] (radix-digit (format "a base-%s digit" base) base))
   ([label base]
-   {:pre #{(integer? base) (<= 0 base 36)}}
+   {:pre #{(integer? base) (> base 0)}}
    (->> base-36-digits (take base) indexed
      (mapalt (fn [[index token]]
                (constant-semantics (case-insensitive-lit token) index)))

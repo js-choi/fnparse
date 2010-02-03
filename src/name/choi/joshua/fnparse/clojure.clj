@@ -107,7 +107,8 @@
   (with-label "keyword" (alt ns-resolved-keyword normal-keyword)))
 
 (defrm radix-natural-number [base]
-  (cascading-rep+ (radix-digit base) identity #(+ (* base %1) %2)))
+  (cascading-rep+ (radix-digit (if (<= base 36) base 36))
+    identity #(+ (* base %1) %2)))
 
 (def decimal-natural-number
   (radix-natural-number 10))
@@ -129,8 +130,9 @@
 
 (def exponential-part
   (prefix-conc
-    #_(case-insensitive-lit \e)
     (set-lit "exponent indicator" "eE")
+      ; If I wasn't worrying about pure Clojure,
+      ; use (case-insensitive-lit \e) above instead.
     (semantics decimal-natural-number
       #(partial * (expt-int 10 %)))))
 
@@ -152,14 +154,13 @@
       (fn [denominator] #(/ % denominator)))))
 
 (defrm radix-coefficient-tail [base]
-  (if (and (integer? base) (<= 0 base 36))
-    (semantics
-      (prefix-conc
-        #_(case-insensitive-lit \r)
-        (set-lit "radix indicator" "rR")
-        (radix-natural-number base))
-      constantly)
-    nothing))
+  (semantics
+    (prefix-conc
+      (set-lit "radix indicator" "rR")
+        ; If I wasn't worrying about pure Clojure,
+        ; use (case-insensitive-lit \r) above instead.
+      (radix-natural-number base))
+    constantly))
 
 (defrm number-tail [base]
   (alt imprecise-number-tail fraction-denominator-tail
