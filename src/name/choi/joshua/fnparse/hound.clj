@@ -56,8 +56,8 @@
 (defmacro defrm- [& forms]
   `(defrm ~@forms))
 
-(defrm only-when [valid? message]
-  (if-not valid? (with-error message) emptiness))
+(defn only-when [valid? message]
+  (if-not valid? (with-error message) (with-product message)))
 
 (defn combine [rule product-fn]
   (letfn [(apply-product-fn [result]

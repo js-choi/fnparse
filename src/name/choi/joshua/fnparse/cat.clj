@@ -93,7 +93,7 @@
     (base-nothing state nil #{(c/ErrorDescriptor :message message)})))
 
 (defn only-when [valid? message]
-  (if-not valid? (with-error message) emptiness))
+  (if-not valid? (with-error message) (with-product valid?)))
 
 (defn combine [rule product-fn]
   (fn [state]
@@ -284,9 +284,6 @@
 
 (defn nothing [state]
   (base-nothing state nil nil))
-
-(defn only-when [valid? message]
-  (if-not valid? (with-error message) emptiness))
 
 (defn validate [rule pred message]
   (complex [product rule, _ (only-when (pred product) message)]

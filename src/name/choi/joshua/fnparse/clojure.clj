@@ -116,11 +116,16 @@
 
 (def ns-resolved-keyword
   (complex [context get-context
-            [_ prefix suffix] (symbol-chars lexed-double-keyword-indicator)]
-    (if (= suffix "")
-      (keyword (:ns-name context) prefix)
-      (if-let [aliased-ns-name (get-in context [:ns-aliases prefix])]
-        (keyword aliased-ns-name suffix)))))
+            [_ prefix suffix] (symbol-chars lexed-double-keyword-indicator)
+            [resolved-prefix suffix]
+              (with-product
+                (if (= suffix "")
+                  [(:ns-name context) prefix]
+                  [(get-in context [:ns-aliases prefix])
+                   suffix]))
+            _ (only-when resolved-prefix
+                (format "no namespace with alias '%s'" prefix))]
+    (keyword resolved-prefix suffix)))
 
 (def keyword-r
   (with-label "keyword" (alt ns-resolved-keyword normal-keyword)))
@@ -316,8 +321,9 @@
                     "a symbol character" "whitespace"}}))
     (is (match? form {} ":a/b" = :a/b))
     (is (match? form {:context (ClojureContext "user" {})} "::b" = :user/b))
-    (is (non-match? form {:position 4} "::z/a"
-          {:message #{"no namespace with alias 'z'"}}))
+    (is (non-match? form {:position 4} "::z/abc"
+          {:message #{"no namespace with alias 'z'"}
+           :label #{"the end of input" "a symbol character"}}))
     (is (match? form {} "clojure.core//" = 'clojure.core//))
     (is (match? form {} "\"a\\n\"" = "a\n"))
     (is (match? document {} "~@a ()" =
