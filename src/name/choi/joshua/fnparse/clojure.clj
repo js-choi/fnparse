@@ -2,6 +2,8 @@
   (:require [name.choi.joshua.fnparse.hound :as p]
             [clojure.template :as t] [clojure.set :as set]
             [clojure.contrib.seq-utils :as seq])
+  (:refer-clojure :rename {symbol make-symbol, keyword make-keyword}
+                  :exclude #{comment})
   (:import [clojure.lang IPersistentMap]))
 
 ; TODO
@@ -10,8 +12,8 @@
 ; Keyword-specific restrictions.
 ; Anonymous functions.
 
-(defn prefix-list-fn [prefix-r]
-  #(list prefix-r %))
+(defn prefix-list-fn [prefix-rule]
+  (fn [product] (list prefix-rule product)))
 
 (defn str* [chars]
   (apply str chars))
@@ -39,14 +41,14 @@
 
 (declare form)
 
-(def comment-r (p/conc (p/lit \;) (p/rep* (p/antilit \newline))))
+(def comment (p/conc (p/lit \;) (p/rep* (p/antilit \newline))))
 
-(def discarded-r (p/prefix (p/lex (p/mapconc "#_")) #'form))
+(def discarded-form (p/prefix (p/lex (p/mapconc "#_")) #'form))
 
 (def ws
   (p/label "whitespace"
     (p/rep+ (p/alt (p/term "a whitespace character" ws-set)
-               comment-r discarded-r))))
+               comment discarded-form))))
 
 (def opt-ws (p/opt ws))
 
@@ -78,7 +80,7 @@
   (p/prefix ns-separator
     (p/alt symbol-char-series (p/chook "/" ns-separator))))
 
-(def symbol-r
+(def symbol
   (p/label "symbol"
     (p/complex [first-char p/ascii-letter
               rest-pre-slash (p/opt symbol-char-series)
@@ -86,9 +88,9 @@
               _ symbol-end]
       (let [pre-slash (str first-char rest-pre-slash)]
         (if post-slash
-          (symbol pre-slash post-slash)
+          (make-symbol pre-slash post-slash)
           (or (peculiar-symbols pre-slash) ; In case it's true, false, or nil
-              (symbol pre-slash)))))))
+              (make-symbol pre-slash)))))))
 
 (def keyword-indicator (p/lit \:))
 
@@ -98,8 +100,8 @@
             post-slash (p/opt symbol-suffix)
             _ symbol-end]
     (if post-slash
-      (keyword pre-slash post-slash)
-      (keyword pre-slash))))
+      (make-keyword pre-slash post-slash)
+      (make-keyword pre-slash))))
 
 (p/defrm ns-resolved-keyword-end [pre-slash]
   (p/alt (p/complex [_ (p/followed-by ns-separator)
@@ -116,9 +118,9 @@
             pre-slash symbol-char-series
             [prefix suffix] (ns-resolved-keyword-end pre-slash)
             _ form-end]
-    (keyword prefix suffix)))
+    (make-keyword prefix suffix)))
 
-(def keyword-r
+(def keyword
   (p/label "keyword" (p/alt ns-resolved-keyword normal-keyword)))
 
 (p/defrm radix-natural-number [base]
@@ -250,7 +252,7 @@
     (p/circumfix (p/lit \() form-series (p/lit \)))))
 
 (def metadata-r
-  (p/alt map-r (p/hook (p/alt keyword-r symbol-r) #(hash-map :tag %))))
+  (p/alt map-r (p/hook (p/alt keyword symbol) #(hash-map :tag %))))
 
 (def with-meta-inner-r
   (p/prefix (padded-lit \^)
@@ -278,8 +280,8 @@
 
 (def form-content
   (p/alt list-r vector-r map-r dispatched-r string-r syntax-quoted-r
-       unquote-spliced-r unquoted-r deprecated-meta-r character-r keyword-r
-       symbol-r number-r))
+       unquote-spliced-r unquoted-r deprecated-meta-r character-r keyword
+       symbol number-r))
 
 (def form (p/label "a form" (p/prefix opt-ws form-content)))
 
