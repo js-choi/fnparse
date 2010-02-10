@@ -39,14 +39,14 @@
 
 (declare form)
 
-(def comment-r (p/conc (p/lit \;) (p/rep* (p/antilit \newline))))
+(def comment-form (p/conc (p/lit \;) (p/rep* (p/antilit \newline))))
 
 (def discarded-r (p/prefix (p/lex (p/mapconc "#_")) #'form))
 
 (def ws
   (p/label "whitespace"
     (p/rep+ (p/alt (p/term "a whitespace character" ws-set)
-               comment-r discarded-r))))
+               comment-form discarded-r))))
 
 (def opt-ws (p/opt ws))
 
@@ -78,7 +78,7 @@
   (p/prefix ns-separator
     (p/alt symbol-char-series (p/chook "/" ns-separator))))
 
-(def symbol-r
+(def symbol-form
   (p/label "symbol"
     (p/complex [first-char p/ascii-letter
               rest-pre-slash (p/opt symbol-char-series)
@@ -118,7 +118,7 @@
             _ form-end]
     (keyword prefix suffix)))
 
-(def keyword-r
+(def keyword-form
   (p/label "keyword" (p/alt ns-resolved-keyword normal-keyword)))
 
 (p/defrm radix-natural-number [base]
@@ -177,7 +177,7 @@
   (p/alt imprecise-number-tail fraction-denominator-tail
        (radix-coefficient-tail base) no-number-tail))
 
-(def number-r
+(def number
   (p/complex [sign (p/opt number-sign)
             prefix-number decimal-natural-number
             tail-fn (number-tail prefix-number)
@@ -195,7 +195,7 @@
   (p/alt (p/mapalt #(p/chook (key %) (p/mapconc (val %))) char-name-string)
        unicode-escape-sequence))
 
-(def character-r (p/prefix (p/lit \\) character-name))
+(def character (p/prefix (p/lit \\) character-name))
 
 (def escaped-char
   (p/prefix (p/lit \\)
@@ -207,7 +207,7 @@
 
 (def string-char (p/alt escaped-char (p/antilit \")))
 
-(def string-r
+(def string
   (p/hook #(->> % seq/flatten (apply str))
     (p/circumfix string-delimiter (p/rep* string-char) string-delimiter)))
 
@@ -219,9 +219,9 @@
               contents (p/opt form-series)
               _ (p/lit end-token)]
       (product-fn contents)))
-  list-r \( \) #(apply list %)
-  vector-r \[ \] vec
-  map-r \{ \} #(apply hash-map %)
+  list-form \( \) #(apply list %)
+  vector-form \[ \] vec
+  map-form \{ \} #(apply hash-map %)
   set-inner-r \{ \} set)
 
 (p/defrm padded-lit [token]
@@ -233,9 +233,9 @@
       (p/prefix (p/conc ((if prefix-is-rule? identity padded-lit) prefix) opt-ws)
                    #'form)))
   quoted-r \' `quote false
-  syntax-quoted-r \` `syntax-quote false
-  unquote-spliced-r (p/lex (p/mapconc "~@")) `unquote-splicing true
-  unquoted-r \~ `unquote false
+  syntax-quoted-form \` `syntax-quote false
+  unquote-spliced-form (p/lex (p/mapconc "~@")) `unquote-splicing true
+  unquoted-form \~ `unquote false
   derefed-r \@ `deref false
   var-inner-r \' `var false
   deprecated-meta-r \^ `meta false)
@@ -250,7 +250,7 @@
     (p/circumfix (p/lit \() form-series (p/lit \)))))
 
 (def metadata-r
-  (p/alt map-r (p/hook (p/alt keyword-r symbol-r) #(hash-map :tag %))))
+  (p/alt map-form (p/hook (p/alt keyword-form symbol-form) #(hash-map :tag %))))
 
 (def with-meta-inner-r
   (p/prefix (padded-lit \^)
@@ -272,14 +272,14 @@
     anonymous-fn-interior
     (p/lit \))))
 
-(def dispatched-r
+(def dispatched-form
   (p/prefix (p/lit \#)
     (p/alt anonymous-fn-r set-inner-r fn-inner-r var-inner-r with-meta-inner-r)))
 
 (def form-content
-  (p/alt list-r vector-r map-r dispatched-r string-r syntax-quoted-r
-       unquote-spliced-r unquoted-r deprecated-meta-r character-r keyword-r
-       symbol-r number-r))
+  (p/alt list-form vector-form map-form dispatched-form string
+         syntax-quoted-form unquote-spliced-form unquoted-form
+         deprecated-meta-r character keyword-form symbol-form number))
 
 (def form (p/label "a form" (p/prefix opt-ws form-content)))
 
