@@ -36,7 +36,7 @@
 (def ws-set (set " ,\t\n"))
 (def indicator-set (set ";()[]{}\\\"'@^`#"))
 (def comment-r (conc (lit \;) (rep* (antilit \newline))))
-(def discarded-r (prefix-conc (lex (mapconc "#_")) #'form))
+(def discarded-r (p/prefix (lex (mapconc "#_")) #'form))
 (def ws
   (with-label "whitespace"
     (rep+ (alt (term "a whitespace character" ws-set)
@@ -61,7 +61,7 @@
         "multiple slashes aren't allowed in symbols"))))
 
 (def symbol-suffix
-  (prefix-conc ns-separator
+  (p/prefix ns-separator
     (alt symbol-char-series (p/chook "/" ns-separator))))
 
 (def symbol-r
@@ -123,13 +123,13 @@
   (p/chook identity emptiness))
 
 (def imprecise-fractional-part
-  (prefix-conc (lit \.)
+  (p/prefix (lit \.)
     (alt (p/hook #(partial + %)
            (cascading-rep+ decimal-digit #(/ % 10) #(/ (+ %1 %2) 10)))
          no-number-tail)))
 
 (def exponential-part
-  (prefix-conc
+  (p/prefix
     (set-lit "exponent indicator" "eE")
       ; If I wasn't worrying about pure Clojure,
       ; use (case-insensitive-lit \e) above instead.
@@ -146,14 +146,14 @@
     (comp (if big-dec? bigdec double) tail-fn)))
 
 (def fraction-denominator-tail
-  (prefix-conc (lit \/)
+  (p/prefix (lit \/)
     (p/hook (fn [denominator] #(/ % denominator))
       (anti-validate decimal-natural-number zero?
         "a fraction's denominator cannot be zero"))))
 
 (defrm radix-coefficient-tail [base]
   (p/hook constantly
-    (prefix-conc
+    (p/prefix
       (set-lit "radix indicator" "rR")
         ; If I wasn't worrying about pure Clojure,
         ; use (case-insensitive-lit \r) above instead.
@@ -173,7 +173,7 @@
 (def string-delimiter (lit \"))
 
 (def unicode-escape-sequence
-  (prefix-conc (lit \u)
+  (p/prefix (lit \u)
     (p/hook (comp char reduce-hexadecimal-digits)
       (factor= 4 hexadecimal-digit))))
 
@@ -181,10 +181,10 @@
   (alt (mapalt #(p/chook (key %) (mapconc (val %))) char-name-string)
        unicode-escape-sequence))
 
-(def character-r (prefix-conc (lit \\) character-name))
+(def character-r (p/prefix (lit \\) character-name))
 
 (def escaped-char
-  (prefix-conc (lit \\)
+  (p/prefix (lit \\)
     (with-label "a valid escape sequence"
       (alt (template-alt [token character]
              (p/chook character (lit token))
@@ -195,9 +195,9 @@
 
 (def string-r
   (p/hook #(->> % flatten (apply str))
-    (circumfix-conc string-delimiter (rep* string-char) string-delimiter)))
+    (p/circumfix string-delimiter (rep* string-char) string-delimiter)))
 
-(def form-series (suffix-conc (rep* #'form) ws?))
+(def form-series (p/suffix (rep* #'form) ws?))
 
 (do-template [rule-name start-token end-token product-fn]
   (def rule-name
@@ -211,12 +211,12 @@
   set-inner-r \{ \} set)
 
 (defrm padded-lit [token]
-  (prefix-conc (lit token) ws?))
+  (p/prefix (lit token) ws?))
 
 (do-template [rule-name prefix product-fn-symbol prefix-is-rule?]
   (def rule-name
     (p/hook (prefix-list-fn product-fn-symbol)
-      (prefix-conc (conc ((if prefix-is-rule? identity padded-lit) prefix) ws?)
+      (p/prefix (conc ((if prefix-is-rule? identity padded-lit) prefix) ws?)
                    #'form)))
   quoted-r \' `quote false
   syntax-quoted-r \` `syntax-quote false
@@ -227,19 +227,19 @@
   deprecated-meta-r \^ `meta false)
 
 (def deprecated-meta-r
-  (suffix-conc deprecated-meta-r
+  (p/suffix deprecated-meta-r
     (effects println
       "WARNING: The ^ indicator is deprecated (since Clojure 1.1).")))
 
 (def fn-inner-r
   (p/hook (prefix-list-fn `mini-fn)
-    (circumfix-conc (lit \() form-series (lit \)))))
+    (p/circumfix (lit \() form-series (lit \)))))
 
 (def metadata-r
   (alt map-r (p/hook (alt keyword-r symbol-r) #(hash-map :tag %))))
 
 (def with-meta-inner-r
-  (prefix-conc (padded-lit \^)
+  (p/prefix (padded-lit \^)
     (complex [metadata metadata-r, _ ws?, content #'form]
       (list `with-meta content metadata))))
 
@@ -253,13 +253,13 @@
   nothing)
 
 (def anonymous-fn-r
-  (circumfix-conc
+  (p/circumfix
     (lit \()
     anonymous-fn-interior
     (lit \))))
 
 (def dispatched-r
-  (prefix-conc (lit \#)
+  (p/prefix (lit \#)
     (alt anonymous-fn-r set-inner-r fn-inner-r var-inner-r with-meta-inner-r)))
 
 (def form-content
@@ -267,10 +267,10 @@
        unquote-spliced-r unquoted-r deprecated-meta-r character-r keyword-r
        symbol-r number-r))
 
-(def form (with-label "a form" (prefix-conc ws? form-content)))
+(def form (with-label "a form" (p/prefix ws? form-content)))
 
 (def document
-  (suffix-conc form-series end-of-input))
+  (p/suffix form-series end-of-input))
 
 (use 'clojure.test 'name.choi.joshua.fnparse.hound.test)
 

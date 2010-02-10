@@ -257,24 +257,18 @@
   rep*/rep+/etc.-type rule will result in an
   infinite loop.")
 
-(defn prefix-conc
-  ([rule-0 rule-1 rule-2 & rest-rules]
-   (let [rest-rules (cons rule-2 rest-rules)
-         body (last rest-rules)
-         prefixes (concat [rule-0 rule-1] (drop-last rest-rules))]
-     (prefix-conc (apply conc prefixes) body)))
-  ([prefix body]
-   (complex [_ prefix, content body] content)))
+(defn prefix [prefix-rule body]
+   (complex [_ prefix-rule, content body] content))
 
-(defn suffix-conc [body suffix]
-  (complex [content body, _ suffix] content))
+(defn suffix [body suffix-rule]
+  (complex [content body, _ suffix-rule] content))
 
-(defn circumfix-conc [prefix body suffix]
-  (prefix-conc prefix (suffix-conc body suffix)))
+(defn circumfix [prefix-rule body suffix-rule]
+  (prefix prefix-rule (suffix body suffix-rule)))
 
 (defn separated-rep [separator element]
   (complex [first-element element
-            rest-elements (rep* (prefix-conc separator element))]
+            rest-elements (rep* (prefix separator element))]
     (cons first-element rest-elements)))
 
 (defmacro template-alt [argv expr & values]
