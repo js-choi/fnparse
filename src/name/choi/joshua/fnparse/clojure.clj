@@ -38,7 +38,7 @@
 (def comment-r (conc (lit \;) (rep* (antilit \newline))))
 (def discarded-r (p/prefix (lex (mapconc "#_")) #'form))
 (def ws
-  (with-label "whitespace"
+  (p/label "whitespace"
     (rep+ (alt (term "a whitespace character" ws-set)
                comment-r discarded-r))))
 (def ws? (opt ws))
@@ -49,7 +49,7 @@
 (def non-alphanumeric-symbol-char
   (set-lit "a non-alphanumeric symbol character" "*+!-_?."))
 (def symbol-char
-  (with-label "a symbol character"
+  (p/label "a symbol character"
     (alt ascii-alphanumeric non-alphanumeric-symbol-char)))
 (def symbol-char-series
   (p/hook str* (rep+ symbol-char)))
@@ -65,7 +65,7 @@
     (alt symbol-char-series (p/chook "/" ns-separator))))
 
 (def symbol-r
-  (with-label "symbol"
+  (p/label "symbol"
     (complex [first-char ascii-letter
               rest-pre-slash (opt symbol-char-series)
               post-slash (opt symbol-suffix)
@@ -105,7 +105,7 @@
     (keyword prefix suffix)))
 
 (def keyword-r
-  (with-label "keyword" (alt ns-resolved-keyword normal-keyword)))
+  (p/label "keyword" (alt ns-resolved-keyword normal-keyword)))
 
 (defrm radix-natural-number [base]
   (cascading-rep+ (radix-digit (if (<= base 36) base 36))
@@ -116,7 +116,7 @@
 
 (def number-sign
   (template-alt [label token product]
-    (with-label label (p/chook product (lit token)))
+    (p/label label (p/chook product (lit token)))
     "positive sign" \+ 1, "negative sign" \- -1))
 
 (def no-number-tail
@@ -185,7 +185,7 @@
 
 (def escaped-char
   (p/prefix (lit \\)
-    (with-label "a valid escape sequence"
+    (p/label "a valid escape sequence"
       (alt (template-alt [token character]
              (p/chook character (lit token))
              \t \tab, \n \newline, \\ \\, \" \")
@@ -267,7 +267,7 @@
        unquote-spliced-r unquoted-r deprecated-meta-r character-r keyword-r
        symbol-r number-r))
 
-(def form (with-label "a form" (p/prefix ws? form-content)))
+(def form (p/label "a form" (p/prefix ws? form-content)))
 
 (def document
   (p/suffix form-series end-of-input))

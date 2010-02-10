@@ -135,11 +135,11 @@
   [steps & product-expr]
   `(domonad parser-m ~steps ~@product-expr))
 
-(defn with-label [label rule]
+(defn label [label-string rule]
   (letfn [(assoc-label [result]
             (-> result force
               (assoc-in [:error :descriptors]
-                #{(c/ErrorDescriptor :label label)})
+                #{(c/ErrorDescriptor :label label-string)})
               delay))]
     (fn labelled-rule [state]
       (let [reply (c/apply-rule state rule)]
@@ -154,8 +154,8 @@
 (defn anti-validate [rule pred message]
   (validate rule (complement pred) message))
 
-(defn term [label predicate]
-  (with-label label
+(defn term [label-string predicate]
+  (label label-string
     (fn terminal-rule [state]
       (let [position (:position state)]
         (if-let [remainder (-> state :remainder seq)]
@@ -170,8 +170,8 @@
               (base-nothing state first-token nil)))
           (base-nothing state ::end-of-input nil))))))
 
-(defn antiterm [label pred]
-  (term label (complement pred)))
+(defn antiterm [label-string pred]
+  (term label-string (complement pred)))
 
 (defvar anything
   (term "anything" (constantly true)))
@@ -188,11 +188,11 @@
 (defn antilit [token]
   (term (str "anything except " token) #(not= token %)))
 
-(defn set-lit [label tokens]
-  (term label (set tokens)))
+(defn set-lit [label-string tokens]
+  (term label-string (set tokens)))
 
-(defn anti-set-lit [label tokens]
-  (antiterm label (tokens set)))
+(defn anti-set-lit [label-string tokens]
+  (antiterm label-string (tokens set)))
 
 (defn conc [& subrules]
   (with-monad parser-m
@@ -242,8 +242,8 @@
         ((with-product (:product result)) state)))))
 
 (defn not-followed-by
-  [label rule]
-  (with-label label
+  [label-string rule]
+  (label label-string
     (fn not-followed-by-rule [state]
       (let [result (-> state (c/apply-rule rule) :result force)]
         (if (c/failure? result)
@@ -258,7 +258,7 @@
   infinite loop.")
 
 (defn prefix [prefix-rule body]
-   (complex [_ prefix-rule, content body] content))
+  (complex [_ prefix-rule, content body] content))
 
 (defn suffix [body suffix-rule]
   (complex [content body, _ suffix-rule] content))
@@ -295,12 +295,12 @@
     a = b - c;
   The new rule's products would be b-product. If
   b fails or c succeeds, then nil is simply returned."
-  ([label minuend subtrahend]
-   (with-label label
+  ([label-string minuend subtrahend]
+   (label label-string
      (complex [_ (not-followed-by nil subtrahend), product minuend]
        product)))
-  ([label minuend first-subtrahend & rest-subtrahends]
-   (except label minuend
+  ([label-string minuend first-subtrahend & rest-subtrahends]
+   (except label-string minuend
      (apply alt (cons first-subtrahend rest-subtrahends)))))
 
 (defn annotate-error [rule message-fn]
@@ -328,12 +328,12 @@
 
 (defrm radix-digit
   ([base] (radix-digit (format "a base-%s digit" base) base))
-  ([label base]
+  ([label-string base]
    {:pre #{(integer? base) (> base 0)}}
    (->> base-36-digits (take base) indexed
      (mapalt (fn [[index token]]
                (chook index (case-insensitive-lit token))))
-     (with-label label))))
+     (label label-string))))
 
 (defvar decimal-digit
   (radix-digit "a decimal digit" 10))
@@ -348,11 +348,11 @@
   (set-lit "a lowercase ASCII letter" lowercase-ascii-alphabet))
 
 (defvar ascii-letter
-  (with-label "an ASCII letter"
+  (label "an ASCII letter"
     (alt uppercase-ascii-letter lowercase-ascii-letter)))
 
 (defvar ascii-alphanumeric
-  (with-label "an alphanumeric ASCII character"
+  (label "an alphanumeric ASCII character"
     (alt ascii-letter decimal-digit)))
 
 ; (def rule (complex [a anything, b anything] [a b]))
@@ -361,8 +361,8 @@
 ; (def rule (lit \3))
 ; (def rule (lex (mapconc "let 3")))
 ; (def rule (alt (lex (mapconc "let 3")) (mapconc "la")))
-; (def rule (lex (with-label "let expr" (mapconc "let 3"))))
-; (def rule (alt (lex (with-label "let expr" (mapconc "let 3")))
+; (def rule (lex (label "let expr" (mapconc "let 3"))))
+; (def rule (alt (lex (label "let expr" (mapconc "let 3")))
 ;                (lit \3)))
 ; (def rule emptiness)
 ; (def rule (rep* (antilit \3)))
