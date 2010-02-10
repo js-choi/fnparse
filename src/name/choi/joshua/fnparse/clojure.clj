@@ -1,7 +1,10 @@
 (ns name.choi.joshua.fnparse.clojure
   (:require [name.choi.joshua.fnparse.hound :as p]
-            [clojure.template :as t] [clojure.set :as set]
-            [clojure.contrib.seq-utils :as seq])
+            [clojure.template :as template] [clojure.set :as set]
+            [clojure.test :as test] [clojure.contrib.seq-utils :as seq]
+            name.choi.joshua.fnparse.hound.test)
+  (:use [clojure.test :only #{deftest is run-tests}])
+  (:refer-clojure :exclude #{for})
   (:import [clojure.lang IPersistentMap]))
 
 ; TODO
@@ -80,7 +83,7 @@
 
 (def symbol-form
   (p/label "symbol"
-    (p/complex [first-char p/ascii-letter
+    (p/for [first-char p/ascii-letter
               rest-pre-slash (p/opt symbol-char-series)
               post-slash (p/opt symbol-suffix)
               _ symbol-end]
@@ -93,7 +96,7 @@
 (def keyword-indicator (p/lit \:))
 
 (def normal-keyword
-  (p/complex [_ keyword-indicator
+  (p/for [_ keyword-indicator
             pre-slash (p/opt symbol-char-series)
             post-slash (p/opt symbol-suffix)
             _ symbol-end]
@@ -102,17 +105,17 @@
       (keyword pre-slash))))
 
 (p/defrm ns-resolved-keyword-end [pre-slash]
-  (p/alt (p/complex [_ (p/followed-by ns-separator)
+  (p/alt (p/for [_ (p/followed-by ns-separator)
                  context p/get-context
                  prefix (p/only-when (get-in context [:ns-aliases pre-slash])
                           (format "no namespace with alias '%s'" pre-slash))
                  suffix symbol-suffix]
          [prefix suffix])
-       (p/complex [context p/get-context]
+       (p/for [context p/get-context]
          [(:ns-name context) pre-slash])))
 
 (def ns-resolved-keyword
-  (p/complex [_ (p/lex (p/factor= 2 keyword-indicator))
+  (p/for [_ (p/lex (p/factor= 2 keyword-indicator))
             pre-slash symbol-char-series
             [prefix suffix] (ns-resolved-keyword-end pre-slash)
             _ form-end]
@@ -150,12 +153,12 @@
     (p/hook #(partial * (expt-int 10 %)) decimal-natural-number)))
 
 (def fractional-exponential-part
-  (p/complex [frac-fn imprecise-fractional-part
+  (p/for [frac-fn imprecise-fractional-part
             exp-fn (p/alt exponential-part no-number-tail)]
     (comp exp-fn frac-fn)))
 
 (def imprecise-number-tail
-  (p/complex [tail-fn (p/alt fractional-exponential-part exponential-part)
+  (p/for [tail-fn (p/alt fractional-exponential-part exponential-part)
             big-dec? (p/opt (p/lit \M))]
     (comp (if big-dec? bigdec double) tail-fn)))
 
@@ -178,7 +181,7 @@
        (radix-coefficient-tail base) no-number-tail))
 
 (def number
-  (p/complex [sign (p/opt number-sign)
+  (p/for [sign (p/opt number-sign)
             prefix-number decimal-natural-number
             tail-fn (number-tail prefix-number)
             _ form-end]
@@ -213,9 +216,9 @@
 
 (def form-series (p/suffix (p/rep* #'form) opt-ws))
 
-(t/do-template [rule-name start-token end-token product-fn]
+(template/do-template [rule-name start-token end-token product-fn]
   (def rule-name
-    (p/complex [_ (p/lit start-token)
+    (p/for [_ (p/lit start-token)
               contents (p/opt form-series)
               _ (p/lit end-token)]
       (product-fn contents)))
@@ -227,7 +230,7 @@
 (p/defrm padded-lit [token]
   (p/prefix (p/lit token) opt-ws))
 
-(t/do-template [rule-name prefix product-fn-symbol prefix-is-rule?]
+(template/do-template [rule-name prefix product-fn-symbol prefix-is-rule?]
   (def rule-name
     (p/hook (prefix-list-fn product-fn-symbol)
       (p/prefix (p/conc ((if prefix-is-rule? identity padded-lit) prefix) opt-ws)
@@ -254,13 +257,13 @@
 
 (def with-meta-inner-r
   (p/prefix (padded-lit \^)
-    (p/complex [metadata metadata-r, _ opt-ws, content #'form]
+    (p/for [metadata metadata-r, _ opt-ws, content #'form]
       (list `with-meta content metadata))))
 
 ; TODO Implement context
 
 (def anonymous-fn-parameter
-  (p/complex [_ (p/lit \%), number (p/opt decimal-natural-number)]
+  (p/for [_ (p/lit \%), number (p/opt decimal-natural-number)]
     (or number 1)))
 
 (def anonymous-fn-interior
@@ -285,8 +288,6 @@
 
 (def document
   (p/suffix form-series p/end-of-input))
-
-(use 'clojure.test 'name.choi.joshua.fnparse.hound.test)
 
 (deftest various-rules
   (let [form form]

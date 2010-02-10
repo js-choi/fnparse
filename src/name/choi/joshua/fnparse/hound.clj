@@ -2,6 +2,7 @@
   (:use clojure.contrib.seq-utils clojure.contrib.def clojure.test
         clojure.set clojure.contrib.monads clojure.template)
   (:require [name.choi.joshua.fnparse.common :as c])
+  (:refer-clojure :exclude #{for})
   (:import [clojure.lang Sequential IPersistentMap IPersistentVector Var]))
 
 (deftype State [remainder position context] :as this
@@ -109,8 +110,8 @@
    m-bind combine
    m-plus alt])
 
-(defmacro complex
-  "Creates a complex rule in monadic
+(defmacro for
+  "Creates a for rule in monadic
   form. It's a lot easier than it sounds.
   It's like a very useful combination of
   conc and semantics.
@@ -126,7 +127,7 @@
   is bound to its corresponding variable.
   After all subrules match, all of the
   variables can be used in the body.
-  The second argument of complex is a body
+  The second argument of for is a body
   that calculates the whole new rule's
   product, with access to any of the variables
   defined in the binding vector.
@@ -148,7 +149,7 @@
           reply)))))
 
 (defn validate [rule pred message]
-  (complex [product rule, _ (only-when (pred product) message)]
+  (for [product rule, _ (only-when (pred product) message)]
     product))
 
 (defn anti-validate [rule pred message]
@@ -177,10 +178,10 @@
   (term "anything" (constantly true)))
 
 (defn hook [semantic-hook subrule]
-  (complex [product subrule] (semantic-hook product)))
+  (for [product subrule] (semantic-hook product)))
 
 (defn chook [product subrule]
-  (complex [_ subrule] product))
+  (for [_ subrule] product))
 
 (defn lit [token]
   (term (format "'%s'" token) #(= token %)))
@@ -208,7 +209,7 @@
 
 (defn cascading-rep+ [rule unary-hook binary-hook]
   ; TODO: Rewrite to not blow up stack with many valid tokens
-  (complex [first-token rule
+  (for [first-token rule
             rest-tokens (opt (cascading-rep+ rule unary-hook binary-hook))]
     (if (nil? rest-tokens)
       (unary-hook first-token)
@@ -258,16 +259,16 @@
   infinite loop.")
 
 (defn prefix [prefix-rule body]
-  (complex [_ prefix-rule, content body] content))
+  (for [_ prefix-rule, content body] content))
 
 (defn suffix [body suffix-rule]
-  (complex [content body, _ suffix-rule] content))
+  (for [content body, _ suffix-rule] content))
 
 (defn circumfix [prefix-rule body suffix-rule]
   (prefix prefix-rule (suffix body suffix-rule)))
 
 (defn separated-rep [separator element]
-  (complex [first-element element
+  (for [first-element element
             rest-elements (rep* (prefix separator element))]
     (cons first-element rest-elements)))
 
@@ -297,7 +298,7 @@
   b fails or c succeeds, then nil is simply returned."
   ([label-string minuend subtrahend]
    (label label-string
-     (complex [_ (not-followed-by nil subtrahend), product minuend]
+     (for [_ (not-followed-by nil subtrahend), product minuend]
        product)))
   ([label-string minuend first-subtrahend & rest-subtrahends]
    (except label-string minuend
@@ -355,7 +356,7 @@
   (label "an alphanumeric ASCII character"
     (alt ascii-letter decimal-digit)))
 
-; (def rule (complex [a anything, b anything] [a b]))
+; (def rule (for [a anything, b anything] [a b]))
 ; (def rule (validate anything (partial = 'a)))
 ; (def rule (mapconc '[a b]))
 ; (def rule (lit \3))
