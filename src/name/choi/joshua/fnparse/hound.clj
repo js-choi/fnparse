@@ -2,7 +2,7 @@
   (:use clojure.contrib.seq-utils clojure.contrib.def clojure.test
         clojure.set clojure.contrib.monads clojure.template)
   (:require [name.choi.joshua.fnparse.common :as c])
-  (:refer-clojure :exclude #{for})
+  (:refer-clojure :exclude #{for +})
   (:import [clojure.lang Sequential IPersistentMap IPersistentVector Var]))
 
 (deftype State [remainder position context] :as this
@@ -88,7 +88,7 @@
                         (c/merge-parse-errors first-error next-error))))))
               (Reply false first-result))))))))
 
-(defn alt [& rules]
+(defn + [& rules]
   (fn summed-rule [state]
     (let [[consuming-replies empty-replies]
             (->> rules
@@ -108,7 +108,7 @@
   [m-zero nothing
    m-result with-product
    m-bind combine
-   m-plus alt])
+   m-plus +])
 
 (defmacro for
   "Creates a for rule in monadic
@@ -200,7 +200,7 @@
     (m-seq subrules)))
 
 (defn opt [rule]
-  (alt rule emptiness))
+  (+ rule emptiness))
 
 (defn lex [subrule]
   (fn [state]
@@ -230,7 +230,7 @@
   (apply conc (map lit tokens)))
 
 (defn mapalt [f coll]
-  (apply alt (map f coll)))
+  (apply + (map f coll)))
 
 (defn optconc [& rules]
   (opt (apply conc rules)))
@@ -274,12 +274,12 @@
 
 (defmacro template-alt [argv expr & values]
   (let [c (count argv)]
-    `(alt ~@(map (fn [a] (apply-template argv expr a)) 
-              (partition c values)))))
+   `(+ ~@(map (fn [a] (apply-template argv expr a))
+           (partition c values)))))
 
 (defn case-insensitive-lit [#^Character token]
-  (alt (lit (Character/toLowerCase token))
-       (lit (Character/toUpperCase token))))
+  (+ (lit (Character/toLowerCase token))
+     (lit (Character/toUpperCase token))))
 
 (defn effects [f & args]
   (fn effects-rule [state]
@@ -302,7 +302,7 @@
        product)))
   ([label-string minuend first-subtrahend & rest-subtrahends]
    (except label-string minuend
-     (apply alt (cons first-subtrahend rest-subtrahends)))))
+     (apply + (cons first-subtrahend rest-subtrahends)))))
 
 (defn annotate-error [rule message-fn]
   (letfn [(annotate [result]
@@ -350,20 +350,20 @@
 
 (defvar ascii-letter
   (label "an ASCII letter"
-    (alt uppercase-ascii-letter lowercase-ascii-letter)))
+    (+ uppercase-ascii-letter lowercase-ascii-letter)))
 
 (defvar ascii-alphanumeric
   (label "an alphanumeric ASCII character"
-    (alt ascii-letter decimal-digit)))
+    (+ ascii-letter decimal-digit)))
 
 ; (def rule (for [a anything, b anything] [a b]))
 ; (def rule (validate anything (partial = 'a)))
 ; (def rule (mapconc '[a b]))
 ; (def rule (lit \3))
 ; (def rule (lex (mapconc "let 3")))
-; (def rule (alt (lex (mapconc "let 3")) (mapconc "la")))
+; (def rule (+ (lex (mapconc "let 3")) (mapconc "la")))
 ; (def rule (lex (label "let expr" (mapconc "let 3"))))
-; (def rule (alt (lex (label "let expr" (mapconc "let 3")))
+; (def rule (+ (lex (label "let expr" (mapconc "let 3")))
 ;                (lit \3)))
 ; (def rule emptiness)
 ; (def rule (rep* (antilit \3)))

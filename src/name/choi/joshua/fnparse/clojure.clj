@@ -48,16 +48,16 @@
 
 (def ws
   (p/label "whitespace"
-    (p/rep+ (p/alt (p/term "a whitespace character" ws-set)
+    (p/rep+ (p/+ (p/term "a whitespace character" ws-set)
                comment-form discarded-form))))
 
 (def opt-ws (p/opt ws))
 
 (def indicator (p/term "an indicator" indicator-set))
 
-(def separator (p/alt ws indicator))
+(def separator (p/+ ws indicator))
 
-(def form-end (p/alt (p/followed-by separator) p/end-of-input))
+(def form-end (p/+ (p/followed-by separator) p/end-of-input))
 
 (def ns-separator (p/lit \/))
 
@@ -66,7 +66,7 @@
 
 (def symbol-char
   (p/label "a symbol character"
-    (p/alt p/ascii-alphanumeric non-alphanumeric-symbol-char)))
+    (p/+ p/ascii-alphanumeric non-alphanumeric-symbol-char)))
 
 (def symbol-char-series
   (p/hook str* (p/rep+ symbol-char)))
@@ -79,7 +79,7 @@
 
 (def symbol-suffix
   (p/prefix ns-separator
-    (p/alt symbol-char-series (p/chook "/" ns-separator))))
+    (p/+ symbol-char-series (p/chook "/" ns-separator))))
 
 (def symbol-form
   (p/label "symbol"
@@ -105,7 +105,7 @@
       (keyword pre-slash))))
 
 (p/defrm ns-resolved-keyword-end [pre-slash]
-  (p/alt (p/for [_ (p/followed-by ns-separator)
+  (p/+ (p/for [_ (p/followed-by ns-separator)
                  context p/get-context
                  prefix (p/only-when (get-in context [:ns-aliases pre-slash])
                           (format "no namespace with alias '%s'" pre-slash))
@@ -122,7 +122,7 @@
     (keyword prefix suffix)))
 
 (def keyword-form
-  (p/label "keyword" (p/alt ns-resolved-keyword normal-keyword)))
+  (p/label "keyword" (p/+ ns-resolved-keyword normal-keyword)))
 
 (p/defrm radix-natural-number [base]
   (p/cascading-rep+ (p/radix-digit (if (<= base 36) base 36))
@@ -141,7 +141,7 @@
 
 (def imprecise-fractional-part
   (p/prefix (p/lit \.)
-    (p/alt (p/hook #(partial + %)
+    (p/+ (p/hook #(partial + %)
            (p/cascading-rep+ p/decimal-digit #(/ % 10) #(/ (+ %1 %2) 10)))
          no-number-tail)))
 
@@ -154,11 +154,11 @@
 
 (def fractional-exponential-part
   (p/for [frac-fn imprecise-fractional-part
-            exp-fn (p/alt exponential-part no-number-tail)]
+            exp-fn (p/+ exponential-part no-number-tail)]
     (comp exp-fn frac-fn)))
 
 (def imprecise-number-tail
-  (p/for [tail-fn (p/alt fractional-exponential-part exponential-part)
+  (p/for [tail-fn (p/+ fractional-exponential-part exponential-part)
             big-dec? (p/opt (p/lit \M))]
     (comp (if big-dec? bigdec double) tail-fn)))
 
@@ -177,7 +177,7 @@
       (radix-natural-number base))))
 
 (p/defrm number-tail [base]
-  (p/alt imprecise-number-tail fraction-denominator-tail
+  (p/+ imprecise-number-tail fraction-denominator-tail
        (radix-coefficient-tail base) no-number-tail))
 
 (def number
@@ -195,7 +195,7 @@
       (p/factor= 4 p/hexadecimal-digit))))
 
 (def character-name
-  (p/alt (p/mapalt #(p/chook (key %) (p/mapconc (val %))) char-name-string)
+  (p/+ (p/mapalt #(p/chook (key %) (p/mapconc (val %))) char-name-string)
        unicode-escape-sequence))
 
 (def character (p/prefix (p/lit \\) character-name))
@@ -203,12 +203,12 @@
 (def escaped-char
   (p/prefix (p/lit \\)
     (p/label "a valid escape sequence"
-      (p/alt (p/template-alt [token character]
+      (p/+ (p/template-alt [token character]
              (p/chook character (p/lit token))
              \t \tab, \n \newline, \\ \\, \" \")
            unicode-escape-sequence))))
 
-(def string-char (p/alt escaped-char (p/antilit \")))
+(def string-char (p/+ escaped-char (p/antilit \")))
 
 (def string
   (p/hook #(->> % seq/flatten (apply str))
@@ -253,7 +253,7 @@
     (p/circumfix (p/lit \() form-series (p/lit \)))))
 
 (def metadata-r
-  (p/alt map-form (p/hook (p/alt keyword-form symbol-form) #(hash-map :tag %))))
+  (p/+ map-form (p/hook (p/+ keyword-form symbol-form) #(hash-map :tag %))))
 
 (def with-meta-inner-r
   (p/prefix (padded-lit \^)
@@ -277,10 +277,10 @@
 
 (def dispatched-form
   (p/prefix (p/lit \#)
-    (p/alt anonymous-fn-r set-inner-r fn-inner-r var-inner-r with-meta-inner-r)))
+    (p/+ anonymous-fn-r set-inner-r fn-inner-r var-inner-r with-meta-inner-r)))
 
 (def form-content
-  (p/alt list-form vector-form map-form dispatched-form string
+  (p/+ list-form vector-form map-form dispatched-form string
          syntax-quoted-form unquote-spliced-form unquoted-form
          deprecated-meta-r character keyword-form symbol-form number))
 
