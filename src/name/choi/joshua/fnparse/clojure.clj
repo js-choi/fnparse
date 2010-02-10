@@ -44,12 +44,12 @@
 
 (def comment-form (p/conc (p/lit \;) (p/rep* (p/antilit \newline))))
 
-(def discarded-r (p/prefix (p/lex (p/mapconc "#_")) #'form))
+(def discarded-form (p/prefix (p/lex (p/mapconc "#_")) #'form))
 
 (def ws
   (p/label "whitespace"
     (p/rep+ (p/alt (p/term "a whitespace character" ws-set)
-               comment-form discarded-r))))
+               comment-form discarded-form))))
 
 (def opt-ws (p/opt ws))
 
