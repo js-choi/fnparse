@@ -42,14 +42,14 @@
 
 (declare form)
 
-(def comment-form (p/cat (p/lit \;) (p/rep* (p/antilit \newline))))
+(def _comment (p/cat (p/lit \;) (p/rep* (p/antilit \newline))))
 
-(def discarded-form (p/prefix (p/lex (p/mapcat "#_")) #'form))
+(def _discarded (p/prefix (p/lex (p/mapcat "#_")) #'form))
 
 (def ws
   (p/label "whitespace"
     (p/rep+ (p/+ (p/term "a whitespace character" ws-set)
-                 comment-form discarded-form))))
+                 _comment _discarded))))
 
 (def opt-ws (p/opt ws))
 
@@ -242,10 +242,10 @@
   unquoted-form \~ `unquote false
   derefed-r \@ `deref false
   var-inner-r \' `var false
-  deprecated-meta-r \^ `meta false)
+  deprecated-meta-form \^ `meta false)
 
-(def deprecated-meta-r
-  (p/suffix deprecated-meta-r
+(def deprecated-meta-form
+  (p/suffix deprecated-meta-form
     (p/effects println
       "WARNING: The ^ indicator is deprecated (since Clojure 1.1).")))
 
@@ -284,7 +284,7 @@
 (def form-content
   (p/+ list-form vector-form map-form dispatched-form string
        syntax-quoted-form unquote-spliced-form unquoted-form
-       deprecated-meta-r character keyword-form symbol-form number))
+       deprecated-meta-form character keyword-form symbol-form number))
 
 (def form (p/label "a form" (p/prefix opt-ws form-content)))
 
