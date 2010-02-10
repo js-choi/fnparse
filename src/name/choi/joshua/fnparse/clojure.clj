@@ -62,7 +62,7 @@
 
 (def symbol-suffix
   (prefix-conc ns-separator
-    (alt symbol-char-series (constant-semantics ns-separator "/"))))
+    (alt symbol-char-series (p/chook "/" ns-separator))))
 
 (def symbol-r
   (with-label "symbol"
@@ -116,11 +116,11 @@
 
 (def number-sign
   (template-alt [label token product]
-    (with-label label (constant-semantics (lit token) product))
+    (with-label label (p/chook product (lit token)))
     "positive sign" \+ 1, "negative sign" \- -1))
 
 (def no-number-tail
-  (constant-semantics emptiness identity))
+  (p/chook identity emptiness))
 
 (def imprecise-fractional-part
   (prefix-conc (lit \.)
@@ -178,8 +178,7 @@
       (factor= 4 hexadecimal-digit))))
 
 (def character-name
-  (alt (mapalt #(constant-semantics (mapconc (val %)) (key %))
-         char-name-string)
+  (alt (mapalt #(p/chook (key %) (mapconc (val %))) char-name-string)
        unicode-escape-sequence))
 
 (def character-r (prefix-conc (lit \\) character-name))
@@ -188,7 +187,7 @@
   (prefix-conc (lit \\)
     (with-label "a valid escape sequence"
       (alt (template-alt [token character]
-             (constant-semantics (lit token) character)
+             (p/chook character (lit token))
              \t \tab, \n \newline, \\ \\, \" \")
            unicode-escape-sequence))))
 

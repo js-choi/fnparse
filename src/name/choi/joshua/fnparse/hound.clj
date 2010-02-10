@@ -179,7 +179,7 @@
 (defn hook [semantic-hook subrule]
   (complex [product subrule] (semantic-hook product)))
 
-(defn constant-semantics [subrule product]
+(defn chook [product subrule]
   (complex [_ subrule] product))
 
 (defn lit [token]
@@ -338,7 +338,7 @@
    {:pre #{(integer? base) (> base 0)}}
    (->> base-36-digits (take base) indexed
      (mapalt (fn [[index token]]
-               (constant-semantics (case-insensitive-lit token) index)))
+               (chook index (case-insensitive-lit token))))
      (with-label label))))
 
 (defvar decimal-digit
