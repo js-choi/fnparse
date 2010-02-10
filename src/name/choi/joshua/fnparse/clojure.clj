@@ -31,26 +31,40 @@
 
 (def peculiar-symbols {"nil" nil, "true" true, "false" false})
 
+;;; RULES START HERE.
+
 (declare form)
 
 (def ws-set (set " ,\t\n"))
+
 (def indicator-set (set ";()[]{}\\\"'@^`#"))
+
 (def comment-r (conc (lit \;) (rep* (antilit \newline))))
+
 (def discarded-r (p/prefix (lex (mapconc "#_")) #'form))
+
 (def ws
   (p/label "whitespace"
     (rep+ (alt (term "a whitespace character" ws-set)
                comment-r discarded-r))))
-(def ws? (opt ws))
+
+(def opt-ws (p/opt ws))
+
 (def indicator (term "an indicator" indicator-set))
+
 (def separator (alt ws indicator))
+
 (def form-end (alt (followed-by separator) end-of-input))
+
 (def ns-separator (lit \/))
+
 (def non-alphanumeric-symbol-char
   (set-lit "a non-alphanumeric symbol character" "*+!-_?."))
+
 (def symbol-char
   (p/label "a symbol character"
     (alt ascii-alphanumeric non-alphanumeric-symbol-char)))
+
 (def symbol-char-series
   (p/hook str* (rep+ symbol-char)))
 
@@ -67,8 +81,8 @@
 (def symbol-r
   (p/label "symbol"
     (complex [first-char ascii-letter
-              rest-pre-slash (opt symbol-char-series)
-              post-slash (opt symbol-suffix)
+              rest-pre-slash (p/opt symbol-char-series)
+              post-slash (p/opt symbol-suffix)
               _ symbol-end]
       (let [pre-slash (str first-char rest-pre-slash)]
         (if post-slash
@@ -80,8 +94,8 @@
 
 (def normal-keyword
   (complex [_ keyword-indicator
-            pre-slash (opt symbol-char-series)
-            post-slash (opt symbol-suffix)
+            pre-slash (p/opt symbol-char-series)
+            post-slash (p/opt symbol-suffix)
             _ symbol-end]
     (if post-slash
       (keyword pre-slash post-slash)
@@ -142,7 +156,7 @@
 
 (def imprecise-number-tail
   (complex [tail-fn (alt fractional-exponential-part exponential-part)
-            big-dec? (opt (lit \M))]
+            big-dec? (p/opt (lit \M))]
     (comp (if big-dec? bigdec double) tail-fn)))
 
 (def fraction-denominator-tail
@@ -164,7 +178,7 @@
        (radix-coefficient-tail base) no-number-tail))
 
 (def number-r
-  (complex [sign (opt number-sign)
+  (complex [sign (p/opt number-sign)
             prefix-number decimal-natural-number
             tail-fn (number-tail prefix-number)
             _ form-end]
@@ -197,12 +211,12 @@
   (p/hook #(->> % flatten (apply str))
     (p/circumfix string-delimiter (rep* string-char) string-delimiter)))
 
-(def form-series (p/suffix (rep* #'form) ws?))
+(def form-series (p/suffix (rep* #'form) opt-ws))
 
 (do-template [rule-name start-token end-token product-fn]
   (def rule-name
     (complex [_ (lit start-token)
-              contents (opt form-series)
+              contents (p/opt form-series)
               _ (lit end-token)]
       (product-fn contents)))
   list-r \( \) #(apply list %)
@@ -211,12 +225,12 @@
   set-inner-r \{ \} set)
 
 (defrm padded-lit [token]
-  (p/prefix (lit token) ws?))
+  (p/prefix (lit token) opt-ws))
 
 (do-template [rule-name prefix product-fn-symbol prefix-is-rule?]
   (def rule-name
     (p/hook (prefix-list-fn product-fn-symbol)
-      (p/prefix (conc ((if prefix-is-rule? identity padded-lit) prefix) ws?)
+      (p/prefix (conc ((if prefix-is-rule? identity padded-lit) prefix) opt-ws)
                    #'form)))
   quoted-r \' `quote false
   syntax-quoted-r \` `syntax-quote false
@@ -240,13 +254,13 @@
 
 (def with-meta-inner-r
   (p/prefix (padded-lit \^)
-    (complex [metadata metadata-r, _ ws?, content #'form]
+    (complex [metadata metadata-r, _ opt-ws, content #'form]
       (list `with-meta content metadata))))
 
 ; TODO Implement context
 
 (defvar anonymous-fn-parameter
-  (complex [_ (lit \%), number (opt decimal-natural-number)]
+  (complex [_ (lit \%), number (p/opt decimal-natural-number)]
     (or number 1)))
 
 (defvar anonymous-fn-interior
@@ -267,7 +281,7 @@
        unquote-spliced-r unquoted-r deprecated-meta-r character-r keyword-r
        symbol-r number-r))
 
-(def form (p/label "a form" (p/prefix ws? form-content)))
+(def form (p/label "a form" (p/prefix opt-ws form-content)))
 
 (def document
   (p/suffix form-series end-of-input))
