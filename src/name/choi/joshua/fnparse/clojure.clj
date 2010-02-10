@@ -49,7 +49,7 @@
 (def ws
   (p/label "whitespace"
     (p/rep+ (p/+ (p/term "a whitespace character" ws-set)
-               comment-form discarded-form))))
+                 comment-form discarded-form))))
 
 (def opt-ws (p/opt ws))
 
@@ -84,9 +84,9 @@
 (def symbol-form
   (p/label "symbol"
     (p/for [first-char p/ascii-letter
-              rest-pre-slash (p/opt symbol-char-series)
-              post-slash (p/opt symbol-suffix)
-              _ symbol-end]
+            rest-pre-slash (p/opt symbol-char-series)
+            post-slash (p/opt symbol-suffix)
+            _ symbol-end]
       (let [pre-slash (str first-char rest-pre-slash)]
         (if post-slash
           (symbol pre-slash post-slash)
@@ -97,28 +97,28 @@
 
 (def normal-keyword
   (p/for [_ keyword-indicator
-            pre-slash (p/opt symbol-char-series)
-            post-slash (p/opt symbol-suffix)
-            _ symbol-end]
+          pre-slash (p/opt symbol-char-series)
+          post-slash (p/opt symbol-suffix)
+          _ symbol-end]
     (if post-slash
       (keyword pre-slash post-slash)
       (keyword pre-slash))))
 
 (p/defrm ns-resolved-keyword-end [pre-slash]
   (p/+ (p/for [_ (p/followed-by ns-separator)
-                 context p/get-context
-                 prefix (p/only-when (get-in context [:ns-aliases pre-slash])
-                          (format "no namespace with alias '%s'" pre-slash))
-                 suffix symbol-suffix]
+               context p/get-context
+               prefix (p/only-when (get-in context [:ns-aliases pre-slash])
+                        (format "no namespace with alias '%s'" pre-slash))
+               suffix symbol-suffix]
          [prefix suffix])
        (p/for [context p/get-context]
          [(:ns-name context) pre-slash])))
 
 (def ns-resolved-keyword
   (p/for [_ (p/lex (p/factor= 2 keyword-indicator))
-            pre-slash symbol-char-series
-            [prefix suffix] (ns-resolved-keyword-end pre-slash)
-            _ form-end]
+          pre-slash symbol-char-series
+          [prefix suffix] (ns-resolved-keyword-end pre-slash)
+          _ form-end]
     (keyword prefix suffix)))
 
 (def keyword-form
@@ -140,7 +140,8 @@
   (p/chook identity p/emptiness))
 
 (def imprecise-fractional-part
-  (p/prefix (p/lit \.)
+  (p/prefix
+    (p/lit \.)
     (p/+ (p/hook #(partial + %)
            (p/cascading-rep+ p/decimal-digit #(/ % 10) #(/ (+ %1 %2) 10)))
          no-number-tail)))
@@ -154,12 +155,12 @@
 
 (def fractional-exponential-part
   (p/for [frac-fn imprecise-fractional-part
-            exp-fn (p/+ exponential-part no-number-tail)]
+          exp-fn (p/+ exponential-part no-number-tail)]
     (comp exp-fn frac-fn)))
 
 (def imprecise-number-tail
   (p/for [tail-fn (p/+ fractional-exponential-part exponential-part)
-            big-dec? (p/opt (p/lit \M))]
+          big-dec? (p/opt (p/lit \M))]
     (comp (if big-dec? bigdec double) tail-fn)))
 
 (def fraction-denominator-tail
@@ -182,9 +183,9 @@
 
 (def number
   (p/for [sign (p/opt number-sign)
-            prefix-number decimal-natural-number
-            tail-fn (number-tail prefix-number)
-            _ form-end]
+          prefix-number decimal-natural-number
+          tail-fn (number-tail prefix-number)
+          _ form-end]
     (tail-fn (* (or sign 1) prefix-number))))
 
 (def string-delimiter (p/lit \"))
@@ -219,8 +220,8 @@
 (template/do-template [rule-name start-token end-token product-fn]
   (def rule-name
     (p/for [_ (p/lit start-token)
-              contents (p/opt form-series)
-              _ (p/lit end-token)]
+            contents (p/opt form-series)
+            _ (p/lit end-token)]
       (product-fn contents)))
   list-form \( \) #(apply list %)
   vector-form \[ \] vec
@@ -234,7 +235,7 @@
   (def rule-name
     (p/hook (prefix-list-fn product-fn-symbol)
       (p/prefix (p/cat ((if prefix-is-rule? identity padded-lit) prefix) opt-ws)
-                   #'form)))
+                #'form)))
   quoted-r \' `quote false
   syntax-quoted-form \` `syntax-quote false
   unquote-spliced-form (p/lex (p/mapcat "~@")) `unquote-splicing true
@@ -253,7 +254,7 @@
     (p/circumfix (p/lit \() form-series (p/lit \)))))
 
 (def metadata-r
-  (p/+ map-form (p/hook (p/+ keyword-form symbol-form) #(hash-map :tag %))))
+  (p/+ map-form (p/hook #(hash-map :tag %) (p/+ keyword-form symbol-form))))
 
 (def with-meta-inner-r
   (p/prefix (padded-lit \^)
@@ -276,13 +277,14 @@
     (p/lit \))))
 
 (def dispatched-form
-  (p/prefix (p/lit \#)
+  (p/prefix
+    (p/lit \#)
     (p/+ anonymous-fn-r set-inner-r fn-inner-r var-inner-r with-meta-inner-r)))
 
 (def form-content
   (p/+ list-form vector-form map-form dispatched-form string
-         syntax-quoted-form unquote-spliced-form unquoted-form
-         deprecated-meta-r character keyword-form symbol-form number))
+       syntax-quoted-form unquote-spliced-form unquoted-form
+       deprecated-meta-r character keyword-form symbol-form number))
 
 (def form (p/label "a form" (p/prefix opt-ws form-content)))
 
