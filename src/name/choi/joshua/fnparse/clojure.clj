@@ -42,9 +42,9 @@
 
 (declare form)
 
-(def comment-form (p/conc (p/lit \;) (p/rep* (p/antilit \newline))))
+(def comment-form (p/cat (p/lit \;) (p/rep* (p/antilit \newline))))
 
-(def discarded-form (p/prefix (p/lex (p/mapconc "#_")) #'form))
+(def discarded-form (p/prefix (p/lex (p/mapcat "#_")) #'form))
 
 (def ws
   (p/label "whitespace"
@@ -195,7 +195,7 @@
       (p/factor= 4 p/hexadecimal-digit))))
 
 (def character-name
-  (p/+ (p/mapalt #(p/chook (key %) (p/mapconc (val %))) char-name-string)
+  (p/+ (p/mapalt #(p/chook (key %) (p/mapcat (val %))) char-name-string)
        unicode-escape-sequence))
 
 (def character (p/prefix (p/lit \\) character-name))
@@ -233,11 +233,11 @@
 (template/do-template [rule-name prefix product-fn-symbol prefix-is-rule?]
   (def rule-name
     (p/hook (prefix-list-fn product-fn-symbol)
-      (p/prefix (p/conc ((if prefix-is-rule? identity padded-lit) prefix) opt-ws)
+      (p/prefix (p/cat ((if prefix-is-rule? identity padded-lit) prefix) opt-ws)
                    #'form)))
   quoted-r \' `quote false
   syntax-quoted-form \` `syntax-quote false
-  unquote-spliced-form (p/lex (p/mapconc "~@")) `unquote-splicing true
+  unquote-spliced-form (p/lex (p/mapcat "~@")) `unquote-splicing true
   unquoted-form \~ `unquote false
   derefed-r \@ `deref false
   var-inner-r \' `var false

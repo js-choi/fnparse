@@ -2,7 +2,7 @@
   (:use clojure.contrib.seq-utils clojure.contrib.def clojure.test
         clojure.set clojure.contrib.monads clojure.template)
   (:require [name.choi.joshua.fnparse.common :as c])
-  (:refer-clojure :exclude #{for +})
+  (:refer-clojure :exclude #{for + mapcat})
   (:import [clojure.lang Sequential IPersistentMap IPersistentVector Var]))
 
 (deftype State [remainder position context] :as this
@@ -114,14 +114,14 @@
   "Creates a for rule in monadic
   form. It's a lot easier than it sounds.
   It's like a very useful combination of
-  conc and semantics.
+  cat and semantics.
   The first argument is a vector
   containing binding forms à la the let and for
   forms. The keys are new, lexically scoped
   variables. Their corresponding vals
   are subrules. Each of these subrules are
   sequentially called as if they were
-  concatinated together with conc. If any of
+  concatinated together with cat. If any of
   them fails, the whole rule immediately fails.
   Meanwhile, each sequential subrule's product
   is bound to its corresponding variable.
@@ -195,7 +195,7 @@
 (defn anti-set-lit [label-string tokens]
   (antiterm label-string (tokens set)))
 
-(defn conc [& subrules]
+(defn cat [& subrules]
   (with-monad parser-m
     (m-seq subrules)))
 
@@ -226,14 +226,14 @@
 (defn rep* [rule]
   (opt (rep+ rule)))
 
-(defn mapconc [tokens]
-  (apply conc (map lit tokens)))
+(defn mapcat [tokens]
+  (apply cat (map lit tokens)))
 
 (defn mapalt [f coll]
   (apply + (map f coll)))
 
-(defn optconc [& rules]
-  (opt (apply conc rules)))
+(defn optcat [& rules]
+  (opt (apply cat rules)))
 
 (defn followed-by [rule]
   (fn [state]
@@ -317,7 +317,7 @@
         (update-in reply [:result] annotate)))))
 
 (defn factor= [n rule]
-  (->> rule (replicate n) (apply conc)))
+  (->> rule (replicate n) (apply cat)))
 
 (defn get-context [state]
   (c/apply-rule state (with-product (:context state))))
@@ -358,16 +358,16 @@
 
 ; (def rule (for [a anything, b anything] [a b]))
 ; (def rule (validate anything (partial = 'a)))
-; (def rule (mapconc '[a b]))
+; (def rule (mapcat '[a b]))
 ; (def rule (lit \3))
-; (def rule (lex (mapconc "let 3")))
-; (def rule (+ (lex (mapconc "let 3")) (mapconc "la")))
-; (def rule (lex (label "let expr" (mapconc "let 3"))))
-; (def rule (+ (lex (label "let expr" (mapconc "let 3")))
+; (def rule (lex (mapcat "let 3")))
+; (def rule (+ (lex (mapcat "let 3")) (mapcat "la")))
+; (def rule (lex (label "let expr" (mapcat "let 3"))))
+; (def rule (+ (lex (label "let expr" (mapcat "let 3")))
 ;                (lit \3)))
 ; (def rule emptiness)
 ; (def rule (rep* (antilit \3)))
 ; (def rule (rep* decimal-digit))
-; (def rule (followed-by (mapconc "li")))
+; (def rule (followed-by (mapcat "li")))
 
 ; (-> "lit 3" make-state rule println)
