@@ -1,7 +1,7 @@
 (ns name.choi.joshua.fnparse.clojure
-  (:use clojure.set clojure.template
-        clojure.contrib.def clojure.contrib.seq-utils)
-  (:require [name.choi.joshua.fnparse.hound :as p])
+  (:require [name.choi.joshua.fnparse.hound :as p]
+            [clojure.template :as t] [clojure.set :as set]
+            [clojure.contrib.seq-utils :as seq])
   (:import [clojure.lang IPersistentMap]))
 
 ; TODO
@@ -20,9 +20,9 @@
   (loop [n pow, y 1, z base]
     (let [t (bit-and n 1), n (bit-shift-right n 1)]
       (cond
-       (zero? t) (recur n y (* z z))
-       (zero? n) (* z y)
-       :else (recur n (* z y) (* z z))))))
+        (zero? t) (recur n y (* z z))
+        (zero? n) (* z y)
+        :else (recur n (* z y) (* z z))))))
 
 (defn reduce-hexadecimal-digits [digits]
   (reduce #(+ (* 16 %1) %2) digits))
@@ -31,13 +31,13 @@
 
 (def peculiar-symbols {"nil" nil, "true" true, "false" false})
 
-;;; RULES START HERE.
-
-(declare form)
-
 (def ws-set (set " ,\t\n"))
 
 (def indicator-set (set ";()[]{}\\\"'@^`#"))
+
+;;; RULES START HERE.
+
+(declare form)
 
 (def comment-r (p/conc (p/lit \;) (p/rep* (p/antilit \newline))))
 
@@ -208,12 +208,12 @@
 (def string-char (p/alt escaped-char (p/antilit \")))
 
 (def string-r
-  (p/hook #(->> % flatten (apply str))
+  (p/hook #(->> % seq/flatten (apply str))
     (p/circumfix string-delimiter (p/rep* string-char) string-delimiter)))
 
 (def form-series (p/suffix (p/rep* #'form) opt-ws))
 
-(do-template [rule-name start-token end-token product-fn]
+(t/do-template [rule-name start-token end-token product-fn]
   (def rule-name
     (p/complex [_ (p/lit start-token)
               contents (p/opt form-series)
@@ -227,7 +227,7 @@
 (p/defrm padded-lit [token]
   (p/prefix (p/lit token) opt-ws))
 
-(do-template [rule-name prefix product-fn-symbol prefix-is-rule?]
+(t/do-template [rule-name prefix product-fn-symbol prefix-is-rule?]
   (def rule-name
     (p/hook (prefix-list-fn product-fn-symbol)
       (p/prefix (p/conc ((if prefix-is-rule? identity padded-lit) prefix) opt-ws)
@@ -259,11 +259,11 @@
 
 ; TODO Implement context
 
-(defvar anonymous-fn-parameter
+(def anonymous-fn-parameter
   (p/complex [_ (p/lit \%), number (p/opt decimal-natural-number)]
     (or number 1)))
 
-(defvar anonymous-fn-interior
+(def anonymous-fn-interior
   p/nothing)
 
 (def anonymous-fn-r
