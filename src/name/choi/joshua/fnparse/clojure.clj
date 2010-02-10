@@ -51,7 +51,7 @@
   (with-label "a symbol character"
     (alt ascii-alphanumeric non-alphanumeric-symbol-char)))
 (def symbol-char-series
-  (semantics (rep+ symbol-char) str*))
+  (hook str* (rep+ symbol-char)))
 
 (def symbol-end
   (annotate-error form-end

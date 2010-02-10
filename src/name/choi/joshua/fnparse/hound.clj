@@ -176,7 +176,7 @@
 (defvar anything
   (term "anything" (constantly true)))
 
-(defn semantics [subrule semantic-hook]
+(defn hook [semantic-hook subrule]
   (complex [product subrule] (semantic-hook product)))
 
 (defn constant-semantics [subrule product]
