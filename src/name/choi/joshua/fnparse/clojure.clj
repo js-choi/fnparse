@@ -1,6 +1,7 @@
 (ns name.choi.joshua.fnparse.clojure
   (:use name.choi.joshua.fnparse.hound clojure.set clojure.template
         clojure.contrib.def clojure.contrib.seq-utils)
+  (:require [name.choi.joshua.fnparse.hound :as p])
   (:import [clojure.lang IPersistentMap]))
 
 ; TODO
@@ -51,7 +52,7 @@
   (with-label "a symbol character"
     (alt ascii-alphanumeric non-alphanumeric-symbol-char)))
 (def symbol-char-series
-  (hook str* (rep+ symbol-char)))
+  (p/hook str* (rep+ symbol-char)))
 
 (def symbol-end
   (annotate-error form-end
@@ -123,18 +124,16 @@
 
 (def imprecise-fractional-part
   (prefix-conc (lit \.)
-    (alt
-      (semantics (cascading-rep+ decimal-digit #(/ % 10) #(/ (+ %1 %2) 10))
-        #(partial + %))
-      no-number-tail)))
+    (alt (p/hook #(partial + %)
+           (cascading-rep+ decimal-digit #(/ % 10) #(/ (+ %1 %2) 10)))
+         no-number-tail)))
 
 (def exponential-part
   (prefix-conc
     (set-lit "exponent indicator" "eE")
       ; If I wasn't worrying about pure Clojure,
       ; use (case-insensitive-lit \e) above instead.
-    (semantics decimal-natural-number
-      #(partial * (expt-int 10 %)))))
+    (p/hook #(partial * (expt-int 10 %)) decimal-natural-number)))
 
 (def fractional-exponential-part
   (complex [frac-fn imprecise-fractional-part
@@ -148,19 +147,17 @@
 
 (def fraction-denominator-tail
   (prefix-conc (lit \/)
-    (semantics
+    (p/hook (fn [denominator] #(/ % denominator))
       (anti-validate decimal-natural-number zero?
-        "a fraction's denominator cannot be zero")
-      (fn [denominator] #(/ % denominator)))))
+        "a fraction's denominator cannot be zero"))))
 
 (defrm radix-coefficient-tail [base]
-  (semantics
+  (p/hook constantly
     (prefix-conc
       (set-lit "radix indicator" "rR")
         ; If I wasn't worrying about pure Clojure,
         ; use (case-insensitive-lit \r) above instead.
-      (radix-natural-number base))
-    constantly))
+      (radix-natural-number base))))
 
 (defrm number-tail [base]
   (alt imprecise-number-tail fraction-denominator-tail
@@ -177,8 +174,8 @@
 
 (def unicode-escape-sequence
   (prefix-conc (lit \u)
-    (semantics (factor= 4 hexadecimal-digit)
-      (comp char reduce-hexadecimal-digits))))
+    (p/hook (comp char reduce-hexadecimal-digits)
+      (factor= 4 hexadecimal-digit))))
 
 (def character-name
   (alt (mapalt #(constant-semantics (mapconc (val %)) (key %))
@@ -198,9 +195,8 @@
 (def string-char (alt escaped-char (antilit \")))
 
 (def string-r
-  (semantics
-    (circumfix-conc string-delimiter (rep* string-char) string-delimiter)
-    #(->> % flatten (apply str))))
+  (p/hook #(->> % flatten (apply str))
+    (circumfix-conc string-delimiter (rep* string-char) string-delimiter)))
 
 (def form-series (suffix-conc (rep* #'form) ws?))
 
@@ -220,10 +216,9 @@
 
 (do-template [rule-name prefix product-fn-symbol prefix-is-rule?]
   (def rule-name
-    (semantics
+    (p/hook (prefix-list-fn product-fn-symbol)
       (prefix-conc (conc ((if prefix-is-rule? identity padded-lit) prefix) ws?)
-                   #'form)
-      (prefix-list-fn product-fn-symbol)))
+                   #'form)))
   quoted-r \' `quote false
   syntax-quoted-r \` `syntax-quote false
   unquote-spliced-r (lex (mapconc "~@")) `unquote-splicing true
@@ -238,11 +233,11 @@
       "WARNING: The ^ indicator is deprecated (since Clojure 1.1).")))
 
 (def fn-inner-r
-  (semantics (circumfix-conc (lit \() form-series (lit \)))
-    (prefix-list-fn `mini-fn)))
+  (p/hook (prefix-list-fn `mini-fn)
+    (circumfix-conc (lit \() form-series (lit \)))))
 
 (def metadata-r
-  (alt map-r (semantics (alt keyword-r symbol-r) #(hash-map :tag %))))
+  (alt map-r (p/hook (alt keyword-r symbol-r) #(hash-map :tag %))))
 
 (def with-meta-inner-r
   (prefix-conc (padded-lit \^)
