@@ -46,20 +46,20 @@
 
 (def _discarded (p/prefix (p/lex (p/mapcat "#_")) #'form))
 
-(def ws
+(def _ws
   (p/label "whitespace"
     (p/rep+ (p/+ (p/term "a whitespace character" ws-set)
                  _comment _discarded))))
 
-(def opt-ws (p/opt ws))
+(def opt-_ws (p/opt _ws))
 
-(def indicator (p/term "an indicator" indicator-set))
+(def indicator_ (p/term "an indicator" indicator-set))
 
-(def separator (p/+ ws indicator))
+(def separator_ (p/+ _ws indicator_))
 
-(def form-end (p/+ (p/followed-by separator) p/end-of-input))
+(def form-end_ (p/+ (p/followed-by separator_) p/end-of-input))
 
-(def ns-separator (p/lit \/))
+(def ns-separator_ (p/lit \/))
 
 (def non-alphanumeric-symbol-char
   (p/set-lit "a non-alphanumeric symbol character" "*+!-_?."))
@@ -72,14 +72,14 @@
   (p/hook str* (p/rep+ symbol-char)))
 
 (def symbol-end
-  (p/annotate-error form-end
+  (p/annotate-error form-end_
     (fn [error]
       (if (= (:unexpected-token error) \/)
         "multiple slashes aren't allowed in symbols"))))
 
 (def symbol-suffix
-  (p/prefix ns-separator
-    (p/+ symbol-char-series (p/chook "/" ns-separator))))
+  (p/prefix ns-separator_
+    (p/+ symbol-char-series (p/chook "/" ns-separator_))))
 
 (def symbol-form
   (p/label "symbol"
@@ -93,10 +93,10 @@
           (or (peculiar-symbols pre-slash) ; In case it's true, false, or nil
               (symbol pre-slash)))))))
 
-(def keyword-indicator (p/lit \:))
+(def keyword-indicator_ (p/lit \:))
 
 (def normal-keyword
-  (p/for [_ keyword-indicator
+  (p/for [_ keyword-indicator_
           pre-slash (p/opt symbol-char-series)
           post-slash (p/opt symbol-suffix)
           _ symbol-end]
@@ -105,7 +105,7 @@
       (keyword pre-slash))))
 
 (p/defrm ns-resolved-keyword-end [pre-slash]
-  (p/+ (p/for [_ (p/followed-by ns-separator)
+  (p/+ (p/for [_ (p/followed-by ns-separator_)
                context p/get-context
                prefix (p/only-when (get-in context [:ns-aliases pre-slash])
                         (format "no namespace with alias '%s'" pre-slash))
@@ -115,10 +115,10 @@
          [(:ns-name context) pre-slash])))
 
 (def ns-resolved-keyword
-  (p/for [_ (p/lex (p/factor= 2 keyword-indicator))
+  (p/for [_ (p/lex (p/factor= 2 keyword-indicator_))
           pre-slash symbol-char-series
           [prefix suffix] (ns-resolved-keyword-end pre-slash)
-          _ form-end]
+          _ form-end_]
     (keyword prefix suffix)))
 
 (def keyword-form
@@ -185,7 +185,7 @@
   (p/for [sign (p/opt number-sign)
           prefix-number decimal-natural-number
           tail-fn (number-tail prefix-number)
-          _ form-end]
+          _ form-end_]
     (tail-fn (* (or sign 1) prefix-number))))
 
 (def string-delimiter (p/lit \"))
@@ -215,7 +215,7 @@
   (p/hook #(->> % seq/flatten (apply str))
     (p/circumfix string-delimiter (p/rep* string-char) string-delimiter)))
 
-(def form-series (p/suffix (p/rep* #'form) opt-ws))
+(def form-series (p/suffix (p/rep* #'form) opt-_ws))
 
 (template/do-template [rule-name start-token end-token product-fn]
   (def rule-name
@@ -229,12 +229,12 @@
   set-inner-r \{ \} set)
 
 (p/defrm padded-lit [token]
-  (p/prefix (p/lit token) opt-ws))
+  (p/prefix (p/lit token) opt-_ws))
 
 (template/do-template [rule-name prefix product-fn-symbol prefix-is-rule?]
   (def rule-name
     (p/hook (prefix-list-fn product-fn-symbol)
-      (p/prefix (p/cat ((if prefix-is-rule? identity padded-lit) prefix) opt-ws)
+      (p/prefix (p/cat ((if prefix-is-rule? identity padded-lit) prefix) opt-_ws)
                 #'form)))
   quoted-r \' `quote false
   syntax-quoted-form \` `syntax-quote false
@@ -258,7 +258,7 @@
 
 (def with-meta-inner-r
   (p/prefix (padded-lit \^)
-    (p/for [metadata metadata-r, _ opt-ws, content #'form]
+    (p/for [metadata metadata-r, _ opt-_ws, content #'form]
       (list `with-meta content metadata))))
 
 ; TODO Implement context
@@ -286,7 +286,7 @@
        syntax-quoted-form unquote-spliced-form unquoted-form
        deprecated-meta-form character keyword-form symbol-form number))
 
-(def form (p/label "a form" (p/prefix opt-ws form-content)))
+(def form (p/label "a form" (p/prefix opt-_ws form-content)))
 
 (def document
   (p/suffix form-series p/end-of-input))
