@@ -31,21 +31,21 @@
       (c/Success product state
         (c/ParseError (:position state) nil nil)))))
 
-(defvar emptiness (with-product nil))
+(defvar emptiness_ (with-product nil))
 
-(defn- base-nothing [state unexpected-token descriptors]
+(defn- make-failed-reply [state unexpected-token descriptors]
   (Reply false
     (c/Failure
       (c/ParseError (:position state)
                     (first (:remainder state))
                     descriptors))))
 
-(defn nothing [state]
-  (base-nothing state nil nil))
+(defn nothing_ [state]
+  (make-failed-reply state nil nil))
 
 (defn with-error [message]
   (fn with-error-rule [state]
-    (base-nothing state nil #{(c/ErrorDescriptor :message message)})))
+    (make-failed-reply state nil #{(c/ErrorDescriptor :message message)})))
 
 (defmacro defrm [fn-name & forms]
   (letfn [(delayify [f] (fn [& args] (delay (force (apply f args)))))]
@@ -105,7 +105,7 @@
 
 (defmonad parser-m
   "The monad that FnParse uses."
-  [m-zero nothing
+  [m-zero nothing_
    m-result with-product
    m-bind combine
    m-plus +])
@@ -170,13 +170,13 @@
                     (assoc state :remainder (next remainder)
                                  :position (inc position))
                     (c/ParseError position nil nil))))
-              (base-nothing state first-token nil)))
-          (base-nothing state ::end-of-input nil))))))
+              (make-failed-reply state first-token nil)))
+          (make-failed-reply state ::end-of-input nil))))))
 
 (defn antiterm [label-string pred]
   (term label-string (complement pred)))
 
-(defvar anything
+(defvar anything_
   (term "anything" (constantly true)))
 
 (defn hook [semantic-hook subrule]
@@ -202,7 +202,7 @@
     (m-seq subrules)))
 
 (defn opt [rule]
-  (+ rule emptiness))
+  (+ rule emptiness_))
 
 (defn lex [subrule]
   (fn [state]
@@ -251,10 +251,10 @@
       (let [result (-> state (c/apply-rule rule) :result force)]
         (if (c/failure? result)
           (Reply false (c/Success true state (:error result)))
-          (-> state nothing (assoc :error (:error result))))))))
+          (-> state (c/apply-rule nothing_) (assoc :error (:error result))))))))
 
-(defvar end-of-input
-  (not-followed-by "the end of input" anything)
+(defvar end-of-input_
+  (not-followed-by "the end of input" anything_)
   "WARNING: Because this is an always succeeding,
   always empty rule, putting this directly into a
   rep*/rep+/etc.-type rule will result in an
@@ -286,7 +286,7 @@
 (defn effects [f & args]
   (fn effects-rule [state]
     (apply f args)
-    (c/apply-rule state emptiness)))
+    (c/apply-rule state emptiness_)))
 
 (defn except
   "Creates a rule that is the exception from
@@ -321,7 +321,7 @@
 (defn factor= [n rule]
   (->> rule (replicate n) (apply cat)))
 
-(defn get-context [state]
+(defn fetch-context_ [state]
   (c/apply-rule state (with-product (:context state))))
 
 (defvar ascii-digits "0123456789")
@@ -338,28 +338,28 @@
                (chook index (case-insensitive-lit token))))
      (label label-string))))
 
-(defvar decimal-digit
+(defvar decimal-digit_
   (radix-digit "a decimal digit" 10))
 
-(defvar hexadecimal-digit
+(defvar hexadecimal-digit_
   (radix-digit "a hexadecimal digit" 16))
 
-(defvar uppercase-ascii-letter
+(defvar uppercase-ascii-letter_
   (set-lit "an uppercase ASCII letter" uppercase-ascii-alphabet))
 
-(defvar lowercase-ascii-letter
+(defvar lowercase-ascii-letter_
   (set-lit "a lowercase ASCII letter" lowercase-ascii-alphabet))
 
-(defvar ascii-letter
+(defvar ascii-letter_
   (label "an ASCII letter"
-    (+ uppercase-ascii-letter lowercase-ascii-letter)))
+    (+ uppercase-ascii-letter_ lowercase-ascii-letter_)))
 
-(defvar ascii-alphanumeric
+(defvar ascii-alphanumeric_
   (label "an alphanumeric ASCII character"
-    (+ ascii-letter decimal-digit)))
+    (+ ascii-letter_ decimal-digit_)))
 
-; (def rule (for [a anything, b anything] [a b]))
-; (def rule (validate anything (partial = 'a)))
+; (def rule (for [a anything_, b anything_] [a b]))
+; (def rule (validate anything_ (partial = 'a)))
 ; (def rule (mapcat '[a b]))
 ; (def rule (lit \3))
 ; (def rule (lex (mapcat "let 3")))
@@ -367,7 +367,7 @@
 ; (def rule (lex (label "let expr" (mapcat "let 3"))))
 ; (def rule (+ (lex (label "let expr" (mapcat "let 3")))
 ;                (lit \3)))
-; (def rule emptiness)
+; (def rule emptiness_)
 ; (def rule (rep* (antilit \3)))
 ; (def rule (rep* decimal-digit))
 ; (def rule (followed-by (mapcat "li")))
