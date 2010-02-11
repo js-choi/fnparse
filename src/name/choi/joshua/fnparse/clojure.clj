@@ -75,30 +75,32 @@
   (p/set-lit "a non-alphanumeric symbol character" "*+!-_?."))
 
 (def symbol-char_
-  (p/label "a symbol character"
-    (p/+ p/ascii-alphanumeric non-alphanumeric-symbol-char_)))
+  (->> (p/+ p/ascii-alphanumeric non-alphanumeric-symbol-char_)
+    (p/label "a symbol character")))
 
 (def symbol-char-series_
-  (p/hook str* (p/rep+ symbol-char_)))
+  (->> (p/rep+ symbol-char_) (p/hook str*)))
 
 (def symbol-end_
   (p/annotate-error annotate-symbol-end form-end_))
 
+(def slash-symbol-suffix_
+  (->> ns-separator_ (p/chook "/")))
+
 (def symbol-suffix_
-  (p/prefix ns-separator_
-    (p/+ symbol-char-series_ (p/chook "/" ns-separator_))))
+  (p/prefix ns-separator_ (p/+ symbol-char-series_ slash-symbol-suffix_)))
 
 (def symbol_
-  (p/label "symbol"
-    (p/for [first-char p/ascii-letter
-            rest-pre-slash (p/opt symbol-char-series_)
-            post-slash (p/opt symbol-suffix_)
-            _ symbol-end_]
-      (let [pre-slash (str first-char rest-pre-slash)]
-        (if post-slash
-          (symbol pre-slash post-slash)
-          (or (peculiar-symbols pre-slash) ; In case it's true, false, or nil
-              (symbol pre-slash)))))))
+  (p/for "a symbol"
+    [first-char     p/ascii-letter
+     rest-pre-slash (p/opt symbol-char-series_)
+     post-slash     (p/opt symbol-suffix_)
+     _ symbol-end_]
+    (let [pre-slash (str first-char rest-pre-slash)]
+      (if post-slash
+        (symbol pre-slash post-slash)
+        (or (peculiar-symbols pre-slash) ; In case it's true, false, or nil
+            (symbol pre-slash))))))
 
 (def keyword-indicator_ (p/lit \:))
 

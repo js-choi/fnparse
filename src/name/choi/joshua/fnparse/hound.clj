@@ -110,6 +110,18 @@
    m-bind combine
    m-plus +])
 
+(defn label [label-string rule]
+  (letfn [(assoc-label [result]
+            (-> result force
+              (assoc-in [:error :descriptors]
+                #{(c/ErrorDescriptor :label label-string)})
+              delay))]
+    (fn labelled-rule [state]
+      (let [reply (c/apply-rule state rule)]
+        (if-not (:tokens-consumed? reply)
+          (update-in reply [:result] assoc-label)
+          reply)))))
+
 (defmacro for
   "Creates a for rule in monadic
   form. It's a lot easier than it sounds.
@@ -133,20 +145,10 @@
   defined in the binding vector.
   It's basically like let, for, or any other
   monad. Very useful!"
-  [steps & product-expr]
-  `(domonad parser-m ~steps ~@product-expr))
-
-(defn label [label-string rule]
-  (letfn [(assoc-label [result]
-            (-> result force
-              (assoc-in [:error :descriptors]
-                #{(c/ErrorDescriptor :label label-string)})
-              delay))]
-    (fn labelled-rule [state]
-      (let [reply (c/apply-rule state rule)]
-        (if-not (:tokens-consumed? reply)
-          (update-in reply [:result] assoc-label)
-          reply)))))
+  ([label-string steps product-expr]
+   `(->> (for ~steps ~product-expr) (label ~label-string)))
+  ([steps product-expr]
+  `(domonad parser-m ~steps ~product-expr)))
 
 (defn validate [rule pred message]
   (for [product rule, _ (only-when (pred product) message)]
