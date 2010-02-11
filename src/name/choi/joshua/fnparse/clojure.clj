@@ -63,6 +63,8 @@
 
 (def opt-ws_ (p/opt ws_))
 
+(def keyword-indicator_ (p/lit \:))
+
 (def indicator_ (p/term "an indicator" indicator-set))
 
 (def separator_ (p/+ ws_ indicator_))
@@ -102,36 +104,45 @@
         (or (peculiar-symbols pre-slash) ; In case it's true, false, or nil
             (symbol pre-slash))))))
 
-(def keyword-indicator_ (p/lit \:))
-
 (def normal-keyword_
-  (p/for [_ keyword-indicator_
-          pre-slash (p/opt symbol-char-series_)
+  (p/for [_          keyword-indicator_
+          pre-slash  (p/opt symbol-char-series_)
           post-slash (p/opt symbol-suffix_)
-          _ symbol-end_]
+          _          symbol-end_]
     (if post-slash
       (keyword pre-slash post-slash)
       (keyword pre-slash))))
 
+(def followed-by-ns-separator_ (p/followed-by ns-separator_))
+
+(p/defrm fetch-referred-namespace [context namespace-alias]
+  (p/only-when (get-in context [:ns-aliases namespace-alias])
+    (format "no namespace with alias '%s'" namespace-alias)))
+
+(p/defrm ns-qualified-keyword-end-with-slash [pre-slash]
+  (p/for [_       followed-by-ns-separator_
+          context p/get-context
+          prefix  (fetch-referred-namespace context pre-slash)
+          suffix  symbol-suffix_]
+    [prefix suffix]))
+
+(p/defrm ns-qualified-keyword-empty-end [pre-slash]
+  (p/for [context p/get-context]
+    [(:ns-name context) pre-slash]))
+
 (p/defrm ns-resolved-keyword-end [pre-slash]
-  (p/+ (p/for [_ (p/followed-by ns-separator_)
-               context p/get-context
-               prefix (p/only-when (get-in context [:ns-aliases pre-slash])
-                        (format "no namespace with alias '%s'" pre-slash))
-               suffix symbol-suffix_]
-         [prefix suffix])
-       (p/for [context p/get-context]
-         [(:ns-name context) pre-slash])))
+  (p/+ (ns-qualified-keyword-end-with-slash pre-slash)
+       (ns-qualified-keyword-empty-end pre-slash)))
 
 (def ns-resolved-keyword_
-  (p/for [_ (p/lex (p/factor= 2 keyword-indicator_))
-          pre-slash symbol-char-series_
+  (p/for [_               (->> keyword-indicator_ (p/factor= 2) p/lex)
+          pre-slash       symbol-char-series_
           [prefix suffix] (ns-resolved-keyword-end pre-slash)
-          _ form-end_]
+          _               form-end_]
     (keyword prefix suffix)))
 
 (def keyword_
-  (p/label "keyword" (p/+ ns-resolved-keyword_ normal-keyword_)))
+  (->> (p/+ ns-resolved-keyword_ normal-keyword_) (p/label "keyword")))
 
 (p/defrm radix-natural-number [base]
   (p/cascading-rep+ (p/radix-digit (if (<= base 36) base 36))
