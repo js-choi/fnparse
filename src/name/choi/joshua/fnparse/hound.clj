@@ -304,7 +304,7 @@
    (except label-string minuend
      (apply + (cons first-subtrahend rest-subtrahends)))))
 
-(defn annotate-error [rule message-fn]
+(defn annotate-error [message-fn rule]
   (letfn [(annotate [result]
             (delay (let [{error :error, :as forced-result} (force result)
                          new-message (message-fn error)]

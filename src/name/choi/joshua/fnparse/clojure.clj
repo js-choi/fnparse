@@ -38,6 +38,10 @@
 
 (def indicator-set (set ";()[]{}\\\"'@^`#"))
 
+(defn annotate-symbol-end [error]
+  (if (= (:unexpected-token error) \/)
+    "multiple slashes aren't allowed in symbols"))
+
 ;;; RULES START HERE.
 
 (declare form_)
@@ -50,10 +54,12 @@
 
 (def discarded_ (p/prefix (p/lex (p/mapcat "#_")) #'form_))
 
+(def normal-ws-char_
+  (p/term "a whitespace character" ws-set))
+
 (def ws_
-  (p/label "whitespace"
-    (p/rep+ (p/+ (p/term "a whitespace character" ws-set)
-                 comment_ discarded_))))
+  (->> (p/+ normal-ws-char_ comment_ discarded_)
+    p/rep+ (p/label "whitespace")))
 
 (def opt-ws_ (p/opt ws_))
 
@@ -76,10 +82,7 @@
   (p/hook str* (p/rep+ symbol-char_)))
 
 (def symbol-end_
-  (p/annotate-error form-end_
-    (fn [error]
-      (if (= (:unexpected-token error) \/)
-        "multiple slashes aren't allowed in symbols"))))
+  (p/annotate-error annotate-symbol-end form-end_))
 
 (def symbol-suffix_
   (p/prefix ns-separator_
