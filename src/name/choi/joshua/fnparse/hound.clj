@@ -36,18 +36,23 @@
 
 (def emptiness_ (with-product nil))
 
-(define-fn- make-failed-reply [state unexpected-token descriptors]
-  (Reply false
-    (c/Failure
-      (c/ParseError (:position state) (first (:remainder state))
-                    descriptors))))
+(define-fn- make-failed-reply
+  ([state descriptors]
+   (make-failed-reply state (first (:remainder state)) descriptors))
+  ([state unexpected-token descriptors]
+   (Reply false
+     (c/Failure
+       (c/ParseError (:position state) unexpected-token descriptors)))))
+
+(def nothing-descriptors
+  #{(c/ErrorDescriptor :label "absolutely nothing")})
 
 (define-fn nothing_ [state]
-  (make-failed-reply state nil nil))
+  (make-failed-reply state nothing-descriptors))
 
 (define-fn with-error [message]
   (fn with-error-rule [state]
-    (make-failed-reply state nil #{(c/ErrorDescriptor :message message)})))
+    (make-failed-reply state #{(c/ErrorDescriptor :message message)})))
 
 (letfn [(delayify [f] (fn [& args] (delay (force (apply f args)))))]
   (defmacro defn [fn-name & forms]
@@ -58,7 +63,7 @@
 (defmacro defn- [fn-name & forms]
   (list* `defn (vary-meta fn-name assoc :private true) forms))
 
-(define-fn only-when [valid? message]
+(defn only-when [valid? message]
   (if-not valid? (with-error message) (with-product valid?)))
 
 (define-fn combine [rule product-fn]
@@ -89,7 +94,7 @@
                         (c/merge-parse-errors first-error next-error))))))
               (Reply false first-result))))))))
 
-(define-fn + [& rules]
+(defn + [& rules]
   (fn summed-rule [state]
     (let [[consuming-replies empty-replies]
             (->> rules

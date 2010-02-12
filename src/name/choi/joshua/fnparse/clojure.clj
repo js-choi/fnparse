@@ -29,7 +29,8 @@
 (defn reduce-hexadecimal-digits [digits]
   (reduce #(+ (* 16 %1) %2) digits))
 
-(deftype ClojureContext [ns-name ns-aliases in-anonymous-fn?] IPersistentMap)
+(deftype ClojureContext [ns-name ns-aliases anonymous-fn-context]
+  IPersistentMap)
 
 (def peculiar-symbols {"nil" nil, "true" true, "false" false})
 
@@ -296,10 +297,13 @@
   r/nothing_)
 
 (def anonymous-fn_
-  (r/circumfix
-    (r/lit \()
-    anonymous-fn-interior_
-    (r/lit \))))
+  (r/for [_ (r/lit \()
+          context r/fetch-context_
+          _ (r/only-when (not (:anonymous-fn-context context))
+              "nested anonymous functions are not allowed")
+          content anonymous-fn-interior_
+          _ (r/lit \))]
+    content))
 
 (def dispatched-inner_
   (r/+ anonymous-fn_ set-inner_ fn-inner_ var-inner_ with-meta-inner_))
@@ -334,7 +338,7 @@
          :label #{"an indicator" "the end of input"
                   "a symbol character" "whitespace"}}))
   (is (match? form_ {} ":a/b" = :a/b))
-  (is (match? form_ {:context (ClojureContext "user" {} false)}
+  (is (match? form_ {:context (ClojureContext "user" {} nil)}
         "::b" = :user/b))
   (is (non-match? form_ {:position 3} "::z/abc"
         {:message #{"no namespace with alias 'z'"}
@@ -344,9 +348,15 @@
   (is (match? form_ {} "\"a\\n\"" = "a\n"))
   (is (match? form_ {} "[~@a ()]" =
         [(list 'clojure.core/unquote-splicing 'a) ()]))
+  (is (match? form_ {:context (ClojureContext "user" {} nil)}
+        "#(+ % %2)" #(= (% 3 2) 5)))
   (is (non-match? form_ {:position 4} "17rAZ"
         {:label #{"a base-17 digit" "an indicator"
                   "whitespace" "the end of input"}}))
+  (is (non-match? form_ {:position 5, :context (ClojureContext "user" {} nil)}
+        "#(% #(%))"
+        {:label #{}
+         :message #{"nested anonymous functions are not allowed"}}))
   (is (non-match? form_ {:position 3} "3/0 3"
         {:label #{"a base-10 digit"}
          :message #{"a fraction's denominator cannot be zero"}})))
