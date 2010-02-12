@@ -1,10 +1,9 @@
 (ns name.choi.joshua.fnparse.clojure
   (:require [name.choi.joshua.fnparse.hound :as r]
-            [clojure.template :as template] [clojure.set :as set]
-            [clojure.test :as test] [clojure.contrib.seq-utils :as seq]
+            [clojure.template :as t] [clojure.set :as set]
+            [clojure.contrib.seq-utils :as seq]
             name.choi.joshua.fnparse.hound.test)
   (:use [clojure.test :only #{deftest is run-tests}])
-  (:refer-clojure :exclude #{for})
   (:import [clojure.lang IPersistentMap]))
 
 ; TODO
@@ -30,7 +29,7 @@
 (defn reduce-hexadecimal-digits [digits]
   (reduce #(+ (* 16 %1) %2) digits))
 
-(deftype ClojureContext [ns-name ns-aliases] IPersistentMap)
+(deftype ClojureContext [ns-name ns-aliases in-anonymous-fn?] IPersistentMap)
 
 (def peculiar-symbols {"nil" nil, "true" true, "false" false})
 
@@ -115,22 +114,22 @@
 
 (def followed-by-ns-separator_ (r/followed-by ns-separator_))
 
-(r/defrm fetch-referred-namespace [context namespace-alias]
+(r/defn fetch-referred-namespace [context namespace-alias]
   (r/only-when (get-in context [:ns-aliases namespace-alias])
     (format "no namespace with alias '%s'" namespace-alias)))
 
-(r/defrm ns-qualified-keyword-end-with-slash [pre-slash]
+(r/defn ns-qualified-keyword-end-with-slash [pre-slash]
   (r/for [_ followed-by-ns-separator_
           context r/fetch-context_
           prefix (fetch-referred-namespace context pre-slash)
           suffix symbol-suffix_]
     [prefix suffix]))
 
-(r/defrm ns-qualified-keyword-empty-end [pre-slash]
+(r/defn ns-qualified-keyword-empty-end [pre-slash]
   (r/for [context r/fetch-context_]
     [(:ns-name context) pre-slash]))
 
-(r/defrm ns-resolved-keyword-end [pre-slash]
+(r/defn ns-resolved-keyword-end [pre-slash]
   (r/+ (ns-qualified-keyword-end-with-slash pre-slash)
        (ns-qualified-keyword-empty-end pre-slash)))
 
@@ -145,7 +144,7 @@
   (r/label "a keyword"
     (r/+ ns-resolved-keyword_ normal-keyword_)))
 
-(r/defrm radix-natural-number [base]
+(r/defn radix-natural-number [base]
   (r/cascading-rep+ (r/radix-digit (if (<= base 36) base 36))
     identity #(+ (* base %1) %2)))
 
@@ -190,7 +189,7 @@
       (r/anti-validate decimal-natural-number_ zero?
         "a fraction's denominator cannot be zero"))))
 
-(r/defrm radix-coefficient-tail [base]
+(r/defn radix-coefficient-tail [base]
   (r/hook constantly
     (r/prefix
       (r/set-lit "radix indicator" "rR")
@@ -198,7 +197,7 @@
         ; use (case-insensitive-r/lit \r) above instead.
       (radix-natural-number base))))
 
-(r/defrm number-tail [base]
+(r/defn number-tail [base]
   (r/+ imprecise-number-tail_ fraction-denominator-tail_
        (radix-coefficient-tail base) no-number-tail_))
 
@@ -238,7 +237,7 @@
 
 (def form-series_ (r/suffix (r/rep* #'form_) opt-ws_))
 
-(template/do-template [rule_ start-token end-token product-fn]
+(t/do-template [rule_ start-token end-token product-fn]
   (def rule_
     (r/for [_ (r/lit start-token)
             contents (r/opt form-series_)
@@ -249,10 +248,10 @@
   map_ \{ \} #(apply hash-map %)
   set-inner_ \{ \} set)
 
-(r/defrm padded-lit [token]
+(r/defn padded-lit [token]
   (r/prefix (r/lit token) opt-ws_))
 
-(template/do-template [rule_ prefix product-fn-symbol prefix-is-rule?]
+(t/do-template [rule_ prefix product-fn-symbol prefix-is-rule?]
   (def rule_
     (r/hook (prefix-list-fn product-fn-symbol)
       (r/prefix
@@ -330,24 +329,25 @@
   (is (match? form_ {} "\"\\na\\u3333\"" = "\na\u3333"))
   (is (non-match? form_ {:position 7} "([1 32]"
         {:label #{"a form" "')'" "whitespace"}}))
-  (is (non-match? document_ {:position 3} "a/b/c"
+  (is (non-match? form_ {:position 3} "a/b/c"
         {:message #{"multiple slashes aren't allowed in symbols"}
          :label #{"an indicator" "the end of input"
                   "a symbol character" "whitespace"}}))
   (is (match? form_ {} ":a/b" = :a/b))
-  (is (match? form_ {:context (ClojureContext "user" {})} "::b" = :user/b))
+  (is (match? form_ {:context (ClojureContext "user" {} false)}
+        "::b" = :user/b))
   (is (non-match? form_ {:position 3} "::z/abc"
         {:message #{"no namespace with alias 'z'"}
          :label #{"the end of input" "a symbol character" "an indicator"
                   "whitespace"}}))
   (is (match? form_ {} "clojure.core//" = 'clojure.core//))
   (is (match? form_ {} "\"a\\n\"" = "a\n"))
-  (is (match? document_ {} "~@a ()" =
+  (is (match? form_ {} "[~@a ()]" =
         [(list 'clojure.core/unquote-splicing 'a) ()]))
-  (is (non-match? document_ {:position 4} "17rAZ"
+  (is (non-match? form_ {:position 4} "17rAZ"
         {:label #{"a base-17 digit" "an indicator"
                   "whitespace" "the end of input"}}))
-  (is (non-match? document_ {:position 3} "3/0 3"
+  (is (non-match? form_ {:position 3} "3/0 3"
         {:label #{"a base-10 digit"}
          :message #{"a fraction's denominator cannot be zero"}})))
 

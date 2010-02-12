@@ -1,9 +1,12 @@
 (ns name.choi.joshua.fnparse.hound
-  (:use clojure.contrib.seq-utils clojure.contrib.def clojure.test
-        clojure.set clojure.contrib.monads clojure.template)
-  (:require [name.choi.joshua.fnparse.common :as c])
-  (:refer-clojure :exclude #{for + mapcat})
-  (:import [clojure.lang Sequential IPersistentMap IPersistentVector Var]))
+  (:require [name.choi.joshua.fnparse.common :as c]
+            [clojure.contrib.seq-utils :as seq]
+            [clojure.contrib.monads :as m]
+            [clojure.template :as t]
+            [clojure.contrib.def :as d])
+  (:refer-clojure :exclude #{for + mapcat}
+                  :rename {defn define-fn, defn- define-fn-})
+  (:import [clojure.lang IPersistentMap]))
 
 (deftype State [remainder position context] :as this
   IPersistentMap
@@ -14,53 +17,51 @@
   IPersistentMap
   c/AParseAnswer (answer-result [] (-> this :result force)))
 
-(defn make-state [remainder context]
+(define-fn make-state [remainder context]
   (State remainder 0 context))
 
-(defn parse [rule input context success-fn failure-fn]
+(define-fn parse [rule input context success-fn failure-fn]
   (c/parse make-state rule input context success-fn failure-fn))
 
-(defn merge-replies [mergee merger]
+(define-fn merge-replies [mergee merger]
   (assoc merger :result
     (update-in (-> merger :result force) [:error]
       c/merge-parse-errors (-> mergee :result force :error))))
 
-(defn with-product [product]
+(define-fn with-product [product]
   (fn with-product-rule [state]
     (Reply false
       (c/Success product state
         (c/ParseError (:position state) nil nil)))))
 
-(defvar emptiness_ (with-product nil))
+(def emptiness_ (with-product nil))
 
-(defn- make-failed-reply [state unexpected-token descriptors]
+(define-fn- make-failed-reply [state unexpected-token descriptors]
   (Reply false
     (c/Failure
-      (c/ParseError (:position state)
-                    (first (:remainder state))
+      (c/ParseError (:position state) (first (:remainder state))
                     descriptors))))
 
-(defn nothing_ [state]
+(define-fn nothing_ [state]
   (make-failed-reply state nil nil))
 
-(defn with-error [message]
+(define-fn with-error [message]
   (fn with-error-rule [state]
     (make-failed-reply state nil #{(c/ErrorDescriptor :message message)})))
 
-(defmacro defrm [fn-name & forms]
-  (letfn [(delayify [f] (fn [& args] (delay (force (apply f args)))))]
-   `(do
-      (defn-memo ~fn-name ~@forms)
-      (alter-var-root (var ~fn-name) ~delayify)
-      (var ~fn-name))))
+(letfn [(delayify [f] (fn [& args] (delay (force (apply f args)))))]
+  (defmacro defn [fn-name & forms]
+   `(do (d/defn-memo ~fn-name ~@forms)
+        (alter-var-root (var ~fn-name) ~delayify)
+        (var ~fn-name))))
 
-(defmacro defrm- [& forms]
-  `(defrm ~@forms))
+(defmacro defn- [fn-name & forms]
+  (list* `defn (vary-meta fn-name assoc :private true) forms))
 
-(defn only-when [valid? message]
+(define-fn only-when [valid? message]
   (if-not valid? (with-error message) (with-product valid?)))
 
-(defn combine [rule product-fn]
+(define-fn combine [rule product-fn]
   (letfn [(apply-product-fn [result]
             (c/apply-rule (:state result) (product-fn (:product result))))]
     (fn [state]
@@ -88,29 +89,29 @@
                         (c/merge-parse-errors first-error next-error))))))
               (Reply false first-result))))))))
 
-(defn + [& rules]
+(define-fn + [& rules]
   (fn summed-rule [state]
     (let [[consuming-replies empty-replies]
             (->> rules
               (map #(c/apply-rule state %))
-              (separate :tokens-consumed?))]
+              (seq/separate :tokens-consumed?))]
       (if (empty? consuming-replies)
         (if (empty? empty-replies)
-          (m-zero state)
-          (let [empty-replies (reductions merge-replies empty-replies)]
+          (c/apply-rule nothing_ state)
+          (let [empty-replies (seq/reductions merge-replies empty-replies)]
             (or (first (drop-while #(-> % :result force c/failure?)
                          empty-replies))
                 (last empty-replies))))
         (first consuming-replies)))))
 
-(defmonad parser-m
+(m/defmonad parser-m
   "The monad that FnParse uses."
   [m-zero nothing_
    m-result with-product
    m-bind combine
    m-plus +])
 
-(defn label [label-string rule]
+(define-fn label [label-string rule]
   (letfn [(assoc-label [result]
             (-> result force
               (assoc-in [:error :descriptors]
@@ -148,16 +149,16 @@
   ([label-string steps product-expr]
    `(->> (for ~steps ~product-expr) (label ~label-string)))
   ([steps product-expr]
-  `(domonad parser-m ~steps ~product-expr)))
+  `(m/domonad parser-m ~steps ~product-expr)))
 
-(defn validate [rule pred message]
+(define-fn validate [rule pred message]
   (for [product rule, _ (only-when (pred product) message)]
     product))
 
-(defn anti-validate [rule pred message]
+(define-fn anti-validate [rule pred message]
   (validate rule (complement pred) message))
 
-(defn term [label-string predicate]
+(define-fn term [label-string predicate]
   (label label-string
     (fn terminal-rule [state]
       (let [position (:position state)]
@@ -173,43 +174,43 @@
               (make-failed-reply state first-token nil)))
           (make-failed-reply state ::end-of-input nil))))))
 
-(defn antiterm [label-string pred]
+(define-fn antiterm [label-string pred]
   (term label-string (complement pred)))
 
-(defvar anything_
+(def anything_
   (term "anything" (constantly true)))
 
-(defn hook [semantic-hook subrule]
+(define-fn hook [semantic-hook subrule]
   (for [product subrule] (semantic-hook product)))
 
-(defn chook [product subrule]
+(define-fn chook [product subrule]
   (for [_ subrule] product))
 
-(defn lit [token]
+(define-fn lit [token]
   (term (format "'%s'" token) #(= token %)))
 
-(defn antilit [token]
+(define-fn antilit [token]
   (term (str "anything except " token) #(not= token %)))
 
-(defn set-lit [label-string tokens]
+(define-fn set-lit [label-string tokens]
   (term label-string (set tokens)))
 
-(defn anti-set-lit [label-string tokens]
+(define-fn anti-set-lit [label-string tokens]
   (antiterm label-string (tokens set)))
 
-(defn cat [& subrules]
-  (with-monad parser-m
-    (m-seq subrules)))
+(define-fn cat [& subrules]
+  (m/with-monad parser-m
+    (m/m-seq subrules)))
 
-(defn opt [rule]
+(define-fn opt [rule]
   (+ rule emptiness_))
 
-(defn lex [subrule]
+(define-fn lex [subrule]
   (fn [state]
     (-> state subrule
       (assoc :tokens-consumed? false))))
 
-(defn cascading-rep+ [rule unary-hook binary-hook]
+(define-fn cascading-rep+ [rule unary-hook binary-hook]
   ; TODO: Rewrite to not blow up stack with many valid tokens
   (for [first-token rule
             rest-tokens (opt (cascading-rep+ rule unary-hook binary-hook))]
@@ -217,34 +218,34 @@
       (unary-hook first-token)
       (binary-hook first-token rest-tokens))))
 
-(defn rep+ [rule]
+(define-fn rep+ [rule]
   ; TODO: Rewrite to not blow up stack with many valid tokens
   (cascading-rep+ rule list cons))
 
-; (defn rep* [rule]
+; (define-fn rep* [rule]
 ;   (with-monad parser-m
 ;     (m-seq-while (complement failure?) (repeat 10 rule))))
 
-(defn rep* [rule]
+(define-fn rep* [rule]
   (opt (rep+ rule)))
 
-(defn mapcat [tokens]
+(define-fn mapcat [tokens]
   (apply cat (map lit tokens)))
 
-(defn mapalt [f coll]
+(define-fn mapalt [f coll]
   (apply + (map f coll)))
 
-(defn optcat [& rules]
+(define-fn optcat [& rules]
   (opt (apply cat rules)))
 
-(defn followed-by [rule]
+(define-fn followed-by [rule]
   (fn [state]
     (let [result (-> state (c/apply-rule rule) :result force)]
       (if (c/failure? result)
         (Reply false result)
         ((with-product (:product result)) state)))))
 
-(defn not-followed-by
+(define-fn not-followed-by
   [label-string rule]
   (label label-string
     (fn not-followed-by-rule [state]
@@ -253,48 +254,48 @@
           (Reply false (c/Success true state (:error result)))
           (-> state (c/apply-rule nothing_) (assoc :error (:error result))))))))
 
-(defvar end-of-input_
+(d/defvar end-of-input_
   (not-followed-by "the end of input" anything_)
   "WARNING: Because this is an always succeeding,
   always empty rule, putting this directly into a
   rep*/rep+/etc.-type rule will result in an
   infinite loop.")
 
-(defn prefix [prefix-rule body]
+(define-fn prefix [prefix-rule body]
   (for [_ prefix-rule, content body] content))
 
-(defn suffix [body suffix-rule]
+(define-fn suffix [body suffix-rule]
   (for [content body, _ suffix-rule] content))
 
-(defn circumfix [prefix-rule body suffix-rule]
+(define-fn circumfix [prefix-rule body suffix-rule]
   (prefix prefix-rule (suffix body suffix-rule)))
 
-(defn separated-rep [separator element]
+(define-fn separated-rep [separator element]
   (for [first-element element
             rest-elements (rep* (prefix separator element))]
     (cons first-element rest-elements)))
 
 (defmacro template-alt [argv expr & values]
   (let [c (count argv)]
-   `(+ ~@(map (fn [a] (apply-template argv expr a))
+   `(+ ~@(map (fn [a] (t/apply-template argv expr a))
            (partition c values)))))
 
-(defn case-insensitive-lit [#^Character token]
+(define-fn case-insensitive-lit [#^Character token]
   (+ (lit (Character/toLowerCase token))
      (lit (Character/toUpperCase token))))
 
-(defn effects [f & args]
+(define-fn effects [f & args]
   (fn effects-rule [state]
     (apply f args)
     (c/apply-rule state emptiness_)))
 
-(defn except
+(define-fn except
   "Creates a rule that is the exception from
   the first given subrules with the second given
   subrule--that is, it accepts only tokens that
   fulfill the first subrule but fails the
   second of the subrules.
-  (def a (except b c)) would be equivalent to the EBNF
+  (define a (except b c)) would be equivalent to the EBNF
     a = b - c;
   The new rule's products would be b-product. If
   b fails or c succeeds, then nil is simply returned."
@@ -306,7 +307,7 @@
    (except label-string minuend
      (apply + (cons first-subtrahend rest-subtrahends)))))
 
-(defn annotate-error [message-fn rule]
+(define-fn annotate-error [message-fn rule]
   (letfn [(annotate [result]
             (delay (let [{error :error, :as forced-result} (force result)
                          new-message (message-fn error)]
@@ -318,58 +319,58 @@
       (let [reply (c/apply-rule state rule)]
         (update-in reply [:result] annotate)))))
 
-(defn factor= [n rule]
+(define-fn factor= [n rule]
   (->> rule (replicate n) (apply cat)))
 
-(defn fetch-context_ [state]
+(define-fn fetch-context_ [state]
   (c/apply-rule state (with-product (:context state))))
 
-(defvar ascii-digits "0123456789")
-(defvar lowercase-ascii-alphabet "abcdefghijklmnopqrstuvwxyz")
-(defvar uppercase-ascii-alphabet "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
-(defvar base-36-digits (str ascii-digits lowercase-ascii-alphabet))
+(def ascii-digits "0123456789")
+(def lowercase-ascii-alphabet "abcdefghijklmnopqrstuvwxyz")
+(def uppercase-ascii-alphabet "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+(def base-36-digits (str ascii-digits lowercase-ascii-alphabet))
 
-(defrm radix-digit
+(defn radix-digit
   ([base] (radix-digit (format "a base-%s digit" base) base))
   ([label-string base]
    {:pre #{(integer? base) (> base 0)}}
-   (->> base-36-digits (take base) indexed
+   (->> base-36-digits (take base) seq/indexed
      (mapalt (fn [[index token]]
                (chook index (case-insensitive-lit token))))
      (label label-string))))
 
-(defvar decimal-digit_
+(def decimal-digit_
   (radix-digit "a decimal digit" 10))
 
-(defvar hexadecimal-digit_
+(def hexadecimal-digit_
   (radix-digit "a hexadecimal digit" 16))
 
-(defvar uppercase-ascii-letter_
+(def uppercase-ascii-letter_
   (set-lit "an uppercase ASCII letter" uppercase-ascii-alphabet))
 
-(defvar lowercase-ascii-letter_
+(def lowercase-ascii-letter_
   (set-lit "a lowercase ASCII letter" lowercase-ascii-alphabet))
 
-(defvar ascii-letter_
+(def ascii-letter_
   (label "an ASCII letter"
     (+ uppercase-ascii-letter_ lowercase-ascii-letter_)))
 
-(defvar ascii-alphanumeric_
+(def ascii-alphanumeric_
   (label "an alphanumeric ASCII character"
     (+ ascii-letter_ decimal-digit_)))
 
-; (def rule (for [a anything_, b anything_] [a b]))
-; (def rule (validate anything_ (partial = 'a)))
-; (def rule (mapcat '[a b]))
-; (def rule (lit \3))
-; (def rule (lex (mapcat "let 3")))
-; (def rule (+ (lex (mapcat "let 3")) (mapcat "la")))
-; (def rule (lex (label "let expr" (mapcat "let 3"))))
-; (def rule (+ (lex (label "let expr" (mapcat "let 3")))
+; (define rule (for [a anything_, b anything_] [a b]))
+; (define rule (validate anything_ (partial = 'a)))
+; (define rule (mapcat '[a b]))
+; (define rule (lit \3))
+; (define rule (lex (mapcat "let 3")))
+; (define rule (+ (lex (mapcat "let 3")) (mapcat "la")))
+; (define rule (lex (label "let expr" (mapcat "let 3"))))
+; (define rule (+ (lex (label "let expr" (mapcat "let 3")))
 ;                (lit \3)))
-; (def rule emptiness_)
-; (def rule (rep* (antilit \3)))
-; (def rule (rep* decimal-digit))
-; (def rule (followed-by (mapcat "li")))
+; (define rule emptiness_)
+; (define rule (rep* (antilit \3)))
+; (define rule (rep* decimal-digit))
+; (define rule (followed-by (mapcat "li")))
 
 ; (-> "lit 3" make-state rule println)
