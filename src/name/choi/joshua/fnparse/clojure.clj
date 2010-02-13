@@ -7,10 +7,9 @@
   (:import [clojure.lang IPersistentMap]))
 
 ; TODO
-; How does Clojure's reader figure out namespaces and namespace aliases?
 ; Unicode character codes.
 ; Keyword-specific restrictions.
-; Anonymous functions.
+; #=, #< reader macros
 
 (defn prefix-list-fn [prefix-rule]
   (fn [product] (list prefix-rule product)))
@@ -71,7 +70,7 @@
 
 (declare form_)
 
-(def comment-indicator_ (r/lit \;))
+(def comment-indicator_ (r/+ (r/lit \;) (r/lex (r/mapcat "#!"))))
 
 (def comment-char_ (r/antilit \newline))
 
@@ -281,19 +280,20 @@
 (r/defn padded-lit [token]
   (r/prefix (r/lit token) opt-ws_))
 
-(t/do-template [rule_ prefix product-fn-symbol prefix-is-rule?]
+(t/do-template [rule_ prefix product-fn-symbol]
   (def rule_
     (r/hook (prefix-list-fn product-fn-symbol)
-      (r/prefix
-        (r/cat ((if prefix-is-rule? identity padded-lit) prefix) opt-ws_)
-        #'form_)))
-  quoted_ \' `quote false
-  syntax-quoted_ \` `syntax-quote false
-  unquote-spliced_ (r/lex (r/mapcat "~@")) `unquote-splicing true
-  unquoted_ \~ `unquote false
-  derefed_ \@ `deref false
-  var-inner_ \' `var false
-  deprecated-meta_ \^ `meta false)
+      (r/prefix (r/cat (padded-lit prefix) opt-ws_) #'form_)))
+  quoted_ \' `quote
+  syntax-quoted_ \` `syntax-quote
+  unquoted_ \~ `unquote
+  derefed_ \@ `deref
+  var-inner_ \' `var
+  deprecated-meta_ \^ `meta)
+
+(def unquote-spliced_
+  (r/hook (prefix-list-fn `unquote-splicing)
+    (r/prefix (r/cat (r/lex (r/mapcat "~@")) opt-ws_) #'form_)))
 
 (def deprecated-meta_
   (r/suffix deprecated-meta_
@@ -315,8 +315,6 @@
   (r/prefix (padded-lit \^)
     (r/for [metadata metadata_, _ opt-ws_, content #'form_]
       (list `with-meta content metadata))))
-
-; TODO Implement context
 
 (def anonymous-fn-parameter-suffix_
   (r/+ decimal-natural-number_ (r/lit \&) (r/chook 1 r/emptiness_)))
@@ -366,9 +364,6 @@
 (def form_
   (r/label "a form" (r/prefix opt-ws_ form-content_)))
 
-(def document_
-  (r/suffix form-series_ r/end-of-input_))
-
 (deftest various-rules
   (is (match? form_ {} "55.2e2" == 5520.))
   (is (match? form_ {} "16rFF" == 255))
@@ -393,7 +388,7 @@
                   "whitespace"}}))
   (is (match? form_ {} "+" = '+))
   (is (match? form_ {} "clojure.core//" = 'clojure.core//))
-  (is (match? form_ {} "\"a\\n\"" = "a\n"))
+  (is (match? form_ {} "#!/usr/bin/clojure\n\"a\\n\"" = "a\n"))
   (is (match? form_ {} "[~@a ()]" =
         [(list 'clojure.core/unquote-splicing 'a) ()]))
   (is (match? form_ {:context (ClojureContext "user" {} nil)}
