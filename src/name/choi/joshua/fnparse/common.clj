@@ -85,7 +85,8 @@
               (report-this# :pass))))
         (fn failure-match [error#]
           (report-this# :fail
-            (format "a valid input for the given rule '%s'" '~rule)
+            (format "a successful parse by the rule '%s' from the input '%s'"
+              '~rule '~input)
             (format-parse-error error#)))))))
 
 (defn non-match-assert-expr

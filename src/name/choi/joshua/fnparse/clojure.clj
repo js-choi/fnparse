@@ -76,9 +76,12 @@
 (def non-alphanumeric-symbol-char_
   (r/set-lit "a non-alphanumeric symbol character" "*+!-_?."))
 
+(def symbol-first-char_
+  (r/+ r/ascii-letter_ non-alphanumeric-symbol-char_))
+
 (def symbol-char_
   (r/label "a symbol character"
-    (r/+ r/ascii-alphanumeric_ non-alphanumeric-symbol-char_)))
+    (r/+ symbol-first-char_ r/decimal-digit_)))
 
 (def symbol-char-series_
   (r/hook str* (r/rep+ symbol-char_)))
@@ -94,7 +97,7 @@
 
 (def symbol_
   (r/for "a symbol"
-         [first-char r/ascii-letter_
+         [first-char symbol-first-char_
           rest-pre-slash (r/opt symbol-char-series_)
           post-slash (r/opt symbol-suffix_)
           _ symbol-end_]
@@ -341,6 +344,7 @@
         {:message #{"no namespace with alias 'z'"}
          :label #{"the end of input" "a symbol character" "an indicator"
                   "whitespace"}}))
+  (is (match? form_ {} "+" = '+))
   (is (match? form_ {} "clojure.core//" = 'clojure.core//))
   (is (match? form_ {} "\"a\\n\"" = "a\n"))
   (is (match? form_ {} "[~@a ()]" =
