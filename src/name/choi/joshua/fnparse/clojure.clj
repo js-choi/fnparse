@@ -32,6 +32,9 @@
 (deftype ClojureContext [ns-name ns-aliases anonymous-fn-context]
   IPersistentMap)
 
+(deftype AnonymousFnContext [normal-parameters slurping-parameter]
+  IPersistentMap)
+
 (def peculiar-symbols {"nil" nil, "true" true, "false" false})
 
 (def ws-set (set " ,\t\n"))
@@ -41,6 +44,22 @@
 (defn annotate-symbol-end [error]
   (if (= (:unexpected-token error) \/)
     "multiple slashes aren't allowed in symbols"))
+
+(defn get-already-existing-symbol [fn-context suffix]
+  (cond
+    (integer? suffix)
+      (get (:normal-parameters fn-context) (dec suffix))
+    (= suffix \&)
+      (:slurping-parameter fn-context)))
+
+(defn update-fn-context [context parameter-suffix parameter-symbol]
+  (cond
+    (integer? parameter-suffix)
+      (update-in context [:anonymous-fn-context :normal-parameters] 
+        conj parameter-symbol)
+    (= parameter-suffix \&)
+      (update-in context [:anonymous-fn-context]
+        assoc :slurping-parameter parameter-symbol)))
 
 ;;; RULES START HERE.
 
@@ -206,10 +225,11 @@
        (radix-coefficient-tail base) no-number-tail_))
 
 (def number_
-  (r/for [sign (r/opt number-sign_)
-          prefix-number decimal-natural-number_
-          tail-fn (number-tail prefix-number)
-          _ form-end_]
+  (r/for "a number"
+    [sign (r/opt number-sign_)
+     prefix-number decimal-natural-number_
+     tail-fn (number-tail prefix-number)
+     _ form-end_]
     (tail-fn (* (or sign 1) prefix-number))))
 
 (def string-delimiter_ (r/lit \"))
@@ -292,27 +312,43 @@
 
 ; TODO Implement context
 
+(def anonymous-fn-parameter-suffix_
+  (r/+ decimal-natural-number_ (r/lit \&) (r/chook 1 r/emptiness_)))
+
 (def anonymous-fn-parameter_
-  (r/for [_ (r/followed-by (r/lit \%))
-           ; followed-by is used because the only-when rule below can make
-           ; make an error. If a plain (r/lit \%) was used, those errors
-           ; would be made after the % sign rather than before: at the wrong
-           ; position, and with the wrong descriptors.
-          context r/fetch-context_
-          _ (r/only-when (:anonymous-fn-context context)
-              "a parameter literals must be inside an anonymous function")
-          _ r/anything_
-          number (r/opt decimal-natural-number_)]
-    (or number 1)))
+  (r/for "a parameter"
+    [_ (r/lit \%)
+     context r/fetch-context_
+     fn-context (r/only-when (:anonymous-fn-context context)
+                  "a parameter literals must be inside an anonymous function")
+     suffix anonymous-fn-parameter-suffix_
+     already-existing-symbol (r/with-product (get-already-existing-symbol
+                                               fn-context suffix))
+     parameter-symbol (r/with-product (or already-existing-symbol
+                                          (gensym "parameter")))
+     _ (if (nil? already-existing-symbol)
+         (r/alter-context update-fn-context suffix parameter-symbol)
+         r/emptiness_)]
+    parameter-symbol))
 
 (def anonymous-fn_
-  (r/for [_ (r/lit \()
-          context r/fetch-context_
-          _ (r/only-when (not (:anonymous-fn-context context))
-              "nested anonymous functions are not allowed")
-          content form-series_
-          _ (r/lit \))]
-    content))
+  (r/for "an anonymous function"
+    [_ (r/lit \()
+     pre-context r/fetch-context_
+     _ (r/only-when (not (:anonymous-fn-context pre-context))
+         "nested anonymous functions are not allowed")
+     _ (r/alter-context assoc :anonymous-fn-context (AnonymousFnContext [] nil))
+     content form-series_
+     post-context r/fetch-context_
+     _ (r/alter-context assoc :anonymous-fn-context nil)
+     _ (r/lit \))]
+    (let [anonymous-fn-context (:anonymous-fn-context post-context)
+          parameters (:normal-parameters anonymous-fn-context)
+          parameters (if-let [slurping-parameter (:slurping-parameter
+                                                   anonymous-fn-context)]
+                       (conj parameters '& slurping-parameter)
+                       parameters)]
+      (list `fn 'anonymous-fn parameters content))))
 
 (def dispatched-inner_
   (r/+ anonymous-fn_ set-inner_ fn-inner_ var-inner_ with-meta-inner_))
@@ -359,14 +395,14 @@
   (is (match? form_ {} "[~@a ()]" =
         [(list 'clojure.core/unquote-splicing 'a) ()]))
   (is (match? form_ {:context (ClojureContext "user" {} nil)}
-        "#(+ % %2)" #(= (% 3 2) 5)))
+        "[#(%) #(apply + % %2 %2 %&)]"
+        #(= ((eval (second %)) 3 2 2 1) 10)))
   (is (non-match? form_ {:position 4} "17rAZ"
         {:label #{"a base-17 digit" "an indicator"
                   "whitespace" "the end of input"}}))
-  (is (non-match? form_ {:position 5, :context (ClojureContext "user" {} nil)}
+  (is (non-match? form_ {:position 6, :context (ClojureContext "user" {} nil)}
         "#(% #(%))"
-        {:label #{}
-         :message #{"nested anonymous functions are not allowed"}}))
+        {:message #{"nested anonymous functions are not allowed"}}))
   (is (non-match? form_ {:position 3} "3/0 3"
         {:label #{"a base-10 digit"}
          :message #{"a fraction's denominator cannot be zero"}})))

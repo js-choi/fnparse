@@ -330,6 +330,12 @@
 (define-fn fetch-context_ [state]
   (c/apply-rule state (with-product (:context state))))
 
+(define-fn alter-context [f & args]
+  (fn context-altering-rule [state]
+    (let [altered-state (apply update-in state [:context] f args)]
+      ; (prn (c/apply-rule altered-state fetch-context_))
+      (c/apply-rule altered-state fetch-context_))))
+
 (def ascii-digits "0123456789")
 (def lowercase-ascii-alphabet "abcdefghijklmnopqrstuvwxyz")
 (def uppercase-ascii-alphabet "ABCDEFGHIJKLMNOPQRSTUVWXYZ")

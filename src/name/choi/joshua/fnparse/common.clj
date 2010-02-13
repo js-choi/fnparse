@@ -56,6 +56,7 @@
 (defn group-descriptors [descriptors]
   (->> descriptors (group-by :kind)
        (map #(vector (key %) (set (map :text (val %)))))
+       (filter #(seq (get % 1)))
        (into {})))
 
 (defn format-parse-error [{:keys #{position descriptors}}]
