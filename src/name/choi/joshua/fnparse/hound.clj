@@ -28,13 +28,13 @@
     (update-in (-> merger :result force) [:error]
       c/merge-parse-errors (-> mergee :result force :error))))
 
-(define-fn with-product [product]
-  (fn with-product-rule [state]
+(define-fn prod [product]
+  (fn prod-rule [state]
     (Reply false
       (c/Success product state
         (c/ParseError (:position state) nil nil)))))
 
-(def emptiness_ (with-product nil))
+(def emptiness_ (prod nil))
 
 (define-fn- make-failed-reply
   ([state descriptors]
@@ -64,7 +64,7 @@
   (list* `defn (vary-meta fn-name assoc :private true) forms))
 
 (defn only-when [valid? message]
-  (if-not valid? (with-error message) (with-product valid?)))
+  (if-not valid? (with-error message) (prod valid?)))
 
 (define-fn combine [rule product-fn]
   (letfn [(apply-product-fn [result]
@@ -112,7 +112,7 @@
 (m/defmonad parser-m
   "The monad that FnParse uses."
   [m-zero nothing_
-   m-result with-product
+   m-result prod
    m-bind combine
    m-plus +])
 
@@ -248,7 +248,7 @@
     (let [result (-> state (c/apply-rule rule) :result force)]
       (if (c/failure? result)
         (Reply false result)
-        ((with-product (:product result)) state)))))
+        ((prod (:product result)) state)))))
 
 (define-fn not-followed-by
   [label-string rule]
@@ -328,7 +328,7 @@
   (->> rule (replicate n) (apply cat)))
 
 (define-fn fetch-context_ [state]
-  (c/apply-rule state (with-product (:context state))))
+  (c/apply-rule state (prod (:context state))))
 
 (define-fn alter-context [f & args]
   (fn context-altering-rule [state]

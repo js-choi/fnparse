@@ -45,6 +45,12 @@
   (if (= (:unexpected-token error) \/)
     "multiple slashes aren't allowed in symbols"))
 
+(defn make-parameter-vector [{:keys #{normal-parameters slurping-parameter}}]
+  {:pre #{(vector? normal-parameters)}}
+  (if slurping-parameter
+    (conj normal-parameters '& slurping-parameter)
+    normal-parameters))
+
 (defn get-already-existing-symbol [fn-context suffix]
   (cond
     (integer? suffix)
@@ -179,7 +185,7 @@
     (r/label label (r/chook product (r/lit token)))
     "positive sign" \+ 1, "negative sign" \- -1))
 
-(def no-number-tail_
+(def empty-number-tail_
   (r/chook identity r/emptiness_))
 
 (def imprecise-fractional-part_
@@ -187,7 +193,7 @@
     (r/lit \.)
     (r/+ (r/hook #(partial + %)
            (r/cascading-rep+ r/decimal-digit_ #(/ % 10) #(/ (+ %1 %2) 10)))
-         no-number-tail_)))
+         empty-number-tail_)))
 
 (def exponential-part_
   (r/prefix
@@ -198,7 +204,7 @@
 
 (def fractional-exponential-part_
   (r/for [frac-fn imprecise-fractional-part_
-          exp-fn (r/+ exponential-part_ no-number-tail_)]
+          exp-fn (r/+ exponential-part_ empty-number-tail_)]
     (comp exp-fn frac-fn)))
 
 (def imprecise-number-tail_
@@ -222,7 +228,7 @@
 
 (r/defn number-tail [base]
   (r/+ imprecise-number-tail_ fraction-denominator-tail_
-       (radix-coefficient-tail base) no-number-tail_))
+       (radix-coefficient-tail base) empty-number-tail_))
 
 (def number_
   (r/for "a number"
@@ -322,10 +328,10 @@
      fn-context (r/only-when (:anonymous-fn-context context)
                   "a parameter literals must be inside an anonymous function")
      suffix anonymous-fn-parameter-suffix_
-     already-existing-symbol (r/with-product (get-already-existing-symbol
-                                               fn-context suffix))
-     parameter-symbol (r/with-product (or already-existing-symbol
-                                          (gensym "parameter")))
+     already-existing-symbol (r/prod (get-already-existing-symbol fn-context
+                                                                  suffix))
+     parameter-symbol (r/prod (or already-existing-symbol
+                                  (gensym "parameter")))
      _ (if (nil? already-existing-symbol)
          (r/alter-context update-fn-context suffix parameter-symbol)
          r/emptiness_)]
@@ -343,11 +349,7 @@
      _ (r/alter-context assoc :anonymous-fn-context nil)
      _ (r/lit \))]
     (let [anonymous-fn-context (:anonymous-fn-context post-context)
-          parameters (:normal-parameters anonymous-fn-context)
-          parameters (if-let [slurping-parameter (:slurping-parameter
-                                                   anonymous-fn-context)]
-                       (conj parameters '& slurping-parameter)
-                       parameters)]
+          parameters (make-parameter-vector anonymous-fn-context)]
       (list `fn 'anonymous-fn parameters content))))
 
 (def dispatched-inner_
