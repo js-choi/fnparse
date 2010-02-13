@@ -293,7 +293,16 @@
 ; TODO Implement context
 
 (def anonymous-fn-parameter_
-  (r/for [_ (r/lit \%), number (r/opt decimal-natural-number_)]
+  (r/for [_ (r/followed-by (r/lit \%))
+           ; followed-by is used because the only-when rule below can make
+           ; make an error. If a plain (r/lit \%) was used, those errors
+           ; would be made after the % sign rather than before: at the wrong
+           ; position, and with the wrong descriptors.
+          context r/fetch-context_
+          _ (r/only-when (:anonymous-fn-context context)
+              "a parameter literals must be inside an anonymous function")
+          _ r/anything_
+          number (r/opt decimal-natural-number_)]
     (or number 1)))
 
 (def anonymous-fn_
@@ -314,7 +323,7 @@
 (def form-content_
   (r/+ list_ vector_ map_ dispatched_ string_ syntax-quoted_
        unquote-spliced_ unquoted_ deprecated-meta_ character_ keyword_
-       symbol_ number_))
+       anonymous-fn-parameter_ symbol_ number_))
 
 (def form_
   (r/label "a form" (r/prefix opt-ws_ form-content_)))
@@ -349,12 +358,12 @@
   (is (match? form_ {} "\"a\\n\"" = "a\n"))
   (is (match? form_ {} "[~@a ()]" =
         [(list 'clojure.core/unquote-splicing 'a) ()]))
-  #_(is (match? form_ {:context (ClojureContext "user" {} nil)}
+  (is (match? form_ {:context (ClojureContext "user" {} nil)}
         "#(+ % %2)" #(= (% 3 2) 5)))
   (is (non-match? form_ {:position 4} "17rAZ"
         {:label #{"a base-17 digit" "an indicator"
                   "whitespace" "the end of input"}}))
-  #_(is (non-match? form_ {:position 5, :context (ClojureContext "user" {} nil)}
+  (is (non-match? form_ {:position 5, :context (ClojureContext "user" {} nil)}
         "#(% #(%))"
         {:label #{}
          :message #{"nested anonymous functions are not allowed"}}))
