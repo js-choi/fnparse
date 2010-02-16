@@ -64,31 +64,33 @@
 
 (defn match-assert-expr
   [parse-fn msg rule input opts]
-  (let [{product-pred :product, :keys #{position context} :or {context {}}}
-          (apply hash-map opts)]
+  (let [{product-pred :product
+         :keys #{position context}
+         :or {product-pred (constantly true)
+              position (count input)
+              context {}}}
+        (apply hash-map opts)]
    `(letfn [(report-this#
               ([kind# expected-arg# actual-arg#]
                (report {:type kind#, :message ~msg, :expected expected-arg#,
                         :actual actual-arg#}))
               ([kind#] (report {:type kind#, :message ~msg})))]
-      (let [input-size# (count ~input)
-            consume-num# (or ~position input-size#)]
-        (~parse-fn ~rule ~input ~context
-          (fn success-match [actual-product# actual-position#]
-            (if (not= actual-position# consume-num#)
-              (report-this# :fail
-                (format "%s tokens consumed by the rule" consume-num#)
-                (format "%s tokens actually consumed" actual-position#))
-              (if (not (~product-pred actual-product#))
-                (report-this# :fail
-                  (list '~product-pred '~'rule-product)
-                  (format "the invalid product %s" (pr-str actual-product#)))
-                (report-this# :pass))))
-          (fn failure-match [error#]
+      (~parse-fn ~rule ~input ~context
+        (fn success-match [actual-product# actual-position#]
+          (if (not= actual-position# ~position)
             (report-this# :fail
-              (format "a successful parse by the rule '%s' from the input '%s'"
-                '~rule '~input)
-              (format-parse-error error#))))))))
+              (format "%s tokens consumed by the rule" ~position)
+              (format "%s tokens actually consumed" actual-position#))
+            (if (not (~product-pred actual-product#))
+              (report-this# :fail
+                (list '~product-pred '~'rule-product)
+                (format "the invalid product %s" (pr-str actual-product#)))
+              (report-this# :pass))))
+        (fn failure-match [error#]
+          (report-this# :fail
+            (format "a successful parse by the rule '%s' from the input '%s'"
+              '~rule '~input)
+            (format-parse-error error#)))))))
 
 (defn non-match-assert-expr
   [parse-fn msg rule {:keys #{position context}} input descriptor-map]

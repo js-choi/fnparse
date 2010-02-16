@@ -366,39 +366,39 @@
 
 (deftest various-rules
   (is (match? form_ "55.2e2" :product #(== % 5520.)))
+  (is (match? form_ "16rFF" :product #(== % 255)))
+  (is (match? form_ "16." :product #(== % 16.)))
+  (is (match? form_ "true" :product true?))
+  (is (= (with-out-str (r/parse form_ "^()" {} list list))
+         "WARNING: The ^ indicator is deprecated (since Clojure 1.1).\n"))
+  (is (match? form_ "[()]" :product #(= % [()])))
+  (is (match? form_ "\"\\na\\u3333\"" :product #(= % "\na\u3333")))
   (comment
-    (is (match? form_ {} "16rFF" == 255))
-    (is (match? form_ {} "16." == 16.))
-    (is (match? form_ {} "true" true?))
-    (is (= (with-out-str (r/parse form_ "^()" {} list list))
-           "WARNING: The ^ indicator is deprecated (since Clojure 1.1).\n"))
-    (is (match? form_ {} "[()]" = [()]))
-    (is (match? form_ {} "\"\\na\\u3333\"" = "\na\u3333"))
     (is (non-match? form_ {:position 7} "([1 32]"
           {:label #{"a form" "')'" "whitespace"}}))
     (is (non-match? form_ {:position 3} "a/b/c"
           {:message #{"multiple slashes aren't allowed in symbols"}
            :label #{"an indicator" "the end of input"
                     "a symbol character" "whitespace"}}))
-    (is (match? form_ {} ":a/b" = :a/b))
-    (is (match? form_ {:context (ClojureContext "user" {} nil)}
+    (is (match? form_ ":a/b" = :a/b))
+    (is (match? form_ {:context (ClojureContext "user" nil)}
           "::b" = :user/b))
     (is (non-match? form_ {:position 3} "::z/abc"
           {:message #{"no namespace with alias 'z'"}
            :label #{"the end of input" "a symbol character" "an indicator"
                     "whitespace"}}))
-    (is (match? form_ {} "+" = '+))
-    (is (match? form_ {} "clojure.core//" = 'clojure.core//))
-    (is (match? form_ {} "#!/usr/bin/clojure\n\"a\\n\"" = "a\n"))
-    (is (match? form_ {} "[~@a ()]" =
+    (is (match? form_ "+" = '+))
+    (is (match? form_ "clojure.core//" = 'clojure.core//))
+    (is (match? form_ "#!/usr/bin/clojure\n\"a\\n\"" = "a\n"))
+    (is (match? form_ "[~@a ()]" =
           [(list 'clojure.core/unquote-splicing 'a) ()]))
-    (is (match? form_ {:context (ClojureContext "user" {} nil)}
+    (is (match? form_ {:context (ClojureContext "user" nil)}
           "[#(%) #(apply + % %2 %2 %&)]"
           #(= ((eval (second %)) 3 2 2 1) 10)))
     (is (non-match? form_ {:position 4} "17rAZ"
           {:label #{"a base-17 digit" "an indicator"
                     "whitespace" "the end of input"}}))
-    (is (non-match? form_ {:position 6, :context (ClojureContext "user" {} nil)}
+    (is (non-match? form_ {:position 6, :context (ClojureContext "user" nil)}
           "#(% #(%))"
           {:message #{"nested anonymous functions are not allowed"}}))
     (is (non-match? form_ {:position 3} "3/0 3"
