@@ -121,10 +121,10 @@
 
 (def symbol_
   (r/for "a symbol"
-         [first-char symbol-first-char_
-          rest-pre-slash (r/opt symbol-char-series_)
-          post-slash (r/opt symbol-suffix_)
-          _ symbol-end_]
+    [first-char symbol-first-char_
+     rest-pre-slash (r/opt symbol-char-series_)
+     post-slash (r/opt symbol-suffix_)
+     _ symbol-end_]
     (let [pre-slash (str first-char rest-pre-slash)]
       (if post-slash
         (symbol pre-slash post-slash)
@@ -323,13 +323,13 @@
   (r/for "a parameter"
     [_ (r/lit \%)
      context r/fetch-context_
-     fn-context (r/only-when (:anonymous-fn-context context)
-                  "a parameter literals must be inside an anonymous function")
+     :let [fn-context (:anonymous-fn-context context)]
+     _ (r/only-when fn-context
+         "a parameter literals must be inside an anonymous function")
      suffix anonymous-fn-parameter-suffix_
-     already-existing-symbol (r/prod (get-already-existing-symbol fn-context
-                                                                  suffix))
-     parameter-symbol (r/prod (or already-existing-symbol
-                                  (gensym "parameter")))
+     :let [already-existing-symbol (get-already-existing-symbol fn-context
+                                                                suffix)
+           parameter-symbol (or already-existing-symbol (gensym "parameter"))]
      _ (if (nil? already-existing-symbol)
          (r/alter-context update-fn-context suffix parameter-symbol)
          r/emptiness_)]
