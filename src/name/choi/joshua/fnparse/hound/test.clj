@@ -4,9 +4,8 @@
             [clojure.test :as test]))
 
 (defmethod test/assert-expr 'match?
-  [msg [_ rule opts input product-pred & product-pred-args]]
-  (c/match-assert-expr p/parse msg rule opts input product-pred
-                       product-pred-args))
+  [msg [_ rule input & opts]]
+  (c/match-assert-expr p/parse msg rule input opts))
 
 (defmethod test/assert-expr 'non-match?
   [msg [_ rule opts input descriptor-map]]
