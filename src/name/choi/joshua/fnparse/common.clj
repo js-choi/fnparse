@@ -64,11 +64,8 @@
 
 (defn match-assert-expr
   [parse-fn msg rule input opts]
-  (let [{product-pred :product
-         :keys #{position context}
-         :or {product-pred (constantly true)
-              position (count input)
-              context {}}}
+  (let [{:keys #{position context product?}
+         :or {product? (list constantly true), position (count input), context {}}}
         (apply hash-map opts)]
    `(letfn [(report-this#
               ([kind# expected-arg# actual-arg#]
@@ -81,9 +78,9 @@
             (report-this# :fail
               (format "%s tokens consumed by the rule" ~position)
               (format "%s tokens actually consumed" actual-position#))
-            (if (not (~product-pred actual-product#))
+            (if (not (~product? actual-product#))
               (report-this# :fail
-                (list '~product-pred '~'rule-product)
+                (list '~product? '~'rule-product)
                 (format "the invalid product %s" (pr-str actual-product#)))
               (report-this# :pass))))
         (fn failure-match [error#]

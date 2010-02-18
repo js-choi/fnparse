@@ -365,44 +365,50 @@
   (r/label "a form" (r/prefix opt-ws_ form-content_)))
 
 (deftest various-rules
-  (is (match? form_ "55.2e2" :product #(== % 5520.)))
-  (is (match? form_ "16rFF" :product #(== % 255)))
-  (is (match? form_ "16." :product #(== % 16.)))
-  (is (match? form_ "true" :product true?))
+  (is (match? form_ "55.2e2" :product? #(== % 5520.)))
+  (is (match? form_ "16rFF" :product? #(== % 255)))
+  (is (match? form_ "16." :product? #(== % 16.)))
+  (is (match? form_ "true" :product? true?))
   (is (= (with-out-str (r/parse form_ "^()" {} list list))
          "WARNING: The ^ indicator is deprecated (since Clojure 1.1).\n"))
-  (is (match? form_ "[()]" :product #(= % [()])))
-  (is (match? form_ "\"\\na\\u3333\"" :product #(= % "\na\u3333")))
-  (is (non-match? form_ "([1 32]" :position 7
+  (is (match? form_ "[()]" :product? #(= % [()])))
+  (is (match? form_ "\"\\na\\u3333\"" :product? #(= % "\na\u3333")))
+  (is (non-match? form_ "([1 32]"
+        :position 7
         :labels #{"a form" "')'" "whitespace"}))
-  (comment
-    (is (non-match? form_ {:position 3} "a/b/c"
-          {:messages #{"multiple slashes aren't allowed in symbols"}
-           :labels #{"an indicator" "the end of input"
-                    "a symbol character" "whitespace"}}))
-    (is (match? form_ ":a/b" = :a/b))
-    (is (match? form_ {:context (ClojureContext "user" nil)}
-          "::b" = :user/b))
-    (is (non-match? form_ {:position 3} "::z/abc"
-          {:messages #{"no namespace with alias 'z'"}
-           :labels #{"the end of input" "a symbol character" "an indicator"
-                    "whitespace"}}))
-    (is (match? form_ "+" = '+))
-    (is (match? form_ "clojure.core//" = 'clojure.core//))
-    (is (match? form_ "#!/usr/bin/clojure\n\"a\\n\"" = "a\n"))
-    (is (match? form_ "[~@a ()]" =
-          [(list 'clojure.core/unquote-splicing 'a) ()]))
-    (is (match? form_ {:context (ClojureContext "user" nil)}
-          "[#(%) #(apply + % %2 %2 %&)]"
-          #(= ((eval (second %)) 3 2 2 1) 10)))
-    (is (non-match? form_ {:position 4} "17rAZ"
-          {:labels #{"a base-17 digit" "an indicator"
-                    "whitespace" "the end of input"}}))
-    (is (non-match? form_ {:position 6, :context (ClojureContext "user" nil)}
-          "#(% #(%))"
-          {:messages #{"nested anonymous functions are not allowed"}}))
-    (is (non-match? form_ {:position 3} "3/0 3"
-          {:labels #{"a base-10 digit"}
-           :messages #{"a fraction's denominator cannot be zero"}}))))
+  (is (non-match? form_ "a/b/c"
+        :position 3
+        :messages #{"multiple slashes aren't allowed in symbols"}
+        :labels #{"an indicator" "the end of input"
+                  "a symbol character" "whitespace"}))
+  (is (match? form_ ":a/b" :product? #(= % :a/b)))
+  (is (match? form_ "::b"
+        :context (ClojureContext "user" nil nil)
+        :product? #(= % :user/b)))
+  (is (non-match? form_ "::z/abc"
+        :position 3
+        :messages #{"no namespace with alias 'z'"}
+        :labels #{"the end of input" "a symbol character" "an indicator"
+                  "whitespace"}))
+  (is (match? form_ "+" :product? #(= % '+)))
+  (is (match? form_ "clojure.core//" :product? #(= % 'clojure.core//)))
+  (is (match? form_ "#!/usr/bin/clojure\n\"a\\n\"" :product? #(= % "a\n")))
+  (is (match? form_ "[~@a ()]"
+        :product? #(= % [(list 'clojure.core/unquote-splicing 'a) ()])))
+  (is (match? form_ "[#(%) #(apply + % %2 %2 %&)]"
+        :context (ClojureContext "user" nil nil)
+        :product? #(= ((eval (second %)) 3 2 8 1) 16)))
+  (is (non-match? form_ "17rAZ"
+        :position 4
+        :labels #{"a base-17 digit" "an indicator" "whitespace"
+                  "the end of input"}))
+  (is (non-match? form_ "#(% #(%))"
+        :position 6
+        :context (ClojureContext "user" nil nil)
+        :messages #{"nested anonymous functions are not allowed"}))
+  (is (non-match? form_ "3/0 3"
+        :position 3
+        :labels #{"a base-10 digit"}
+        :messages #{"a fraction's denominator cannot be zero"})))
 
 (run-tests)
