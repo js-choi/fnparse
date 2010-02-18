@@ -8,5 +8,5 @@
   (c/match-assert-expr p/parse msg rule input opts))
 
 (defmethod test/assert-expr 'non-match?
-  [msg [_ rule opts input descriptor-map]]
-  (c/non-match-assert-expr p/parse msg rule opts input descriptor-map))
+  [msg [_ rule input & opts]]
+  (c/non-match-assert-expr p/parse msg rule input opts))

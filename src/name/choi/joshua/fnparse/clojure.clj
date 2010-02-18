@@ -373,19 +373,19 @@
          "WARNING: The ^ indicator is deprecated (since Clojure 1.1).\n"))
   (is (match? form_ "[()]" :product #(= % [()])))
   (is (match? form_ "\"\\na\\u3333\"" :product #(= % "\na\u3333")))
+  (is (non-match? form_ "([1 32]" :position 7
+        :labels #{"a form" "')'" "whitespace"}))
   (comment
-    (is (non-match? form_ {:position 7} "([1 32]"
-          {:label #{"a form" "')'" "whitespace"}}))
     (is (non-match? form_ {:position 3} "a/b/c"
-          {:message #{"multiple slashes aren't allowed in symbols"}
-           :label #{"an indicator" "the end of input"
+          {:messages #{"multiple slashes aren't allowed in symbols"}
+           :labels #{"an indicator" "the end of input"
                     "a symbol character" "whitespace"}}))
     (is (match? form_ ":a/b" = :a/b))
     (is (match? form_ {:context (ClojureContext "user" nil)}
           "::b" = :user/b))
     (is (non-match? form_ {:position 3} "::z/abc"
-          {:message #{"no namespace with alias 'z'"}
-           :label #{"the end of input" "a symbol character" "an indicator"
+          {:messages #{"no namespace with alias 'z'"}
+           :labels #{"the end of input" "a symbol character" "an indicator"
                     "whitespace"}}))
     (is (match? form_ "+" = '+))
     (is (match? form_ "clojure.core//" = 'clojure.core//))
@@ -396,13 +396,13 @@
           "[#(%) #(apply + % %2 %2 %&)]"
           #(= ((eval (second %)) 3 2 2 1) 10)))
     (is (non-match? form_ {:position 4} "17rAZ"
-          {:label #{"a base-17 digit" "an indicator"
+          {:labels #{"a base-17 digit" "an indicator"
                     "whitespace" "the end of input"}}))
     (is (non-match? form_ {:position 6, :context (ClojureContext "user" nil)}
           "#(% #(%))"
-          {:message #{"nested anonymous functions are not allowed"}}))
+          {:messages #{"nested anonymous functions are not allowed"}}))
     (is (non-match? form_ {:position 3} "3/0 3"
-          {:label #{"a base-10 digit"}
-           :message #{"a fraction's denominator cannot be zero"}}))))
+          {:labels #{"a base-10 digit"}
+           :messages #{"a fraction's denominator cannot be zero"}}))))
 
 (run-tests)

@@ -57,7 +57,7 @@
   (->> descriptors (group-by :kind)
        (map #(vector (key %) (set (map :text (val %)))))
        (filter #(seq (get % 1)))
-       (into {})))
+       (into {:message nil, :label nil})))
 
 (defn format-parse-error [{:keys #{position descriptors}}]
   (format-parse-error-data position (group-descriptors descriptors)))
@@ -93,26 +93,28 @@
             (format-parse-error error#)))))))
 
 (defn non-match-assert-expr
-  [parse-fn msg rule {:keys #{position context}} input descriptor-map]
-  {:pre #{(map? descriptor-map) (or (nil? position) (integer? position))}}
- `(letfn [(report-this#
-            ([kind# expected-arg# actual-arg#]
-             (report {:type kind#, :message ~msg, :expected expected-arg#,
-                      :actual actual-arg#}))
-            ([kind#] (report {:type kind#, :message ~msg})))]
-    (let [expected-error-str# (format-parse-error-data 
-                                (or ~position "any") ~descriptor-map)]
-      (~parse-fn ~rule ~input ~context
-        (fn success-nonmatch [actual-product# actual-position#]
-          (report-this# :fail expected-error-str#
-            (format "successful parse up to %s with a product of %s"
-              actual-position# actual-product#)))
-        (fn failure-nonmatch
-          [{actual-position# :position, actual-descriptors# :descriptors}]
-          (let [actual-descriptor-map# (group-descriptors actual-descriptors#)]
-            (if (and (or (nil? ~position) (== ~position actual-position#))
-                     (= ~descriptor-map actual-descriptor-map#))
-              (report-this# :pass)
-              (report-this# :fail expected-error-str#
-                (format-parse-error-data
-                  actual-position# actual-descriptor-map#)))))))))
+  [parse-fn msg rule input opts]
+  ; {:pre #{(map? descriptor-map) (or (nil? position) (integer? position))}}
+  (let [{:keys #{labels messages position context}} (apply hash-map opts)
+        descriptor-map {:label labels, :message messages}]
+   `(letfn [(report-this#
+              ([kind# expected-arg# actual-arg#]
+               (report {:type kind#, :message ~msg, :expected expected-arg#,
+                        :actual actual-arg#}))
+              ([kind#] (report {:type kind#, :message ~msg})))]
+      (let [expected-error-str# (format-parse-error-data 
+                                  (or ~position "any") ~descriptor-map)]
+        (~parse-fn ~rule ~input ~context
+          (fn success-nonmatch [actual-product# actual-position#]
+            (report-this# :fail expected-error-str#
+              (format "successful parse up to %s with a product of %s"
+                actual-position# actual-product#)))
+          (fn failure-nonmatch
+            [{actual-position# :position, actual-descriptors# :descriptors}]
+            (let [actual-descriptor-map# (group-descriptors actual-descriptors#)]
+              (if (and (or (nil? ~position) (== ~position actual-position#))
+                       (= ~descriptor-map actual-descriptor-map#))
+                (report-this# :pass)
+                (report-this# :fail expected-error-str#
+                  (format-parse-error-data
+                    actual-position# actual-descriptor-map#))))))))))
