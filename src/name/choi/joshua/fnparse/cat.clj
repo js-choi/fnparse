@@ -2,9 +2,8 @@
   (:require [clojure.contrib.monads :as m] [clojure.template :as template]
             [name.choi.joshua.fnparse.common :as c] [clojure.contrib.def :as d]
             [clojure.contrib.seq :as seq])
-  (:refer-clojure
-    :rename {defn define-fn, defn- define-fn-}
-    :exclude #{+ for mapcat})
+  (:refer-clojure :rename {defn define-fn, defn- define-fn-}
+                  :exclude #{for + mapcat})
   (:import [clojure.lang IPersistentMap]))
 
 (defprotocol ABankable
@@ -395,7 +394,13 @@
           (c/Success true state (:error result))
           (-> state nothing_ (assoc :error (:error result))))))))
 
-(define-fn lit-conc-seq
+(define-fn mapcat [f tokens]
+  (->> tokens (map f) (apply cat)))
+
+(define-fn mapsum [f tokens]
+  (->> tokens (map f) (apply +)))
+
+(define-fn phrase
   "A convenience function: it creates a rule
   that is the concatenation of the literals
   formed from the given sequence of literal tokens.
@@ -407,22 +412,8 @@
   function. This is the function that is used
   to create the literal rules from each element
   in the given token sequence."
-  ([token-seq]
-   (lit-conc-seq token-seq lit))
-  ([token-seq rule-maker]
-   (+ cat (map rule-maker token-seq))))
-
-(define-fn lit-alt-seq
-  "A convenience function: it creates a rule
-  that is the alternation of the literals
-  formed from the given sequence of literal tokens.
-  (def a (lit-alt-seq [\"a\" \"b\" \"c\"]))
-  would be equivalent to the EBNF:
-    a = \"a\" | \"b\" | \"c\";"
-  ([token-seq]
-   (lit-alt-seq token-seq lit))
-  ([token-seq rule-maker]
-   (apply + (map rule-maker token-seq))))
+  [tokens]
+  (mapcat lit tokens))
 
 (define-fn except
   "Creates a rule that is the exception from
@@ -441,24 +432,6 @@
   ([label-str minuend first-subtrahend & rest-subtrahends]
    (except label-str minuend
      (apply + (cons first-subtrahend rest-subtrahends)))))
-
-(define-fn antiterm [label-str pred]
-  (term label-str (complement pred)))
-
-(define-fn antilit [token]
-  (term (str "anything except " token) #(not= token %)))
-
-(define-fn set-lit [label-str tokens]
-  (term label-str (set tokens)))
-
-(define-fn anti-set-lit [label-str tokens]
-  (antiterm label-str (tokens set)))
-
-(define-fn mapconc [tokens]
-  (apply cat (map lit tokens)))
-
-(define-fn mapalt [f coll]
-  (apply + (map f coll)))
 
 (define-fn prefix-conc [prefix body]
   (for [_ prefix, content body] content))
@@ -487,7 +460,7 @@
   ([label-str base]
    {:pre #{(integer? base) (<= 0 base 36)}}
    (->> base-36-digits (take base) seq/indexed
-     (mapalt (fn [[index token]] (chook index (case-insensitive-lit token))))
+     (mapsum (fn [[index token]] (chook index (case-insensitive-lit token))))
      (label label-str))))
 
 (d/defvar decimal-digit

@@ -4,8 +4,8 @@
             [clojure.contrib.monads :as m]
             [clojure.template :as t]
             [clojure.contrib.def :as d])
-  (:refer-clojure :exclude #{for + litcat}
-                  :rename {defn define-fn, defn- define-fn-})
+  (:refer-clojure :rename {defn define-fn, defn- define-fn-}
+                  :exclude #{for + mapcat})
   (:import [clojure.lang IPersistentMap]))
 
 (deftype State [remainder position context] :as this
@@ -253,14 +253,14 @@
 (define-fn rep* [rule]
   (opt (rep+ rule)))
 
-(define-fn litcat [tokens]
-  (apply cat (map lit tokens)))
+(define-fn mapcat [f tokens]
+  (->> tokens (map f) (apply cat)))
 
-(define-fn litalt [f coll]
-  (apply + (map f coll)))
+(define-fn mapsum [f tokens]
+  (->> tokens (map f) (apply +)))
 
-(define-fn optcat [& rules]
-  (opt (apply cat rules)))
+(define-fn phrase [tokens]
+  (mapcat lit tokens))
 
 (d/defvar end-of-input_
   (not-followed-by "the end of input" anything_)
@@ -349,8 +349,7 @@
   ([label-str base]
    {:pre #{(integer? base) (> base 0)}}
    (->> base-36-digits (take base) seq/indexed
-     (litalt (fn [[index token]]
-               (chook index (case-insensitive-lit token))))
+     (mapsum (fn [[index token]] (chook index (case-insensitive-lit token))))
      (label label-str))))
 
 (def decimal-digit_
@@ -375,16 +374,16 @@
 
 ; (define rule (for [a anything_, b anything_] [a b]))
 ; (define rule (validate anything_ (partial = 'a)))
-; (define rule (litcat '[a b]))
+; (define rule (phrase '[a b]))
 ; (define rule (lit \3))
-; (define rule (lex (litcat "let 3")))
-; (define rule (+ (lex (litcat "let 3")) (litcat "la")))
-; (define rule (lex (label "let expr" (litcat "let 3"))))
-; (define rule (+ (lex (label "let expr" (litcat "let 3")))
+; (define rule (lex (phrase "let 3")))
+; (define rule (+ (lex (phrase "let 3")) (phrase "la")))
+; (define rule (lex (label "let expr" (phrase "let 3"))))
+; (define rule (+ (lex (label "let expr" (phrase "let 3")))
 ;                (lit \3)))
 ; (define rule emptiness_)
 ; (define rule (rep* (antilit \3)))
 ; (define rule (rep* decimal-digit))
-; (define rule (followed-by (litcat "li")))
+; (define rule (followed-by (phrase "li")))
 
 ; (-> "lit 3" make-state rule println)
