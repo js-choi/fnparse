@@ -1,7 +1,7 @@
 (ns name.choi.joshua.fnparse.common
-  (:use clojure.template clojure.set clojure.test clojure.contrib.def
-        clojure.contrib.seq-utils)
-  (:require [clojure.contrib.str-utils2 :as str])
+  (:require [clojure.contrib.str-utils2 :as str] [clojure.template :as temp]
+            [clojure.set :as set] [clojure.test :as test]
+            [clojure.contrib.seq-utils :as seq])
   (:import [clojure.lang Sequential IPersistentMap IPersistentVector Var]))
 
 (defprotocol AState
@@ -22,7 +22,7 @@
   IPersistentMap
   AParseAnswer (answer-result [] this))
 
-(do-template [fn-name type-name doc-string]
+(temp/do-template [fn-name type-name doc-string]
   (defn fn-name doc-string [result]
     (-> result type (isa? type-name)))
   failure? ::Failure "Is the given result a Failure?"
@@ -44,7 +44,7 @@
   (cond
     (or (> position-b position-a) (empty? descriptors-a)) error-b
     (or (< position-b position-a) (empty? descriptors-b)) error-a
-    true (assoc error-a :descriptors (union descriptors-a descriptors-b))))
+    true (assoc error-a :descriptors (set/union descriptors-a descriptors-b))))
 
 (defn format-parse-error-data [position descriptor-map]
   (let [{labels :label, messages :message} descriptor-map
@@ -54,7 +54,7 @@
     (format "parse error at position %s: %s" position message-text)))
 
 (defn group-descriptors [descriptors]
-  (->> descriptors (group-by :kind)
+  (->> descriptors (seq/group-by :kind)
        (map #(vector (key %) (set (map :text (val %)))))
        (filter #(seq (get % 1)))
        (into {:message nil, :label nil})))
@@ -69,9 +69,10 @@
         (apply hash-map opts)]
    `(letfn [(report-this#
               ([kind# expected-arg# actual-arg#]
-               (report {:type kind#, :message ~msg, :expected expected-arg#,
-                        :actual actual-arg#}))
-              ([kind#] (report {:type kind#, :message ~msg})))]
+               (test/report {:type kind#, :message ~msg,
+                             :expected expected-arg#, :actual actual-arg#}))
+              ([kind#]
+               (test/report {:type kind#, :message ~msg})))]
       (~parse-fn ~rule ~input ~context
         (fn success-match [actual-product# actual-position#]
           (if (not= actual-position# ~position)
@@ -96,9 +97,10 @@
         descriptor-map {:label labels, :message messages}]
    `(letfn [(report-this#
               ([kind# expected-arg# actual-arg#]
-               (report {:type kind#, :message ~msg, :expected expected-arg#,
-                        :actual actual-arg#}))
-              ([kind#] (report {:type kind#, :message ~msg})))]
+               (test/report {:type kind#, :message ~msg,
+                             :expected expected-arg#, :actual actual-arg#}))
+              ([kind#]
+               (test/report {:type kind#, :message ~msg})))]
       (let [expected-error-str# (format-parse-error-data 
                                   (or ~position "any") ~descriptor-map)]
         (~parse-fn ~rule ~input ~context
