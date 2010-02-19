@@ -2,8 +2,7 @@
   (:require [name.choi.joshua.fnparse.cat :as r]
             [clojure.template :as template]
             name.choi.joshua.fnparse.cat.test)
-  (:use [clojure.test :only #{deftest is run-tests}])
-  (:refer-clojure :exclude #{+}))
+  (:use [clojure.test :only #{deftest is run-tests}]))
 
 (set! *warn-on-reflection* true)
 
@@ -19,25 +18,25 @@
   opening-parenthesis \(, closing-parenthesis \))
 
 (def indicator
-  (r/with-label "an indicator"
+  (r/label "an indicator"
     (r/+ plus-sign minus-sign multiplication-sign division-sign
          opening-parenthesis closing-parenthesis)))
 
 (def number-expr
-  (r/with-label "a number"
-    (r/+ (r/complex [first-digits #'number-expr, next-digit digit]
+  (r/label "a number"
+    (r/+ (r/for [first-digits #'number-expr, next-digit digit]
            (r/+ (* 10 first-digits) next-digit))
          digit)))
 
 (def symbol-char (r/except "a symbol character" r/anything indicator))
 
 (def symbol-content
-  (r/+ (r/complex [first-char symbol-char, next-chars #'symbol-content]
+  (r/+ (r/for [first-char symbol-char, next-chars #'symbol-content]
          (cons first-char next-chars))
        (r/semantics symbol-char list)))
 
 (def symbol-expr
-  (r/with-label "a symbol" (r/semantics symbol-content #(apply str %))))
+  (r/label "a symbol" (r/semantics symbol-content #(apply str %))))
 
 (def terminal-level-expr
   (r/+ number-expr symbol-expr))

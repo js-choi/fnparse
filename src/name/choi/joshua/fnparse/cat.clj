@@ -2,7 +2,7 @@
   (:require [clojure.contrib.monads :as m] [clojure.template :as template]
             [name.choi.joshua.fnparse.common :as c] [clojure.contrib.def :as d]
             [clojure.contrib.seq :as seq])
-  (:refer-clojure :exclude #{+})
+  (:refer-clojure :exclude #{+ for})
   (:import [clojure.lang IPersistentMap]))
 
 (defprotocol ABankable
@@ -237,7 +237,16 @@
    m-bind combine
    m-plus +])
 
-(defmacro complex
+(defn label [label-str rule]
+  {:pre #{(string? label-str)}}
+  (fn labelled-rule [state]
+    (let [result (c/apply-rule state rule), initial-position (:position state)]
+      (if-not (-> result :error :position (> initial-position))
+        (assoc-in result [:error :descriptors]
+          #{(c/ErrorDescriptor :label label-str)})
+        result))))
+
+(defmacro for
   "Creates a complex rule in monadic
   form. It's a lot easier than it sounds.
   It's like a very useful combination of
@@ -260,19 +269,13 @@
   defined in the binding vector.
   It's basically like let, for, or any other
   monad. Very useful!"
-  [steps & product-expr]
-  `(m/domonad parser-m ~steps ~@product-expr))
-
-(defn with-label [label rule]
-  (fn labelled-rule [state]
-    (let [result (c/apply-rule state rule), initial-position (:position state)]
-      (if-not (-> result :error :position (> initial-position))
-        (assoc-in result [:error :descriptors]
-          #{(c/ErrorDescriptor :label label)})
-        result))))
+  ([label-str steps product-expr]
+   `(->> (for ~steps ~product-expr) (label ~label-str)))
+  ([steps product-expr]
+  `(m/domonad parser-m ~steps ~product-expr)))
 
 (defn validate [rule pred message]
-  (complex [product rule, _ (only-when (pred product) message)]
+  (for [product rule, _ (only-when (pred product) message)]
     product))
 
 (defn anti-validate [rule pred message]
@@ -287,8 +290,8 @@
     a = ? (validator %) evaluates to true ?;
   The new rule's product would be the first token, if it fulfills the
   validator."
-  [label validator]
-  (with-label label
+  [label-str validator]
+  (label label-str
     (fn terminal-rule [{:keys #{tokens position} :as state}]
       (let [token (nth tokens position ::nothing)]
         (if (not= token ::nothing)
@@ -342,8 +345,8 @@
   any tokens, but fails when the given
   subrule succeeds. On success, the new
   rule's product is always true."
-  [label rule]
-  (with-label label
+  [rule]
+  (label "<not followed by something>"
     (fn not-followed-by-rule [state]
       (let [result (c/apply-rule state rule)]
         (if (c/failure? result)
@@ -357,7 +360,7 @@
   that takes one argument: the product of
   the subrule."
   [subrule semantic-hook]
-  (complex [subproduct subrule]
+  (for [subproduct subrule]
     (semantic-hook subproduct)))
 
 (defn constant-semantics
@@ -365,7 +368,7 @@
   hook. Its product is always the given
   constant."
   [subrule semantic-value]
-  (complex [subproduct subrule]
+  (for [subproduct subrule]
     semantic-value))
 
 (defn conc
@@ -452,25 +455,25 @@
     a = b - c;
   The new rule's products would be b-product. If
   b fails or c succeeds, then nil is simply returned."
-  ([label minuend subtrahend]
-   (with-label label
-     (complex [_ (not-followed-by nil subtrahend), product minuend]
+  ([label-str minuend subtrahend]
+   (label label-str
+     (for [_ (not-followed-by subtrahend), product minuend]
        product)))
-  ([label minuend first-subtrahend & rest-subtrahends]
-   (except label minuend
+  ([label-str minuend first-subtrahend & rest-subtrahends]
+   (except label-str minuend
      (apply + (cons first-subtrahend rest-subtrahends)))))
 
-(defn antiterm [label pred]
-  (term label (complement pred)))
+(defn antiterm [label-str pred]
+  (term label-str (complement pred)))
 
 (defn antilit [token]
   (term (str "anything except " token) #(not= token %)))
 
-(defn set-lit [label tokens]
-  (term label (set tokens)))
+(defn set-lit [label-str tokens]
+  (term label-str (set tokens)))
 
-(defn anti-set-lit [label tokens]
-  (antiterm label (tokens set)))
+(defn anti-set-lit [label-str tokens]
+  (antiterm label-str (tokens set)))
 
 (defn mapconc [tokens]
   (apply conc (map lit tokens)))
@@ -479,10 +482,10 @@
   (apply + (map f coll)))
 
 (defn prefix-conc [prefix body]
-  (complex [_ prefix, content body] content))
+  (for [_ prefix, content body] content))
 
 (defn suffix-conc [body suffix]
-  (complex [content body, _ suffix] content))
+  (for [content body, _ suffix] content))
 
 (defn circumfix-conc [prefix body suffix]
   (prefix-conc prefix (suffix-conc body suffix)))
@@ -502,12 +505,12 @@
 
 (defrm radix-digit
   ([base] (radix-digit (format "a base-%s digit" base) base))
-  ([label base]
+  ([label-str base]
    {:pre #{(integer? base) (<= 0 base 36)}}
    (->> base-36-digits (take base) seq/indexed
      (mapalt (fn [[index token]]
                (constant-semantics (case-insensitive-lit token) index)))
-     (with-label label))))
+     (label label-str))))
 
 (d/defvar decimal-digit
   (radix-digit "a decimal digit" 10))
@@ -522,5 +525,5 @@
   (set-lit "a lowercase ASCII letter" "abcdefghijklmnopqrstuvwxyz"))
 
 (d/defvar ascii-letter
-  (with-label "an ASCII letter"
+  (label "an ASCII letter"
     (+ uppercase-ascii-letter lowercase-ascii-letter)))

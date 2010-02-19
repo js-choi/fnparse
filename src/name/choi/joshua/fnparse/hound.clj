@@ -116,11 +116,11 @@
    m-bind combine
    m-plus +])
 
-(define-fn label [label-string rule]
+(define-fn label [label-str rule]
   (letfn [(assoc-label [result]
             (-> result force
               (assoc-in [:error :descriptors]
-                #{(c/ErrorDescriptor :label label-string)})
+                #{(c/ErrorDescriptor :label label-str)})
               delay))]
     (fn labelled-rule [state]
       (let [reply (c/apply-rule state rule)]
@@ -151,8 +151,8 @@
   defined in the binding vector.
   It's basically like let, for, or any other
   monad. Very useful!"
-  ([label-string steps product-expr]
-   `(->> (for ~steps ~product-expr) (label ~label-string)))
+  ([label-str steps product-expr]
+   `(->> (for ~steps ~product-expr) (label ~label-str)))
   ([steps product-expr]
   `(m/domonad parser-m ~steps ~product-expr)))
 
@@ -163,8 +163,8 @@
 (define-fn anti-validate [rule pred message]
   (validate rule (complement pred) message))
 
-(define-fn term [label-string predicate]
-  (label label-string
+(define-fn term [label-str predicate]
+  (label label-str
     (fn terminal-rule [state]
       (let [position (:position state)]
         (if-let [remainder (-> state :remainder seq)]
@@ -179,8 +179,8 @@
               (make-failed-reply state first-token nil)))
           (make-failed-reply state ::end-of-input nil))))))
 
-(define-fn antiterm [label-string pred]
-  (term label-string (complement pred)))
+(define-fn antiterm [label-str pred]
+  (term label-str (complement pred)))
 
 (def anything_
   (term "anything" (constantly true)))
@@ -197,11 +197,11 @@
 (define-fn antilit [token]
   (term (str "anything except " token) #(not= token %)))
 
-(define-fn set-lit [label-string tokens]
-  (term label-string (set tokens)))
+(define-fn set-lit [label-str tokens]
+  (term label-str (set tokens)))
 
-(define-fn anti-set-lit [label-string tokens]
-  (antiterm label-string (tokens set)))
+(define-fn anti-set-lit [label-str tokens]
+  (antiterm label-str (tokens set)))
 
 (define-fn cat [& subrules]
   (m/with-monad parser-m
@@ -251,8 +251,8 @@
         ((prod (:product result)) state)))))
 
 (define-fn not-followed-by
-  [label-string rule]
-  (label label-string
+  [label-str rule]
+  (label label-str
     (fn not-followed-by-rule [state]
       (let [result (-> state (c/apply-rule rule) :result force)]
         (if (c/failure? result)
@@ -304,12 +304,12 @@
     a = b - c;
   The new rule's products would be b-product. If
   b fails or c succeeds, then nil is simply returned."
-  ([label-string minuend subtrahend]
-   (label label-string
+  ([label-str minuend subtrahend]
+   (label label-str
      (for [_ (not-followed-by nil subtrahend), product minuend]
        product)))
-  ([label-string minuend first-subtrahend & rest-subtrahends]
-   (except label-string minuend
+  ([label-str minuend first-subtrahend & rest-subtrahends]
+   (except label-str minuend
      (apply + (cons first-subtrahend rest-subtrahends)))))
 
 (define-fn annotate-error [message-fn rule]
@@ -343,12 +343,12 @@
 
 (defn radix-digit
   ([base] (radix-digit (format "a base-%s digit" base) base))
-  ([label-string base]
+  ([label-str base]
    {:pre #{(integer? base) (> base 0)}}
    (->> base-36-digits (take base) seq/indexed
      (mapalt (fn [[index token]]
                (chook index (case-insensitive-lit token))))
-     (label label-string))))
+     (label label-str))))
 
 (def decimal-digit_
   (radix-digit "a decimal digit" 10))
