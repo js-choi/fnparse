@@ -214,7 +214,7 @@
               result (vary-bank result update-in [:lr-stack] pop)]
           result)))))
 
-(defn alt [& rules]
+(defn + [& rules]
   (remember
     (fn summed-rule [state]
       (let [apply-next-rule
@@ -235,7 +235,7 @@
   [m-zero nothing_
    m-result prod
    m-bind combine
-   m-plus alt])
+   m-plus +])
 
 (defmacro complex
   "Creates a complex rule in monadic
@@ -398,7 +398,7 @@
   (def a (opt b)) would be equivalent to the EBNF:
     a = b?;"
   [subrule]
-  (alt subrule emptiness_))
+  (+ subrule emptiness_))
 
 (defmacro invisi-conc
   "Like conc, only that the product is the
@@ -428,7 +428,7 @@
   ([token-seq]
    (lit-conc-seq token-seq lit))
   ([token-seq rule-maker]
-   (alt conc (map rule-maker token-seq))))
+   (+ conc (map rule-maker token-seq))))
 
 (defn lit-alt-seq
   "A convenience function: it creates a rule
@@ -440,7 +440,7 @@
   ([token-seq]
    (lit-alt-seq token-seq lit))
   ([token-seq rule-maker]
-   (apply alt (map rule-maker token-seq))))
+   (apply + (map rule-maker token-seq))))
 
 (defn except
   "Creates a rule that is the exception from
@@ -458,7 +458,7 @@
        product)))
   ([label minuend first-subtrahend & rest-subtrahends]
    (except label minuend
-     (apply alt (cons first-subtrahend rest-subtrahends)))))
+     (apply + (cons first-subtrahend rest-subtrahends)))))
 
 (defn antiterm [label pred]
   (term label (complement pred)))
@@ -476,7 +476,7 @@
   (apply conc (map lit tokens)))
 
 (defn mapalt [f coll]
-  (apply alt (map f coll)))
+  (apply + (map f coll)))
 
 (defn prefix-conc [prefix body]
   (complex [_ prefix, content body] content))
@@ -487,13 +487,13 @@
 (defn circumfix-conc [prefix body suffix]
   (prefix-conc prefix (suffix-conc body suffix)))
 
-(defmacro template-alt [argv expr & values]
+(defmacro template-+ [argv expr & values]
   (let [c (count argv)]
-    `(alt ~@(map (fn [a] (template/apply-template argv expr a)) 
+    `(+ ~@(map (fn [a] (template/apply-template argv expr a)) 
               (partition c values)))))
 
 (defn case-insensitive-lit [#^Character token]
-  (alt (lit (Character/toLowerCase token))
+  (+ (lit (Character/toLowerCase token))
        (lit (Character/toUpperCase token))))
 
 (d/defvar ascii-digits "0123456789")
@@ -523,4 +523,4 @@
 
 (d/defvar ascii-letter
   (with-label "an ASCII letter"
-    (alt uppercase-ascii-letter lowercase-ascii-letter)))
+    (+ uppercase-ascii-letter lowercase-ascii-letter)))
