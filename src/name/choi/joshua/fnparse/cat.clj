@@ -2,14 +2,16 @@
   (:require [clojure.contrib.monads :as m] [clojure.template :as template]
             [name.choi.joshua.fnparse.common :as c] [clojure.contrib.def :as d]
             [clojure.contrib.seq :as seq])
-  (:refer-clojure :exclude #{+ for})
+  (:refer-clojure
+    :rename {defn define-fn, defn- define-fn-}
+    :exclude #{+ for})
   (:import [clojure.lang IPersistentMap]))
 
 (defprotocol ABankable
   (get-bank [o])
   (set-bank [o new-bank]))
 
-(defn- vary-bank [bankable f & args]
+(define-fn- vary-bank [bankable f & args]
   (set-bank bankable (apply f (get-bank bankable) args)))
 
 (deftype State [tokens position context] :as this
@@ -48,13 +50,13 @@
   {:get-bank meta
    :set-bank with-meta})
 
-(defn- make-state [input context]
+(define-fn- make-state [input context]
   (State input 0 context (Bank {} [] {}) nil))
 
-(defn parse [rule input context success-fn failure-fn]
+(define-fn parse [rule input context success-fn failure-fn]
   (c/parse make-state rule input context success-fn failure-fn))
 
-(defn prod [product]
+(define-fn prod [product]
   (fn product-rule [state]
     (c/Success product state
       (c/ParseError (:position state) nil nil))))
@@ -76,23 +78,23 @@
   is always nil, and it therefore always
   returns [nil given-state].")
 
-(defn- make-failure [state unexpected-token descriptors]
+(define-fn- make-failure [state unexpected-token descriptors]
   (set-bank
     (c/Failure
       (c/ParseError (:position state) unexpected-token descriptors))
     (get-bank state)))
 
-(defn nothing_ [state]
+(define-fn nothing_ [state]
   (make-failure state nil #{}))
 
-(defn with-error [message]
+(define-fn with-error [message]
   (fn with-error-rule [state]
     (make-failure state nil #{(c/ErrorDescriptor :message message)})))
 
-(defn only-when [valid? message]
+(define-fn only-when [valid? message]
   (if-not valid? (with-error message) (prod valid?)))
 
-(defn combine [rule product-fn]
+(define-fn combine [rule product-fn]
   (fn [state]
     (let [{first-error :error, :as first-result} (c/apply-rule state rule)]
       (if (c/success? first-result)
@@ -104,19 +106,19 @@
             :error (c/merge-parse-errors first-error next-error)))
         first-result))))
 
-(defn- get-memory [bank subrule state-position]
+(define-fn- get-memory [bank subrule state-position]
   (-> bank :memory (get-in [subrule state-position])))
 
-(defn- store-memory [bank subrule state-position result]
+(define-fn- store-memory [bank subrule state-position result]
   (assoc-in bank [:memory subrule state-position] result))
 
-(defn- clear-bank [bankable]
+(define-fn- clear-bank [bankable]
   (set-bank bankable nil))
 
-(defn- get-lr-node [bank index]
+(define-fn- get-lr-node [bank index]
   (-> bank :lr-stack (get index)))
 
-(defn- grow-lr [subrule state node-index]
+(define-fn- grow-lr [subrule state node-index]
   (let [state-0 state
         position-0 (:position state-0)
         bank-0 (assoc-in (get-bank state-0) [:position-heads position-0]
@@ -138,11 +140,11 @@
                            position-0 (clear-bank cur-result))]
             (recur new-bank)))))))
 
-(defn- add-head-if-not-already-there [head involved-rules]
+(define-fn- add-head-if-not-already-there [head involved-rules]
   (update-in (or head (Head #{} #{})) [:involved-rules]
     into involved-rules))
 
-(defn- setup-lr [lr-stack stack-index]
+(define-fn- setup-lr [lr-stack stack-index]
   (let [indexes (range (inc stack-index) (count lr-stack))
         involved-rules (map :rule (subvec lr-stack (inc stack-index)))
         lr-stack (update-in lr-stack [stack-index :head]
@@ -151,7 +153,7 @@
                    lr-stack indexes)]
     lr-stack))
 
-(defn- lr-answer [subrule state node-index seed-result]
+(define-fn- lr-answer [subrule state node-index seed-result]
   (let [bank (get-bank state)
         bank (assoc-in bank [:lr-stack node-index :seed] seed-result)
         lr-node (get-lr-node bank node-index)
@@ -163,7 +165,7 @@
           (set-bank node-seed bank)
           (grow-lr subrule (set-bank state bank) node-index))))))
 
-(defn- recall [bank subrule state]
+(define-fn- recall [bank subrule state]
   (let [position (:position state)
         memory (get-memory bank subrule position)
         node-index (-> bank :position-heads (get position))
@@ -182,7 +184,7 @@
               (vary-bank result store-memory subrule position result))
             memory))))))
 
-(defn- remember [subrule]
+(define-fn- remember [subrule]
   (fn remembering-rule [state]
     (let [bank (get-bank state)
           state-position (:position state)
@@ -214,7 +216,7 @@
               result (vary-bank result update-in [:lr-stack] pop)]
           result)))))
 
-(defn + [& rules]
+(define-fn + [& rules]
   (remember
     (fn summed-rule [state]
       (let [apply-next-rule
@@ -237,7 +239,7 @@
    m-bind combine
    m-plus +])
 
-(defn label [label-str rule]
+(define-fn label [label-str rule]
   {:pre #{(string? label-str)}}
   (fn labelled-rule [state]
     (let [result (c/apply-rule state rule), initial-position (:position state)]
@@ -274,14 +276,7 @@
   ([steps product-expr]
   `(m/domonad parser-m ~steps ~product-expr)))
 
-(defn validate [rule pred message]
-  (for [product rule, _ (only-when (pred product) message)]
-    product))
-
-(defn anti-validate [rule pred message]
-  (validate rule (complement pred) message))
-
-(defn term
+(define-fn term
   "(term validator) is equivalent
   to (validate anything validator).
   Creates a rule that is a terminal rule of the given validator--that is, it
@@ -301,6 +296,9 @@
             (make-failure state token nil))
           (make-failure state ::end-of-input nil))))))
 
+(define-fn antiterm [label-str pred]
+  (term label-str (complement pred)))
+
 (d/defvar anything
   (term "anything" (constantly true))
   "A rule that matches anything--that is, it matches
@@ -308,7 +306,7 @@
   This rule's product is the first token it receives.
   It fails if there are no tokens left.")
 
-(defn lit
+(define-fn lit
   "Equivalent to (comp term (partial partial =)).
   Creates a rule that is the terminal
   rule of the given literal token--that is,
@@ -321,7 +319,7 @@
   [token]
   (term (format "'%s'" token) (partial = token)))
 
-(defn re-term
+(define-fn re-term
   "Equivalent to (comp term (partial partial re-matches)).
   Creates a rule that is the terminal rule of the given regex--that is, it
   accepts only tokens that match the given regex.
@@ -333,14 +331,14 @@
   (term (str "a token matching pattern " pattern)
     (partial re-matches pattern)))
 
-(defn followed-by [rule]
+(define-fn followed-by [rule]
   (fn [state]
     (let [result (c/apply-rule state rule)]
       (if (c/success? result)
         ((prod (:product result)) state)
         result))))
 
-(defn not-followed-by
+(define-fn not-followed-by
   "Creates a rule that does not consume
   any tokens, but fails when the given
   subrule succeeds. On success, the new
@@ -353,7 +351,7 @@
           (c/Success true state (:error result))
           (-> state nothing_ (assoc :error (:error result))))))))
 
-(defn semantics
+(define-fn semantics
   "Creates a rule with a semantic hook,
   basically a simple version of a complex
   rule. The semantic hook is a function
@@ -363,7 +361,7 @@
   (for [subproduct subrule]
     (semantic-hook subproduct)))
 
-(defn constant-semantics
+(define-fn constant-semantics
   "Creates a rule with a constant semantic
   hook. Its product is always the given
   constant."
@@ -371,7 +369,7 @@
   (for [subproduct subrule]
     semantic-value))
 
-(defn conc
+(define-fn conc
   "Creates a rule that is the concatenation
   of the given subrules. Basically a simple
   version of complex, each subrule consumes
@@ -389,10 +387,10 @@
     (fn concatenation-rule [state]
       ((m/m-seq subrules) state))))
 
-(defn vconc [& subrules]
+(define-fn vconc [& subrules]
   (semantics (apply conc subrules) vec))
 
-(defn opt
+(define-fn opt
   "Creates a rule that is the optional form
   of the subrule. It always succeeds. Its result
   is either the subrule's (if the subrule
@@ -416,7 +414,7 @@
   [first-subrule & rest-subrules]
   `(semantics (conc ~first-subrule ~@rest-subrules) first))
 
-(defn lit-conc-seq
+(define-fn lit-conc-seq
   "A convenience function: it creates a rule
   that is the concatenation of the literals
   formed from the given sequence of literal tokens.
@@ -433,7 +431,7 @@
   ([token-seq rule-maker]
    (+ conc (map rule-maker token-seq))))
 
-(defn lit-alt-seq
+(define-fn lit-alt-seq
   "A convenience function: it creates a rule
   that is the alternation of the literals
   formed from the given sequence of literal tokens.
@@ -445,7 +443,7 @@
   ([token-seq rule-maker]
    (apply + (map rule-maker token-seq))))
 
-(defn except
+(define-fn except
   "Creates a rule that is the exception from
   the first given subrules with the second given
   subrule--that is, it accepts only tokens that
@@ -463,31 +461,31 @@
    (except label-str minuend
      (apply + (cons first-subtrahend rest-subtrahends)))))
 
-(defn antiterm [label-str pred]
+(define-fn antiterm [label-str pred]
   (term label-str (complement pred)))
 
-(defn antilit [token]
+(define-fn antilit [token]
   (term (str "anything except " token) #(not= token %)))
 
-(defn set-lit [label-str tokens]
+(define-fn set-lit [label-str tokens]
   (term label-str (set tokens)))
 
-(defn anti-set-lit [label-str tokens]
+(define-fn anti-set-lit [label-str tokens]
   (antiterm label-str (tokens set)))
 
-(defn mapconc [tokens]
+(define-fn mapconc [tokens]
   (apply conc (map lit tokens)))
 
-(defn mapalt [f coll]
+(define-fn mapalt [f coll]
   (apply + (map f coll)))
 
-(defn prefix-conc [prefix body]
+(define-fn prefix-conc [prefix body]
   (for [_ prefix, content body] content))
 
-(defn suffix-conc [body suffix]
+(define-fn suffix-conc [body suffix]
   (for [content body, _ suffix] content))
 
-(defn circumfix-conc [prefix body suffix]
+(define-fn circumfix-conc [prefix body suffix]
   (prefix-conc prefix (suffix-conc body suffix)))
 
 (defmacro template-+ [argv expr & values]
@@ -495,7 +493,7 @@
     `(+ ~@(map (fn [a] (template/apply-template argv expr a)) 
               (partition c values)))))
 
-(defn case-insensitive-lit [#^Character token]
+(define-fn case-insensitive-lit [#^Character token]
   (+ (lit (Character/toLowerCase token))
        (lit (Character/toUpperCase token))))
 
