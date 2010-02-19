@@ -1,9 +1,8 @@
 (ns name.choi.joshua.fnparse.cat
-  (:use clojure.template clojure.set clojure.contrib.def
-        clojure.contrib.seq)
-  (:require [clojure.contrib.monads :as m]
-            [name.choi.joshua.fnparse.common :as c])
-  (:import [clojure.lang Sequential IPersistentMap IPersistentVector Var]))
+  (:require [clojure.contrib.monads :as m] [clojure.template :as template]
+            [name.choi.joshua.fnparse.common :as c] [clojure.contrib.def :as d]
+            [clojure.contrib.seq :as seq])
+  (:import [clojure.lang IPersistentMap]))
 
 (defprotocol ABankable
   (get-bank [o])
@@ -63,12 +62,12 @@
       (c/ParseError (:position state) nil nil))))
 
 (defmacro defrm [& forms]
-  `(defn-memo ~@forms))
+  `(d/defn-memo ~@forms))
 
 (defmacro defrm- [& forms]
   `(defrm ~@forms))
 
-(defvar emptiness
+(d/defvar emptiness
   (with-product nil)
   "A rule that matches emptiness--that
   is, it always matches with every given
@@ -230,10 +229,10 @@
                  (update-in [:error]
                    #(c/merge-parse-errors (:error prev-result) %))))
             initial-result (emptiness state)
-            results (rest (reductions apply-next-rule
+            results (rest (seq/reductions apply-next-rule
                             initial-result rules))]
         #_ (str results) #_ (prn "results" results)
-        (or (find-first c/success? results) (last results))))))
+        (or (seq/find-first c/success? results) (last results))))))
 
 (m/defmonad parser-m
   "The monad that FnParse uses."
@@ -312,7 +311,7 @@
             (base-nothing state token nil))
           (base-nothing state ::end-of-input nil))))))
 
-(defvar anything
+(d/defvar anything
   (term "anything" (constantly true))
   "A rule that matches anything--that is, it matches
   the first token of the tokens it is given.
@@ -503,38 +502,38 @@
 
 (defmacro template-alt [argv expr & values]
   (let [c (count argv)]
-    `(alt ~@(map (fn [a] (apply-template argv expr a)) 
+    `(alt ~@(map (fn [a] (template/apply-template argv expr a)) 
               (partition c values)))))
 
 (defn case-insensitive-lit [#^Character token]
   (alt (lit (Character/toLowerCase token))
        (lit (Character/toUpperCase token))))
 
-(defvar ascii-digits "0123456789")
-(defvar lowercase-ascii-alphabet "abcdefghijklmnopqrstuvwxyz")
-(defvar base-36-digits (str ascii-digits lowercase-ascii-alphabet))
+(d/defvar ascii-digits "0123456789")
+(d/defvar lowercase-ascii-alphabet "abcdefghijklmnopqrstuvwxyz")
+(d/defvar base-36-digits (str ascii-digits lowercase-ascii-alphabet))
 
 (defrm radix-digit
   ([base] (radix-digit (format "a base-%s digit" base) base))
   ([label base]
    {:pre #{(integer? base) (<= 0 base 36)}}
-   (->> base-36-digits (take base) indexed
+   (->> base-36-digits (take base) seq/indexed
      (mapalt (fn [[index token]]
                (constant-semantics (case-insensitive-lit token) index)))
      (with-label label))))
 
-(defvar decimal-digit
+(d/defvar decimal-digit
   (radix-digit "a decimal digit" 10))
 
-(defvar hexadecimal-digit
+(d/defvar hexadecimal-digit
   (radix-digit "a hexadecimal digit" 16))
 
-(defvar uppercase-ascii-letter
+(d/defvar uppercase-ascii-letter
   (set-lit "an uppercase ASCII letter" "ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
 
-(defvar lowercase-ascii-letter
+(d/defvar lowercase-ascii-letter
   (set-lit "a lowercase ASCII letter" "abcdefghijklmnopqrstuvwxyz"))
 
-(defvar ascii-letter
+(d/defvar ascii-letter
   (with-label "an ASCII letter"
     (alt uppercase-ascii-letter lowercase-ascii-letter)))
