@@ -53,10 +53,7 @@
 (defn parse [rule input context success-fn failure-fn]
   (c/parse make-state rule input context success-fn failure-fn))
 
-(defn- inc-position [state]
-  (update-in state [:position] inc))
-
-(defn with-product [product]
+(defn prod [product]
   (fn product-rule [state]
     (c/Success product state
       (c/ParseError (:position state) nil nil))))
@@ -67,8 +64,8 @@
 (defmacro defrm- [& forms]
   `(defrm ~@forms))
 
-(d/defvar emptiness
-  (with-product nil)
+(d/defvar emptiness_
+  (prod nil)
   "A rule that matches emptiness--that
   is, it always matches with every given
   token sequence, and it always returns
@@ -78,21 +75,21 @@
   is always nil, and it therefore always
   returns [nil given-state].")
 
-(defn- base-nothing [state unexpected-token descriptors]
+(defn- make-failure [state unexpected-token descriptors]
   (set-bank
     (c/Failure
       (c/ParseError (:position state) unexpected-token descriptors))
     (get-bank state)))
 
 (defn nothing [state]
-  (base-nothing state nil #{}))
+  (make-failure state nil #{}))
 
 (defn with-error [message]
   (fn with-error-rule [state]
-    (base-nothing state nil #{(c/ErrorDescriptor :message message)})))
+    (make-failure state nil #{(c/ErrorDescriptor :message message)})))
 
 (defn only-when [valid? message]
-  (if-not valid? (with-error message) (with-product valid?)))
+  (if-not valid? (with-error message) (prod valid?)))
 
 (defn combine [rule product-fn]
   (fn [state]
@@ -228,7 +225,7 @@
                  (c/apply-rule next-rule)
                  (update-in [:error]
                    #(c/merge-parse-errors (:error prev-result) %))))
-            initial-result (emptiness state)
+            initial-result (emptiness_ state)
             results (rest (seq/reductions apply-next-rule
                             initial-result rules))]
         #_ (str results) #_ (prn "results" results)
@@ -237,7 +234,7 @@
 (m/defmonad parser-m
   "The monad that FnParse uses."
   [m-zero nothing
-   m-result with-product
+   m-result prod
    m-bind combine
    m-plus alt])
 
@@ -275,15 +272,6 @@
           #{(c/ErrorDescriptor :label label)})
         result))))
 
-(defn- base-nothing [state unexpected-token descriptors]
-  (set-bank
-    (c/Failure
-      (c/ParseError (:position state) unexpected-token descriptors))
-    (get-bank state)))
-
-(defn nothing [state]
-  (base-nothing state nil nil))
-
 (defn validate [rule pred message]
   (complex [product rule, _ (only-when (pred product) message)]
     product))
@@ -308,8 +296,8 @@
           (if (validator token)
             (c/Success token (assoc state :position (inc position))
               (c/ParseError position token nil))
-            (base-nothing state token nil))
-          (base-nothing state ::end-of-input nil))))))
+            (make-failure state token nil))
+          (make-failure state ::end-of-input nil))))))
 
 (d/defvar anything
   (term "anything" (constantly true))
@@ -347,7 +335,7 @@
   (fn [state]
     (let [result (c/apply-rule state rule)]
       (if (c/success? result)
-        ((with-product (:product result)) state)
+        ((prod (:product result)) state)
         result))))
 
 (defn not-followed-by
@@ -411,7 +399,7 @@
   (def a (opt b)) would be equivalent to the EBNF:
     a = b?;"
   [subrule]
-  (alt subrule emptiness))
+  (alt subrule emptiness_))
 
 (defmacro invisi-conc
   "Like conc, only that the product is the

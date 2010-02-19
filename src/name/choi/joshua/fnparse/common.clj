@@ -2,7 +2,7 @@
   (:require [clojure.contrib.string :as str] [clojure.template :as temp]
             [clojure.set :as set] [clojure.test :as test]
             [clojure.contrib.seq :as seq])
-  (:import [clojure.lang Sequential IPersistentMap IPersistentVector Var]))
+  (:import [clojure.lang IPersistentMap]))
 
 (defprotocol AState
   (position [state]))
