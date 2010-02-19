@@ -4,7 +4,7 @@
             [clojure.contrib.monads :as m]
             [clojure.template :as t]
             [clojure.contrib.def :as d])
-  (:refer-clojure :exclude #{for + mapcat}
+  (:refer-clojure :exclude #{for + litcat}
                   :rename {defn define-fn, defn- define-fn-})
   (:import [clojure.lang IPersistentMap]))
 
@@ -207,6 +207,9 @@
   (m/with-monad parser-m
     (m/m-seq subrules)))
 
+(define-fn vcat [& subrules]
+  (hook vec (apply cat subrules)))
+
 (define-fn opt [rule]
   (+ rule emptiness_))
 
@@ -250,10 +253,10 @@
 (define-fn rep* [rule]
   (opt (rep+ rule)))
 
-(define-fn mapcat [tokens]
+(define-fn litcat [tokens]
   (apply cat (map lit tokens)))
 
-(define-fn mapalt [f coll]
+(define-fn litalt [f coll]
   (apply + (map f coll)))
 
 (define-fn optcat [& rules]
@@ -346,7 +349,7 @@
   ([label-str base]
    {:pre #{(integer? base) (> base 0)}}
    (->> base-36-digits (take base) seq/indexed
-     (mapalt (fn [[index token]]
+     (litalt (fn [[index token]]
                (chook index (case-insensitive-lit token))))
      (label label-str))))
 
@@ -372,16 +375,16 @@
 
 ; (define rule (for [a anything_, b anything_] [a b]))
 ; (define rule (validate anything_ (partial = 'a)))
-; (define rule (mapcat '[a b]))
+; (define rule (litcat '[a b]))
 ; (define rule (lit \3))
-; (define rule (lex (mapcat "let 3")))
-; (define rule (+ (lex (mapcat "let 3")) (mapcat "la")))
-; (define rule (lex (label "let expr" (mapcat "let 3"))))
-; (define rule (+ (lex (label "let expr" (mapcat "let 3")))
+; (define rule (lex (litcat "let 3")))
+; (define rule (+ (lex (litcat "let 3")) (litcat "la")))
+; (define rule (lex (label "let expr" (litcat "let 3"))))
+; (define rule (+ (lex (label "let expr" (litcat "let 3")))
 ;                (lit \3)))
 ; (define rule emptiness_)
 ; (define rule (rep* (antilit \3)))
 ; (define rule (rep* decimal-digit))
-; (define rule (followed-by (mapcat "li")))
+; (define rule (followed-by (litcat "li")))
 
 ; (-> "lit 3" make-state rule println)

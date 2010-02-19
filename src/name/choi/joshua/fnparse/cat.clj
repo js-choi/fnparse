@@ -4,7 +4,7 @@
             [clojure.contrib.seq :as seq])
   (:refer-clojure
     :rename {defn define-fn, defn- define-fn-}
-    :exclude #{+ for})
+    :exclude #{+ for mapcat})
   (:import [clojure.lang IPersistentMap]))
 
 (defprotocol ABankable
@@ -361,6 +361,9 @@
   (m/with-monad parser-m
     (m/m-seq subrules)))
 
+(define-fn vcat [& subrules]
+  (hook vec (apply cat subrules)))
+
 (define-fn opt
   "Creates a rule that is the optional form
   of the subrule. It always succeeds. Its result
@@ -391,9 +394,6 @@
         (if (c/failure? result)
           (c/Success true state (:error result))
           (-> state nothing_ (assoc :error (:error result))))))))
-
-(define-fn vconc [& subrules]
-  (hook vec (apply cat subrules)))
 
 (define-fn lit-conc-seq
   "A convenience function: it creates a rule

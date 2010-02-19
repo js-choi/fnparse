@@ -70,13 +70,13 @@
 
 (declare form_)
 
-(def comment-indicator_ (r/+ (r/lit \;) (r/lex (r/mapcat "#!"))))
+(def comment-indicator_ (r/+ (r/lit \;) (r/lex (r/litcat "#!"))))
 
 (def comment-char_ (r/antilit \newline))
 
 (def comment_ (r/cat comment-indicator_ (r/rep* comment-char_)))
 
-(def discarded_ (r/prefix (r/lex (r/mapcat "#_")) #'form_))
+(def discarded_ (r/prefix (r/lex (r/litcat "#_")) #'form_))
 
 (def normal-ws-char_
   (r/term "a whitespace character" ws-set))
@@ -245,7 +245,7 @@
       (r/factor= 4 r/hexadecimal-digit_))))
 
 (def character-name_
-  (r/+ (r/mapalt #(r/chook (key %) (r/mapcat (val %))) char-name-string)
+  (r/+ (r/litalt #(r/chook (key %) (r/litcat (val %))) char-name-string)
        unicode-escape-sequence_))
 
 (def character_ (r/prefix (r/lit \\) character-name_))
@@ -293,7 +293,7 @@
 
 (def unquote-spliced_
   (r/hook (prefix-list-fn `unquote-splicing)
-    (r/prefix (r/cat (r/lex (r/mapcat "~@")) opt-ws_) #'form_)))
+    (r/prefix (r/cat (r/lex (r/litcat "~@")) opt-ws_) #'form_)))
 
 (def deprecated-meta_
   (r/suffix deprecated-meta_

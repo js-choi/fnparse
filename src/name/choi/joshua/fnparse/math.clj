@@ -44,7 +44,7 @@
 (def parenthesized-expr
   (r/circumfix-conc opening-parenthesis #'expr closing-parenthesis))
 
-(def function-expr (r/vconc symbol-expr parenthesized-expr))
+(def function-expr (r/vcat symbol-expr parenthesized-expr))
 
 (def parenthesized-level-expr
   (r/+ parenthesized-expr terminal-level-expr))
@@ -53,18 +53,18 @@
   (r/+ function-expr parenthesized-level-expr))
 
 (def pos-neg-level-expr
-  (r/+ (r/vconc (r/+ plus-sign minus-sign) function-level-expr)
+  (r/+ (r/vcat (r/+ plus-sign minus-sign) function-level-expr)
        function-level-expr))
 
 (def multiplication-level-expr
-  (r/+ (r/vconc
+  (r/+ (r/vcat
          #'multiplication-level-expr
          (r/+ multiplication-sign division-sign)
          pos-neg-level-expr)
        pos-neg-level-expr))
 
 (def addition-level-expr
-  (r/+ (r/vconc
+  (r/+ (r/vcat
          #'addition-level-expr
          (r/+ plus-sign minus-sign)
          multiplication-level-expr)
