@@ -9,8 +9,8 @@
 (declare expr)
 
 (def digit
-  (r/semantics (r/term "a decimal digit" #(Character/isDigit (char %)))
-    #(Integer/parseInt (str %))))
+  (r/hook #(Integer/parseInt (str %))
+    (r/term "a decimal digit" #(Character/isDigit (char %)))))
 
 (template/do-template [rule-name token]
   (def rule-name (r/lit token))
@@ -33,10 +33,10 @@
 (def symbol-content
   (r/+ (r/for [first-char symbol-char, next-chars #'symbol-content]
          (cons first-char next-chars))
-       (r/semantics symbol-char list)))
+       (r/hook list symbol-char)))
 
 (def symbol-expr
-  (r/label "a symbol" (r/semantics symbol-content #(apply str %))))
+  (r/label "a symbol" (r/hook #(apply str %) symbol-content)))
 
 (def terminal-level-expr
   (r/+ number-expr symbol-expr))

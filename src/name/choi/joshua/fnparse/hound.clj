@@ -215,6 +215,22 @@
     (-> state subrule
       (assoc :tokens-consumed? false))))
 
+(define-fn followed-by [rule]
+  (fn [state]
+    (let [result (-> state (c/apply-rule rule) :result force)]
+      (if (c/failure? result)
+        (Reply false result)
+        ((prod (:product result)) state)))))
+
+(define-fn not-followed-by
+  [label-str rule]
+  (label label-str
+    (fn not-followed-by-rule [state]
+      (let [result (-> state (c/apply-rule rule) :result force)]
+        (if (c/failure? result)
+          (Reply false (c/Success true state (:error result)))
+          (-> state (c/apply-rule nothing_) (assoc :error (:error result))))))))
+
 (define-fn cascading-rep+ [rule unary-hook binary-hook]
   ; TODO: Rewrite to not blow up stack with many valid tokens
   (for [first-token rule
@@ -242,22 +258,6 @@
 
 (define-fn optcat [& rules]
   (opt (apply cat rules)))
-
-(define-fn followed-by [rule]
-  (fn [state]
-    (let [result (-> state (c/apply-rule rule) :result force)]
-      (if (c/failure? result)
-        (Reply false result)
-        ((prod (:product result)) state)))))
-
-(define-fn not-followed-by
-  [label-str rule]
-  (label label-str
-    (fn not-followed-by-rule [state]
-      (let [result (-> state (c/apply-rule rule) :result force)]
-        (if (c/failure? result)
-          (Reply false (c/Success true state (:error result)))
-          (-> state (c/apply-rule nothing_) (assoc :error (:error result))))))))
 
 (d/defvar end-of-input_
   (not-followed-by "the end of input" anything_)

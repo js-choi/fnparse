@@ -306,6 +306,22 @@
   This rule's product is the first token it receives.
   It fails if there are no tokens left.")
 
+(define-fn hook
+  "Creates a rule with a semantic hook,
+  basically a simple version of a complex
+  rule. The semantic hook is a function
+  that takes one argument: the product of
+  the subrule."
+  [f rule]
+  (for [product rule] (f product)))
+
+(define-fn chook
+  "Creates a rule with a constant semantic
+  hook. Its product is always the given
+  constant."
+  [product rule]
+  (for [_ rule] product))
+
 (define-fn lit
   "Equivalent to (comp term (partial partial =)).
   Creates a rule that is the terminal
@@ -376,39 +392,8 @@
           (c/Success true state (:error result))
           (-> state nothing_ (assoc :error (:error result))))))))
 
-(define-fn semantics
-  "Creates a rule with a semantic hook,
-  basically a simple version of a complex
-  rule. The semantic hook is a function
-  that takes one argument: the product of
-  the subrule."
-  [subrule semantic-hook]
-  (for [subproduct subrule]
-    (semantic-hook subproduct)))
-
-(define-fn constant-semantics
-  "Creates a rule with a constant semantic
-  hook. Its product is always the given
-  constant."
-  [subrule semantic-value]
-  (for [subproduct subrule]
-    semantic-value))
-
 (define-fn vconc [& subrules]
-  (semantics (apply cat subrules) vec))
-
-(defmacro invisi-conc
-  "Like conc, only that the product is the
-  first subrule's product only, not a vector of
-  all the products of the subrules--effectively
-  hiding the products of the other subrules.
-  The rest of the subrules consume tokens too;
-  their products simply aren't accessible.
-  This is useful for applying set-info and
-  update-info to a rule, without having to deal
-  with set-info or update-info's products."
-  [first-subrule & rest-subrules]
-  `(semantics (cat ~first-subrule ~@rest-subrules) first))
+  (hook vec (apply cat subrules)))
 
 (define-fn lit-conc-seq
   "A convenience function: it creates a rule
@@ -502,8 +487,7 @@
   ([label-str base]
    {:pre #{(integer? base) (<= 0 base 36)}}
    (->> base-36-digits (take base) seq/indexed
-     (mapalt (fn [[index token]]
-               (constant-semantics (case-insensitive-lit token) index)))
+     (mapalt (fn [[index token]] (chook index (case-insensitive-lit token))))
      (label label-str))))
 
 (d/defvar decimal-digit
