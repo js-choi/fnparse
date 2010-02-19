@@ -299,7 +299,7 @@
 (define-fn antiterm [label-str pred]
   (term label-str (complement pred)))
 
-(d/defvar anything
+(d/defvar anything_
   (term "anything" (constantly true))
   "A rule that matches anything--that is, it matches
   the first token of the tokens it is given.
@@ -319,17 +319,42 @@
   [token]
   (term (format "'%s'" token) (partial = token)))
 
-(define-fn re-term
-  "Equivalent to (comp term (partial partial re-matches)).
-  Creates a rule that is the terminal rule of the given regex--that is, it
-  accepts only tokens that match the given regex.
-  (def a (re-term #\"...\")) would be equivalent to the EBNF
-    a = ? (re-matches #\"...\" %) evaluates to true ?;
-  The new rule's product would be the first token, if it matches the given
-  regex."
-  [pattern]
-  (term (str "a token matching pattern " pattern)
-    (partial re-matches pattern)))
+(define-fn antilit [token]
+  (term (str "anything except " token) #(not= token %)))
+
+(define-fn set-lit [label-str tokens]
+  (term label-str (set tokens)))
+
+(define-fn anti-set-lit [label-str tokens]
+  (antiterm label-str (tokens set)))
+
+(define-fn cat
+  "Creates a rule that is the concatenation
+  of the given subrules. Basically a simple
+  version of complex, each subrule consumes
+  tokens in order, and if any fail, the entire
+  rule fails.
+  (def a (conc b c d)) would be equivalent to the EBNF:
+    a = b, c, d;
+  This macro is almost equivalent to m-seq for
+  the parser-m monad. The difference is that
+  it defers evaluation of whatever variables
+  it receives, so that it accepts expressions
+  containing unbound variables that are defined later."
+  [& subrules]
+  (m/with-monad parser-m
+    (m/m-seq subrules)))
+
+(define-fn opt
+  "Creates a rule that is the optional form
+  of the subrule. It always succeeds. Its result
+  is either the subrule's (if the subrule
+  succeeds), or else its product is nil, and the
+  rule acts as the emptiness rule.
+  (def a (opt b)) would be equivalent to the EBNF:
+    a = b?;"
+  [rule]
+  (+ rule emptiness_))
 
 (define-fn followed-by [rule]
   (fn [state]
@@ -369,37 +394,8 @@
   (for [subproduct subrule]
     semantic-value))
 
-(define-fn conc
-  "Creates a rule that is the concatenation
-  of the given subrules. Basically a simple
-  version of complex, each subrule consumes
-  tokens in order, and if any fail, the entire
-  rule fails.
-  (def a (conc b c d)) would be equivalent to the EBNF:
-    a = b, c, d;
-  This macro is almost equivalent to m-seq for
-  the parser-m monad. The difference is that
-  it defers evaluation of whatever variables
-  it receives, so that it accepts expressions
-  containing unbound variables that are defined later."
-  [& subrules]
-  (m/with-monad parser-m
-    (fn concatenation-rule [state]
-      ((m/m-seq subrules) state))))
-
 (define-fn vconc [& subrules]
-  (semantics (apply conc subrules) vec))
-
-(define-fn opt
-  "Creates a rule that is the optional form
-  of the subrule. It always succeeds. Its result
-  is either the subrule's (if the subrule
-  succeeds), or else its product is nil, and the
-  rule acts as the emptiness rule.
-  (def a (opt b)) would be equivalent to the EBNF:
-    a = b?;"
-  [subrule]
-  (+ subrule emptiness_))
+  (semantics (apply cat subrules) vec))
 
 (defmacro invisi-conc
   "Like conc, only that the product is the
@@ -412,7 +408,7 @@
   update-info to a rule, without having to deal
   with set-info or update-info's products."
   [first-subrule & rest-subrules]
-  `(semantics (conc ~first-subrule ~@rest-subrules) first))
+  `(semantics (cat ~first-subrule ~@rest-subrules) first))
 
 (define-fn lit-conc-seq
   "A convenience function: it creates a rule
@@ -429,7 +425,7 @@
   ([token-seq]
    (lit-conc-seq token-seq lit))
   ([token-seq rule-maker]
-   (+ conc (map rule-maker token-seq))))
+   (+ cat (map rule-maker token-seq))))
 
 (define-fn lit-alt-seq
   "A convenience function: it creates a rule
@@ -474,7 +470,7 @@
   (antiterm label-str (tokens set)))
 
 (define-fn mapconc [tokens]
-  (apply conc (map lit tokens)))
+  (apply cat (map lit tokens)))
 
 (define-fn mapalt [f coll]
   (apply + (map f coll)))

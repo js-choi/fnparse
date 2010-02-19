@@ -28,7 +28,7 @@
            (r/+ (* 10 first-digits) next-digit))
          digit)))
 
-(def symbol-char (r/except "a symbol character" r/anything indicator))
+(def symbol-char (r/except "a symbol character" r/anything_ indicator))
 
 (def symbol-content
   (r/+ (r/for [first-char symbol-char, next-chars #'symbol-content]
