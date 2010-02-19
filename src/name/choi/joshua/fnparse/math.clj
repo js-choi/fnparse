@@ -1,7 +1,8 @@
 (ns name.choi.joshua.fnparse.math
-  (:use clojure.template clojure.test
-        name.choi.joshua.fnparse.cat.test)
-  (:require [name.choi.joshua.fnparse.cat :as r])
+  (:require [name.choi.joshua.fnparse.cat :as r]
+            [clojure.template :as template]
+            name.choi.joshua.fnparse.cat.test)
+  (:use [clojure.test :only #{deftest is run-tests}])
   (:refer-clojure :exclude #{+}))
 
 (set! *warn-on-reflection* true)
@@ -12,7 +13,7 @@
   (r/semantics (r/term "a decimal digit" #(Character/isDigit (char %)))
     #(Integer/parseInt (str %))))
 
-(do-template [rule-name token]
+(template/do-template [rule-name token]
   (def rule-name (r/lit token))
   plus-sign \+, minus-sign \-, multiplication-sign \*, division-sign \/,
   opening-parenthesis \(, closing-parenthesis \))
