@@ -2,6 +2,7 @@
   (:require [clojure.contrib.monads :as m] [clojure.template :as template]
             [name.choi.joshua.fnparse.common :as c] [clojure.contrib.def :as d]
             [clojure.contrib.seq :as seq])
+  (:refer-clojure :exclude #{+})
   (:import [clojure.lang IPersistentMap]))
 
 (defprotocol ABankable
@@ -81,7 +82,7 @@
       (c/ParseError (:position state) unexpected-token descriptors))
     (get-bank state)))
 
-(defn nothing [state]
+(defn nothing_ [state]
   (make-failure state nil #{}))
 
 (defn with-error [message]
@@ -173,7 +174,7 @@
         (if-not (or memory
                     (-> lr-node :rule (= subrule))
                     (-> head :involved-rules (contains? subrule)))
-          (set-bank (nothing state) bank)
+          (set-bank (nothing_ state) bank)
           (if (-> head :rules-to-be-evaluated (contains? subrule))
             (let [bank (update-in [:lr-stack node-index :rules-to-be-evalated]
                          disj subrule)
@@ -187,33 +188,31 @@
           state-position (:position state)
           found-memory-val (recall bank subrule state)]
       (if found-memory-val
-        (do
-          (if (integer? found-memory-val)
-            (let [bank (update-in bank [:lr-stack]
-                         setup-lr found-memory-val)
-                  new-failure (set-bank (nothing state) bank)]
-              new-failure)
-            (set-bank found-memory-val bank)))
-        (do
-          (let [bank (store-memory bank subrule state-position
-                       (-> bank :lr-stack count))
-                bank (update-in bank [:lr-stack] conj
-                       (LRNode nil subrule nil))
-                state-0b (set-bank state bank)
-                subresult (c/apply-rule  state-0b subrule)
-                bank (get-bank subresult)
-                submemory (get-memory bank subrule state-position)
-                current-lr-node (-> bank :lr-stack peek)
-                ; bank (update-in bank [:lr-stack] pop)
-                bank (store-memory bank subrule state-position
-                       (clear-bank subresult))
-                new-state (set-bank state bank)
-                result
-                  (if (and (integer? submemory) (:head current-lr-node))
-                    (lr-answer subrule new-state submemory subresult)
-                    (set-bank subresult bank))
-                result (vary-bank result update-in [:lr-stack] pop)]
-            result))))))
+        (if (integer? found-memory-val)
+          (let [bank (update-in bank [:lr-stack]
+                       setup-lr found-memory-val)
+                new-failure (set-bank (nothing_ state) bank)]
+            new-failure)
+          (set-bank found-memory-val bank))
+        (let [bank (store-memory bank subrule state-position
+                     (-> bank :lr-stack count))
+              bank (update-in bank [:lr-stack] conj
+                     (LRNode nil subrule nil))
+              state-0b (set-bank state bank)
+              subresult (c/apply-rule  state-0b subrule)
+              bank (get-bank subresult)
+              submemory (get-memory bank subrule state-position)
+              current-lr-node (-> bank :lr-stack peek)
+              ; bank (update-in bank [:lr-stack] pop)
+              bank (store-memory bank subrule state-position
+                     (clear-bank subresult))
+              new-state (set-bank state bank)
+              result
+                (if (and (integer? submemory) (:head current-lr-node))
+                  (lr-answer subrule new-state submemory subresult)
+                  (set-bank subresult bank))
+              result (vary-bank result update-in [:lr-stack] pop)]
+          result)))))
 
 (defn alt [& rules]
   (remember
@@ -233,7 +232,7 @@
 
 (m/defmonad parser-m
   "The monad that FnParse uses."
-  [m-zero nothing
+  [m-zero nothing_
    m-result prod
    m-bind combine
    m-plus alt])
@@ -349,7 +348,7 @@
       (let [result (c/apply-rule state rule)]
         (if (c/failure? result)
           (c/Success true state (:error result))
-          (-> state nothing (assoc :error (:error result))))))))
+          (-> state nothing_ (assoc :error (:error result))))))))
 
 (defn semantics
   "Creates a rule with a semantic hook,
