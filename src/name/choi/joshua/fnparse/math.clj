@@ -70,13 +70,6 @@
 
 (def expr addition-level-expr)
 
-(defn parse-expr [input]
-  (parse expr input
-    #(if (empty? %2)
-       (println "SUCCESS!" %1)
-       (println "Partial success." %1 %2))
-    #(println "ERROR!" %)))
-
 (deftest various-exprs
   (is (match? expr "3+1*cos(-(-5)+sin(2))"
         :product #(= % [3 '+ [1 '* ['cos [['- [-' 5]] '+ ['sin 2]]]]])))
