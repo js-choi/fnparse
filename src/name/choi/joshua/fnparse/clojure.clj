@@ -1,7 +1,7 @@
 (ns name.choi.joshua.fnparse.clojure
   (:require [name.choi.joshua.fnparse.hound :as r]
             [clojure.template :as t] [clojure.set :as set]
-            [clojure.contrib.seq-utils :as seq]
+            [clojure.contrib.seq :as seq]
             name.choi.joshua.fnparse.hound.test)
   (:use [clojure.test :only #{deftest is run-tests}])
   (:import [clojure.lang IPersistentMap]))

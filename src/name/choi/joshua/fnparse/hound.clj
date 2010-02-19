@@ -1,6 +1,6 @@
 (ns name.choi.joshua.fnparse.hound
   (:require [name.choi.joshua.fnparse.common :as c]
-            [clojure.contrib.seq-utils :as seq]
+            [clojure.contrib.seq :as seq]
             [clojure.contrib.monads :as m]
             [clojure.template :as t]
             [clojure.contrib.def :as d])

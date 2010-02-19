@@ -1,7 +1,7 @@
 (ns name.choi.joshua.fnparse.common
-  (:require [clojure.contrib.str-utils2 :as str] [clojure.template :as temp]
+  (:require [clojure.contrib.string :as str] [clojure.template :as temp]
             [clojure.set :as set] [clojure.test :as test]
-            [clojure.contrib.seq-utils :as seq])
+            [clojure.contrib.seq :as seq])
   (:import [clojure.lang Sequential IPersistentMap IPersistentVector Var]))
 
 (defprotocol AState
@@ -65,7 +65,8 @@
 (defn match-assert-expr
   [parse-fn msg rule input opts]
   (let [{:keys #{position context product?}
-         :or {product? (list constantly true), position (count input), context {}}}
+         :or {product? (list constantly true), position (count input),
+              context {}}}
         (apply hash-map opts)]
    `(letfn [(report-this#
               ([kind# expected-arg# actual-arg#]

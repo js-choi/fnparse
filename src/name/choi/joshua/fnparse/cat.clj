@@ -1,6 +1,6 @@
 (ns name.choi.joshua.fnparse.cat
   (:use clojure.template clojure.set clojure.contrib.def
-        clojure.contrib.seq-utils)
+        clojure.contrib.seq)
   (:require [clojure.contrib.monads :as m]
             [name.choi.joshua.fnparse.common :as c])
   (:import [clojure.lang Sequential IPersistentMap IPersistentVector Var]))
