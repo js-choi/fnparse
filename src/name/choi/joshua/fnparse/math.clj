@@ -78,8 +78,10 @@
     #(println "ERROR!" %)))
 
 (deftest various-exprs
-  (is (match? expr {} "3+1*cos(-(-5)+sin(2))" =))
-  (is (non-match? expr "*3+1*cos(-(-5)+sin(2))" 0
-        {:label #{"a number" "a symbol" "'-'" "'+'" "'('"}})))
+  (is (match? expr "3+1*cos(-(-5)+sin(2))"
+        :product #(= % [3 '+ [1 '* ['cos [['- [-' 5]] '+ ['sin 2]]]]])))
+  (is (non-match? expr "*3+1*cos(-(-5)+sin(2))"
+        :labels #{"a number" "a symbol" "'-'" "'+'" "'('"}
+        :position 0)))
 
 (run-tests)
