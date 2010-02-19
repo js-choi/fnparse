@@ -1,6 +1,7 @@
 (ns name.choi.joshua.fnparse.math
-  (:use clojure.template name.choi.joshua.fnparse.cat clojure.test
+  (:use clojure.template clojure.test
         name.choi.joshua.fnparse.cat.test)
+  (:require [name.choi.joshua.fnparse.cat :as r])
   (:refer-clojure :exclude #{+}))
 
 (set! *warn-on-reflection* true)
@@ -8,64 +9,64 @@
 (declare expr)
 
 (def digit
-  (semantics (term "a decimal digit" #(Character/isDigit (char %)))
+  (r/semantics (r/term "a decimal digit" #(Character/isDigit (char %)))
     #(Integer/parseInt (str %))))
 
 (do-template [rule-name token]
-  (def rule-name (lit token))
+  (def rule-name (r/lit token))
   plus-sign \+, minus-sign \-, multiplication-sign \*, division-sign \/,
   opening-parenthesis \(, closing-parenthesis \))
 
 (def indicator
-  (with-label "an indicator"
-    (+ plus-sign minus-sign multiplication-sign division-sign
+  (r/with-label "an indicator"
+    (r/+ plus-sign minus-sign multiplication-sign division-sign
          opening-parenthesis closing-parenthesis)))
 
 (def number-expr
-  (with-label "a number"
-    (+ (complex [first-digits #'number-expr, next-digit digit]
-           (+ (* 10 first-digits) next-digit))
+  (r/with-label "a number"
+    (r/+ (r/complex [first-digits #'number-expr, next-digit digit]
+           (r/+ (* 10 first-digits) next-digit))
          digit)))
 
-(def symbol-char (except "a symbol character" anything indicator))
+(def symbol-char (r/except "a symbol character" r/anything indicator))
 
 (def symbol-content
-  (+ (complex [first-char symbol-char, next-chars #'symbol-content]
+  (r/+ (r/complex [first-char symbol-char, next-chars #'symbol-content]
          (cons first-char next-chars))
-       (semantics symbol-char list)))
+       (r/semantics symbol-char list)))
 
 (def symbol-expr
-  (with-label "a symbol" (semantics symbol-content #(apply str %))))
+  (r/with-label "a symbol" (r/semantics symbol-content #(apply str %))))
 
 (def terminal-level-expr
-  (+ number-expr symbol-expr))
+  (r/+ number-expr symbol-expr))
 
 (def parenthesized-expr
-  (circumfix-conc opening-parenthesis #'expr closing-parenthesis))
+  (r/circumfix-conc opening-parenthesis #'expr closing-parenthesis))
 
-(def function-expr (vconc symbol-expr parenthesized-expr))
+(def function-expr (r/vconc symbol-expr parenthesized-expr))
 
 (def parenthesized-level-expr
-  (+ parenthesized-expr terminal-level-expr))
+  (r/+ parenthesized-expr terminal-level-expr))
 
 (def function-level-expr
-  (+ function-expr parenthesized-level-expr))
+  (r/+ function-expr parenthesized-level-expr))
 
 (def pos-neg-level-expr
-  (+ (vconc (+ plus-sign minus-sign) function-level-expr)
+  (r/+ (r/vconc (r/+ plus-sign minus-sign) function-level-expr)
        function-level-expr))
 
 (def multiplication-level-expr
-  (+ (vconc
+  (r/+ (r/vconc
          #'multiplication-level-expr
-         (+ multiplication-sign division-sign)
+         (r/+ multiplication-sign division-sign)
          pos-neg-level-expr)
        pos-neg-level-expr))
 
 (def addition-level-expr
-  (+ (vconc
+  (r/+ (r/vconc
          #'addition-level-expr
-         (+ plus-sign minus-sign)
+         (r/+ plus-sign minus-sign)
          multiplication-level-expr)
        multiplication-level-expr))
 
@@ -73,7 +74,7 @@
 
 (deftest various-exprs
   (is (match? expr "3+1*cos(-(-5)+sin(2))"
-        :product #(= % [3 '+ [1 '* ['cos [['- [-' 5]] '+ ['sin 2]]]]])))
+        :product? #(= % [3 \+ [1 \* ["cos" [[\- [\- 5]] \+ ["sin" 2]]]]])))
   (is (non-match? expr "*3+1*cos(-(-5)+sin(2))"
         :labels #{"a number" "a symbol" "'-'" "'+'" "'('"}
         :position 0)))

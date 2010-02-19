@@ -82,8 +82,7 @@
               (format "%s tokens actually consumed" actual-position#))
             (if (not (~product? actual-product#))
               (report-this# :fail
-                (list '~product? '~'rule-product)
-                (format "the invalid product %s" (pr-str actual-product#)))
+                (list '~'validate-product '~product?) actual-product#)
               (report-this# :pass))))
         (fn failure-match [error#]
           (report-this# :fail
