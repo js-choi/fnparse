@@ -2,6 +2,7 @@
   (:require [clojure.contrib.string :as str] [clojure.template :as temp]
             [clojure.set :as set] [clojure.test :as test]
             [clojure.contrib.seq :as seq])
+  (:refer-clojure :rename {apply app})
   (:import [clojure.lang IPersistentMap]))
 
 (defprotocol AState
@@ -28,12 +29,12 @@
   failure? ::Failure "Is the given result a Failure?"
   success? ::Success "Is the given result is a Success?")
 
-(defn apply-rule [state rule]
+(defn apply [state rule]
   ((force rule) state))
 
 (defn parse [make-state rule input context success-fn failure-fn]
   (let [state (make-state input context)
-        result (-> state (apply-rule rule) answer-result)]
+        result (-> state (apply rule) answer-result)]
     (if (failure? result)
       (failure-fn (:error result))
       (success-fn (:product result) (-> result :state position)))))
@@ -67,7 +68,7 @@
   (let [{:keys #{position context product?}
          :or {product? (list constantly true), position (count input),
               context {}}}
-        (apply hash-map opts)]
+        (app hash-map opts)]
    `(letfn [(report-this#
               ([kind# expected-arg# actual-arg#]
                (test/report {:type kind#, :message ~msg,
@@ -93,7 +94,7 @@
 (defn non-match-assert-expr
   [parse-fn msg rule input opts]
   ; {:pre #{(map? descriptor-map) (or (nil? position) (integer? position))}}
-  (let [{:keys #{labels messages position context}} (apply hash-map opts)
+  (let [{:keys #{labels messages position context}} (app hash-map opts)
         descriptor-map {:label labels, :message messages}]
    `(letfn [(report-this#
               ([kind# expected-arg# actual-arg#]

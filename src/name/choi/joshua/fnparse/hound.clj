@@ -68,9 +68,9 @@
 
 (define-fn combine [rule product-fn]
   (letfn [(apply-product-fn [result]
-            (c/apply-rule (:state result) (product-fn (:product result))))]
+            (c/apply (:state result) (product-fn (:product result))))]
     (fn [state]
-      (let [first-reply (c/apply-rule state rule)]
+      (let [first-reply (c/apply state rule)]
         (if (:tokens-consumed? first-reply)
           (assoc first-reply :result
             (delay
@@ -98,11 +98,11 @@
   (fn summed-rule [state]
     (let [[consuming-replies empty-replies]
             (->> rules
-              (map #(c/apply-rule state %))
+              (map #(c/apply state %))
               (seq/separate :tokens-consumed?))]
       (if (empty? consuming-replies)
         (if (empty? empty-replies)
-          (c/apply-rule nothing_ state)
+          (c/apply nothing_ state)
           (let [empty-replies (seq/reductions merge-replies empty-replies)]
             (or (first (drop-while #(-> % :result force c/failure?)
                          empty-replies))
@@ -123,7 +123,7 @@
                 #{(c/ErrorDescriptor :label label-str)})
               delay))]
     (fn labelled-rule [state]
-      (let [reply (c/apply-rule state rule)]
+      (let [reply (c/apply state rule)]
         (if-not (:tokens-consumed? reply)
           (update-in reply [:result] assoc-label)
           reply)))))
@@ -220,7 +220,7 @@
 
 (define-fn followed-by [rule]
   (fn [state]
-    (let [result (-> state (c/apply-rule rule) :result force)]
+    (let [result (-> state (c/apply rule) :result force)]
       (if (c/failure? result)
         (Reply false result)
         ((prod (:product result)) state)))))
@@ -229,10 +229,10 @@
   [rule]
   (label "<not followed by rule>"
     (fn not-followed-by-rule [state]
-      (let [result (-> state (c/apply-rule rule) :result force)]
+      (let [result (-> state (c/apply rule) :result force)]
         (if (c/failure? result)
           (Reply false (c/Success true state (:error result)))
-          (-> state (c/apply-rule nothing_) (assoc :error (:error result))))))))
+          (-> state (c/apply nothing_) (assoc :error (:error result))))))))
 
 (define-fn cascading-rep+ [rule unary-hook binary-hook]
   ; TODO: Rewrite to not blow up stack with many valid tokens
@@ -295,7 +295,7 @@
 (define-fn effects [f & args]
   (fn effects-rule [state]
     (apply f args)
-    (c/apply-rule state emptiness_)))
+    (c/apply state emptiness_)))
 
 (define-fn except
   "Creates a rule that is the exception from
@@ -324,20 +324,20 @@
                          conj (c/ErrorDescriptor :message new-message))
                        forced-result))))]
     (fn error-annotation-rule [state]
-      (let [reply (c/apply-rule state rule)]
+      (let [reply (c/apply state rule)]
         (update-in reply [:result] annotate)))))
 
 (define-fn factor= [n rule]
   (->> rule (replicate n) (apply cat)))
 
 (define-fn fetch-context_ [state]
-  (c/apply-rule state (prod (:context state))))
+  (c/apply state (prod (:context state))))
 
 (define-fn alter-context [f & args]
   (fn context-altering-rule [state]
     (let [altered-state (apply update-in state [:context] f args)]
-      ; (prn (c/apply-rule altered-state fetch-context_))
-      (c/apply-rule altered-state fetch-context_))))
+      ; (prn (c/apply altered-state fetch-context_))
+      (c/apply altered-state fetch-context_))))
 
 (def ascii-digits "0123456789")
 (def lowercase-ascii-alphabet "abcdefghijklmnopqrstuvwxyz")

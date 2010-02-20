@@ -180,7 +180,7 @@
   (radix-natural-number 10))
 
 (def number-sign_
-  (r/template-alt [label token product]
+  (r/template-sum [label token product]
     (r/label label (r/chook product (r/lit token)))
     "positive sign" \+ 1, "negative sign" \- -1))
 
@@ -253,7 +253,7 @@
 (def escaped-char_
   (r/prefix (r/lit \\)
     (r/label "a valid escape sequence"
-      (r/+ (r/template-alt [token character]
+      (r/+ (r/template-sum [token character]
              (r/chook character (r/lit token))
              \t \tab, \n \newline, \\ \\, \" \")
            unicode-escape-sequence_))))

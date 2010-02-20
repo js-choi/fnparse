@@ -95,12 +95,12 @@
 
 (define-fn combine [rule product-fn]
   (fn [state]
-    (let [{first-error :error, :as first-result} (c/apply-rule state rule)]
+    (let [{first-error :error, :as first-result} (c/apply state rule)]
       (if (c/success? first-result)
         (let [next-rule
                 (-> first-result :product product-fn)
               {next-error :error, :as next-result}
-                (-> first-result :state (c/apply-rule next-rule))]
+                (-> first-result :state (c/apply next-rule))]
           (assoc next-result
             :error (c/merge-parse-errors first-error next-error)))
         first-result))))
@@ -126,7 +126,7 @@
       (let [cur-bank (update-in cur-bank [:lr-stack node-index]
                        #(assoc % :rules-to-be-evaluated
                           (:involved-rules %)))
-            cur-result (c/apply-rule (set-bank state-0 cur-bank) subrule)
+            cur-result (c/apply (set-bank state-0 cur-bank) subrule)
             cur-result-bank (get-bank cur-result)
             cur-memory-val (get-memory cur-result-bank subrule position-0)]
         (if (or (c/failure? cur-result)
@@ -179,7 +179,7 @@
           (if (-> head :rules-to-be-evaluated (contains? subrule))
             (let [bank (update-in [:lr-stack node-index :rules-to-be-evalated]
                          disj subrule)
-                  result (-> state (set-bank bank) (c/apply-rule subrule))]
+                  result (-> state (set-bank bank) (c/apply subrule))]
               (vary-bank result store-memory subrule position result))
             memory))))))
 
@@ -200,7 +200,7 @@
               bank (update-in bank [:lr-stack] conj
                      (LRNode nil subrule nil))
               state-0b (set-bank state bank)
-              subresult (c/apply-rule  state-0b subrule)
+              subresult (c/apply  state-0b subrule)
               bank (get-bank subresult)
               submemory (get-memory bank subrule state-position)
               current-lr-node (-> bank :lr-stack peek)
@@ -222,7 +222,7 @@
              (fn apply-next-rule [prev-result next-rule]
                (-> state
                  (set-bank (get-bank prev-result))
-                 (c/apply-rule next-rule)
+                 (c/apply next-rule)
                  (update-in [:error]
                    #(c/merge-parse-errors (:error prev-result) %))))
             initial-result (emptiness_ state)
@@ -241,7 +241,7 @@
 (define-fn label [label-str rule]
   {:pre #{(string? label-str)}}
   (fn labelled-rule [state]
-    (let [result (c/apply-rule state rule), initial-position (:position state)]
+    (let [result (c/apply state rule), initial-position (:position state)]
       (if-not (-> result :error :position (> initial-position))
         (assoc-in result [:error :descriptors]
           #{(c/ErrorDescriptor :label label-str)})
@@ -376,7 +376,7 @@
 
 (define-fn followed-by [rule]
   (fn [state]
-    (let [result (c/apply-rule state rule)]
+    (let [result (c/apply state rule)]
       (if (c/success? result)
         ((prod (:product result)) state)
         result))))
@@ -389,7 +389,7 @@
   [rule]
   (label "<not followed by something>"
     (fn not-followed-by-rule [state]
-      (let [result (c/apply-rule state rule)]
+      (let [result (c/apply state rule)]
         (if (c/failure? result)
           (c/Success true state (:error result))
           (-> state nothing_ (assoc :error (:error result))))))))
@@ -443,7 +443,7 @@
 (define-fn effects [f & args]
   (fn effects-rule [state]
     (apply f args)
-    (c/apply-rule state emptiness_)))
+    (c/apply state emptiness_)))
 
 (define-fn except
   "Creates a rule that is the exception from
@@ -471,7 +471,7 @@
                   conj (c/ErrorDescriptor :message new-message))
                 error)))]
     (fn error-annotation-rule [state]
-      (let [reply (c/apply-rule state rule)]
+      (let [reply (c/apply state rule)]
         (update-in reply [:error] annotate)))))
 
 (def ascii-digits "0123456789")
