@@ -6,11 +6,36 @@
   (:import [clojure.lang IPersistentMap]))
 
 (defprotocol AState
+  "The protocol of FnParse states, which must
+  be able to return a position."
   (position [state]))
 
-(deftype ErrorDescriptor [kind text] IPersistentMap)
+(deftype
+  #^{:doc "Represents descriptors representing a single
+   potential cause of a FnParse error.
+  kind: Either of the keywords :message or :label.
+        :message means that the descriptor is a
+        generic message. :label means that it's
+        the label of a rule that was expected at a
+        certain position but was not found.
+  text: A string. The text of the descriptor."}
+  ErrorDescriptor [kind text]
+  IPersistentMap)
 
-(deftype ParseError [position unexpected-token descriptors] IPersistentMap)
+(deftype
+  #^{:doc "Represents FnParse errors.
+  position: An integer. The position in the token
+            sequence that the error was detected at.
+  unexpected-token: A token—specifically, the token
+                    at which the error was detected.
+                    If the token is actually the end
+                    of the input, then this is the
+                    keyword ::common/end-of-input
+                    instead.
+  descriptors: The set of ErrorDescriptors that
+               describe this error."}
+  ParseError
+  [position unexpected-token descriptors] IPersistentMap)
 
 (defprotocol AParseAnswer
   (answer-result [answer]))

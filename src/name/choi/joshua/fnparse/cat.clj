@@ -293,7 +293,7 @@
             (c/Success token (assoc state :position (inc position))
               (c/ParseError position token nil))
             (make-failure state token nil))
-          (make-failure state ::end-of-input nil))))))
+          (make-failure state ::c/end-of-input nil))))))
 
 (define-fn antiterm [label-str pred]
   (term label-str (complement pred)))

@@ -177,7 +177,7 @@
                                  :position (inc position))
                     (c/ParseError position nil nil))))
               (make-failed-reply state first-token nil)))
-          (make-failed-reply state ::end-of-input nil))))))
+          (make-failed-reply state ::c/end-of-input nil))))))
 
 (define-fn antiterm [label-str pred]
   (term label-str (complement pred)))
