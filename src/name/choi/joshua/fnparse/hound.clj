@@ -226,8 +226,8 @@
         ((prod (:product result)) state)))))
 
 (define-fn not-followed-by
-  [label-str rule]
-  (label label-str
+  [rule]
+  (label "<not followed by rule>"
     (fn not-followed-by-rule [state]
       (let [result (-> state (c/apply-rule rule) :result force)]
         (if (c/failure? result)
@@ -263,27 +263,27 @@
   (mapcat lit tokens))
 
 (d/defvar end-of-input_
-  (not-followed-by "the end of input" anything_)
+  (label "the end of input" (not-followed-by anything_))
   "WARNING: Because this is an always succeeding,
   always empty rule, putting this directly into a
   rep*/rep+/etc.-type rule will result in an
   infinite loop.")
 
-(define-fn prefix [prefix-rule body]
-  (for [_ prefix-rule, content body] content))
+(define-fn prefix [prefix-rule body-rule]
+  (for [_ prefix-rule, content body-rule] content))
 
-(define-fn suffix [body suffix-rule]
-  (for [content body, _ suffix-rule] content))
+(define-fn suffix [body-rule suffix-rule]
+  (for [content body-rule, _ suffix-rule] content))
 
-(define-fn circumfix [prefix-rule body suffix-rule]
-  (prefix prefix-rule (suffix body suffix-rule)))
+(define-fn circumfix [prefix-rule body-rule suffix-rule]
+  (prefix prefix-rule (suffix body-rule suffix-rule)))
 
 (define-fn separated-rep [separator element]
   (for [first-element element
             rest-elements (rep* (prefix separator element))]
     (cons first-element rest-elements)))
 
-(defmacro template-alt [argv expr & values]
+(defmacro template-sum [argv expr & values]
   (let [c (count argv)]
    `(+ ~@(map (fn [a] (t/apply-template argv expr a))
            (partition c values)))))
@@ -309,7 +309,7 @@
   b fails or c succeeds, then nil is simply returned."
   ([label-str minuend subtrahend]
    (label label-str
-     (for [_ (not-followed-by nil subtrahend), product minuend]
+     (for [_ (not-followed-by subtrahend), product minuend]
        product)))
   ([label-str minuend first-subtrahend & rest-subtrahends]
    (except label-str minuend

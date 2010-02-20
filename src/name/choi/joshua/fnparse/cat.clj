@@ -415,6 +415,36 @@
   [tokens]
   (mapcat lit tokens))
 
+(d/defvar end-of-input_
+  (label "the end of input" (not-followed-by anything_))
+  "WARNING: Because this is an always succeeding,
+  always empty rule, putting this directly into a
+  rep*/rep+/etc.-type rule will result in an
+  infinite loop.")
+
+(define-fn prefix [prefix-rule body-rule]
+  (for [_ prefix-rule, content body-rule] content))
+
+(define-fn suffix [body-rule suffix-rule]
+  (for [content body-rule, _ suffix-rule] content))
+
+(define-fn circumfix [prefix-rule body-rule suffix-rule]
+  (prefix prefix-rule (suffix body-rule suffix-rule)))
+
+(defmacro template-sum [argv expr & values]
+  (let [c (count argv)]
+   `(+ ~@(map (fn [a] (template/apply-template argv expr a)) 
+             (partition c values)))))
+
+(define-fn case-insensitive-lit [#^Character token]
+  (+ (lit (Character/toLowerCase token))
+       (lit (Character/toUpperCase token))))
+
+(define-fn effects [f & args]
+  (fn effects-rule [state]
+    (apply f args)
+    (c/apply-rule state emptiness_)))
+
 (define-fn except
   "Creates a rule that is the exception from
   the first given subrules with the second given
@@ -433,27 +463,21 @@
    (except label-str minuend
      (apply + (cons first-subtrahend rest-subtrahends)))))
 
-(define-fn prefix-conc [prefix body]
-  (for [_ prefix, content body] content))
+(define-fn annotate-error [message-fn rule]
+  (letfn [(annotate [error]
+            (let [new-message (message-fn error)]
+              (if new-message
+                (update-in error [:descriptors]
+                  conj (c/ErrorDescriptor :message new-message))
+                error)))]
+    (fn error-annotation-rule [state]
+      (let [reply (c/apply-rule state rule)]
+        (update-in reply [:error] annotate)))))
 
-(define-fn suffix-conc [body suffix]
-  (for [content body, _ suffix] content))
-
-(define-fn circumfix-conc [prefix body suffix]
-  (prefix-conc prefix (suffix-conc body suffix)))
-
-(defmacro template-+ [argv expr & values]
-  (let [c (count argv)]
-    `(+ ~@(map (fn [a] (template/apply-template argv expr a)) 
-              (partition c values)))))
-
-(define-fn case-insensitive-lit [#^Character token]
-  (+ (lit (Character/toLowerCase token))
-       (lit (Character/toUpperCase token))))
-
-(d/defvar ascii-digits "0123456789")
-(d/defvar lowercase-ascii-alphabet "abcdefghijklmnopqrstuvwxyz")
-(d/defvar base-36-digits (str ascii-digits lowercase-ascii-alphabet))
+(def ascii-digits "0123456789")
+(def lowercase-ascii-alphabet "abcdefghijklmnopqrstuvwxyz")
+(def uppercase-ascii-alphabet "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+(def base-36-digits (str ascii-digits lowercase-ascii-alphabet))
 
 (defrm radix-digit
   ([base] (radix-digit (format "a base-%s digit" base) base))
@@ -463,18 +487,22 @@
      (mapsum (fn [[index token]] (chook index (case-insensitive-lit token))))
      (label label-str))))
 
-(d/defvar decimal-digit
+(def decimal-digit_
   (radix-digit "a decimal digit" 10))
 
-(d/defvar hexadecimal-digit
+(def hexadecimal-digit_
   (radix-digit "a hexadecimal digit" 16))
 
-(d/defvar uppercase-ascii-letter
-  (set-lit "an uppercase ASCII letter" "ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
+(def uppercase-ascii-letter_
+  (set-lit "an uppercase ASCII letter" uppercase-ascii-alphabet))
 
-(d/defvar lowercase-ascii-letter
-  (set-lit "a lowercase ASCII letter" "abcdefghijklmnopqrstuvwxyz"))
+(def lowercase-ascii-letter_
+  (set-lit "a lowercase ASCII letter" lowercase-ascii-alphabet))
 
-(d/defvar ascii-letter
+(def ascii-letter_
   (label "an ASCII letter"
-    (+ uppercase-ascii-letter lowercase-ascii-letter)))
+    (+ uppercase-ascii-letter_ lowercase-ascii-letter_)))
+
+(def ascii-alphanumeric_
+  (label "an alphanumeric ASCII character"
+    (+ ascii-letter_ decimal-digit_)))
