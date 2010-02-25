@@ -7,9 +7,9 @@
   (:import [clojure.lang IPersistentMap]))
 
 ; TODO
-; Unicode character codes.
-; Keyword-specific restrictions.
 ; #=, #< reader macros
+
+;;; HELPER FUNCTIONS AND TYPES.
 
 (defn prefix-list-fn [prefix-rule]
   (fn [product] (list prefix-rule product)))
@@ -70,6 +70,8 @@
 
 (declare _form)
 
+;; Whitespace.
+
 (def _comment-indicator (r/+ (r/lit \;) (r/lex (r/phrase "#!"))))
 
 (def _comment-char (r/antilit \newline))
@@ -87,13 +89,15 @@
 
 (def _opt-ws (r/opt _ws))
 
-(def _keyword-indicator (r/lit \:))
+;; Indicators and form separators.
 
 (def _indicator (r/term "an indicator" indicator-set))
 
 (def _separator (r/+ _ws _indicator))
 
 (def _form-end (r/+ (r/followed-by _separator) r/_end-of-input))
+
+;; Symbols.
 
 (def _ns-separator (r/lit \/))
 
@@ -130,6 +134,10 @@
         (symbol pre-slash post-slash)
         (or (peculiar-symbols pre-slash) ; In case it's true, false, or nil
             (symbol pre-slash))))))
+
+;; Keywords.
+
+(def _keyword-indicator (r/lit \:))
 
 (def _normal-keyword
   (r/for [_ _keyword-indicator
@@ -171,6 +179,8 @@
 (def _keyword
   (r/label "a keyword"
     (r/+ _ns-resolved-keyword _normal-keyword)))
+
+;; Numbers.
 
 (r/defn radix-natural-number [base]
   (r/cascading-rep+ (r/radix-digit (if (<= base 36) base 36))
@@ -237,21 +247,29 @@
      _ _form-end]
     (tail-fn (* (or sign 1) prefix-number))))
 
-(def _string-delimiter (r/lit \"))
+;; Unicode escape sequences for chars and strings.
 
 (def _unicode-escape-sequence
   (r/prefix (r/lit \u)
     (r/hook (comp char reduce-hexadecimal-digits)
       (r/factor= 4 r/_hexadecimal-digit))))
 
+;; Characters.
+
+(def _character-indicator (r/lit \\))
+
 (def _character-name
   (r/+ (r/mapsum #(r/chook (key %) (r/phrase (val %))) char-name-string)
        _unicode-escape-sequence))
 
-(def _character (r/prefix (r/lit \\) _character-name))
+(def _character (r/prefix _character-indicator _character-name))
+
+;; Strings.
+
+(def _string-delimiter (r/lit \"))
 
 (def _escaped-char
-  (r/prefix (r/lit \\)
+  (r/prefix _character-indicator
     (r/label "a valid escape sequence"
       (r/+ (r/template-sum [token character]
              (r/chook character (r/lit token))
@@ -263,6 +281,8 @@
 (def _string
   (r/hook #(->> % seq/flatten str*)
     (r/circumfix _string-delimiter (r/rep* _string-char) _string-delimiter)))
+
+;; Circumflex compound forms: lists, vectors, maps, and sets.
 
 (def _form-series (r/suffix (r/rep* #'_form) _opt-ws))
 
@@ -276,6 +296,8 @@
   _vector \[ \] vec
   _map \{ \} #(apply hash-map %)
   _set-inner \{ \} set)
+
+;; Prefix compound forms: syntax-quoted, with-meta, etc.
 
 (r/defn padded-lit [token]
   (r/prefix (r/lit token) _opt-ws))
@@ -316,6 +338,8 @@
     (r/for [metadata _metadata, _ _opt-ws, content #'_form]
       (list `with-meta content metadata))))
 
+;; Anonymous functions.
+
 (def _anonymous-fn-parameter-suffix
   (r/+ _decimal-natural-number (r/lit \&) (r/chook 1 r/_emptiness)))
 
@@ -350,6 +374,8 @@
           parameters (make-parameter-vector anonymous-fn-context)]
       (list `fn 'anonymous-fn parameters content))))
 
+;; All forms put together. (Order matters for lexed rules.)
+
 (def _dispatched-inner
   (r/+ _anonymous-fn _set-inner _fn-inner _var-inner _with-meta-inner))
 
@@ -363,6 +389,8 @@
 
 (def _form
   (r/label "a form" (r/prefix _opt-ws _form-content)))
+
+;;; TESTS.
 
 (deftest various-rules
   (is (match? _form "55.2e2" :product? #(== % 5520.)))
