@@ -4,10 +4,8 @@
             [clojure.contrib.seq :as seq]
             name.choi.joshua.fnparse.hound.test)
   (:use [clojure.test :only #{deftest is run-tests}])
+  (:refer-clojure :exclude #{read-string})
   (:import [clojure.lang IPersistentMap]))
-
-; TODO
-; #", #< reader macros
 
 ;;; HELPER FUNCTIONS AND TYPES.
 
@@ -415,6 +413,31 @@
 (def _form
   (r/label "a form" (r/prefix _opt-ws _form-content)))
 
+;;; THE FINAL READ FUNCTION.
+
+(defn read-string
+  "Reads one object from the given string. Also can
+  take the options below. If the reading is successful,
+  the resulting object is returned. Otherwise, a Java
+  Exception is thrown.
+  ns-name: A string. The name of the namespace to
+           interpret double-coloned keywords in.
+           Defaults to (name *ns*).
+  ns-aliases: A map of strings to strings. Keys are
+              namespace aliases, and vals are
+              corresponding namespace names. Defaults
+              to (ns-aliases *ns*).
+  reader-eval?: A boolean. If logical true, allows
+                ReaderEval forms (i.e. #=(...)),
+                which can be a security hole.
+                Defaults to *read-eval*."
+  [input & opts]
+  (let [{:keys #{ns-name ns-aliases reader-eval?}} (apply hash-map opts)]
+    (r/parse _form input (ClojureContext ns-name ns-aliases nil reader-eval?)
+      (fn [product position] product)
+      (fn [error] (throw (Exception. (r/format-parse-error error)))))))
+  
+
 ;;; TESTS.
 
 (deftest various-rules
@@ -470,6 +493,7 @@
   (is (non-match? _form "#<java.lang.String@35235>"
         :position 25
         :labels #{}
-        :messages #{"the data in #<java.lang.String@35235> is unrecoverable"})))
+        :messages #{"the data in #<java.lang.String@35235> is unrecoverable"}))
+  (is (= (read-string "[3 2 5]") [3 2 5])))
 
 (run-tests)

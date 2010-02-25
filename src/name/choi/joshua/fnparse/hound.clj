@@ -23,6 +23,9 @@
 (define-fn parse [rule input context success-fn failure-fn]
   (c/parse make-state rule input context success-fn failure-fn))
 
+(define-fn format-parse-error [error]
+  (c/format-parse-error error))
+
 (define-fn merge-replies [mergee merger]
   (assoc merger :result
     (update-in (-> merger :result force) [:error]
