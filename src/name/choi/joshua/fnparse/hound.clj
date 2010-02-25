@@ -34,7 +34,7 @@
       (c/Success product state
         (c/ParseError (:position state) nil nil)))))
 
-(def emptiness_ (prod nil))
+(def _emptiness (prod nil))
 
 (define-fn- make-failed-reply
   ([state descriptors]
@@ -47,7 +47,7 @@
 (def nothing-descriptors
   #{(c/ErrorDescriptor :label "absolutely nothing")})
 
-(define-fn nothing_ [state]
+(define-fn _nothing [state]
   (make-failed-reply state nothing-descriptors))
 
 (define-fn with-error [message]
@@ -102,7 +102,7 @@
               (seq/separate :tokens-consumed?))]
       (if (empty? consuming-replies)
         (if (empty? empty-replies)
-          (c/apply nothing_ state)
+          (c/apply _nothing state)
           (let [empty-replies (seq/reductions merge-replies empty-replies)]
             (or (first (drop-while #(-> % :result force c/failure?)
                          empty-replies))
@@ -111,7 +111,7 @@
 
 (m/defmonad parser-m
   "The monad that FnParse uses."
-  [m-zero nothing_
+  [m-zero _nothing
    m-result prod
    m-bind combine
    m-plus +])
@@ -182,7 +182,7 @@
 (define-fn antiterm [label-str pred]
   (term label-str (complement pred)))
 
-(def anything_
+(def _anything
   (term "anything" (constantly true)))
 
 (define-fn hook [semantic-hook subrule]
@@ -211,7 +211,7 @@
   (hook vec (apply cat subrules)))
 
 (define-fn opt [rule]
-  (+ rule emptiness_))
+  (+ rule _emptiness))
 
 (define-fn lex [subrule]
   (fn [state]
@@ -232,7 +232,7 @@
       (let [result (-> state (c/apply rule) :result force)]
         (if (c/failure? result)
           (Reply false (c/Success true state (:error result)))
-          (-> state (c/apply nothing_) (assoc :error (:error result))))))))
+          (-> state (c/apply _nothing) (assoc :error (:error result))))))))
 
 (define-fn cascading-rep+ [rule unary-hook binary-hook]
   ; TODO: Rewrite to not blow up stack with many valid tokens
@@ -262,8 +262,8 @@
 (define-fn phrase [tokens]
   (mapcat lit tokens))
 
-(d/defvar end-of-input_
-  (label "the end of input" (not-followed-by anything_))
+(d/defvar _end-of-input
+  (label "the end of input" (not-followed-by _anything))
   "WARNING: Because this is an always succeeding,
   always empty rule, putting this directly into a
   rep*/rep+/etc.-type rule will result in an
@@ -295,7 +295,7 @@
 (define-fn effects [f & args]
   (fn effects-rule [state]
     (apply f args)
-    (c/apply state emptiness_)))
+    (c/apply state _emptiness)))
 
 (define-fn except
   "Creates a rule that is the exception from
@@ -330,14 +330,14 @@
 (define-fn factor= [n rule]
   (->> rule (replicate n) (apply cat)))
 
-(define-fn fetch-context_ [state]
+(define-fn _fetch-context [state]
   (c/apply state (prod (:context state))))
 
 (define-fn alter-context [f & args]
   (fn context-altering-rule [state]
     (let [altered-state (apply update-in state [:context] f args)]
-      ; (prn (c/apply altered-state fetch-context_))
-      (c/apply altered-state fetch-context_))))
+      ; (prn (c/apply altered-state _fetch-context))
+      (c/apply altered-state _fetch-context))))
 
 (def ascii-digits "0123456789")
 (def lowercase-ascii-alphabet "abcdefghijklmnopqrstuvwxyz")
@@ -352,28 +352,28 @@
      (mapsum (fn [[index token]] (chook index (case-insensitive-lit token))))
      (label label-str))))
 
-(def decimal-digit_
+(def _decimal-digit
   (radix-digit "a decimal digit" 10))
 
-(def hexadecimal-digit_
+(def _hexadecimal-digit
   (radix-digit "a hexadecimal digit" 16))
 
-(def uppercase-ascii-letter_
+(def _uppercase-ascii-letter
   (set-lit "an uppercase ASCII letter" uppercase-ascii-alphabet))
 
-(def lowercase-ascii-letter_
+(def _lowercase-ascii-letter
   (set-lit "a lowercase ASCII letter" lowercase-ascii-alphabet))
 
-(def ascii-letter_
+(def _ascii-letter
   (label "an ASCII letter"
-    (+ uppercase-ascii-letter_ lowercase-ascii-letter_)))
+    (+ _uppercase-ascii-letter _lowercase-ascii-letter)))
 
-(def ascii-alphanumeric_
+(def _ascii-alphanumeric
   (label "an alphanumeric ASCII character"
-    (+ ascii-letter_ decimal-digit_)))
+    (+ _ascii-letter _decimal-digit)))
 
-; (define rule (for [a anything_, b anything_] [a b]))
-; (define rule (validate anything_ (partial = 'a)))
+; (define rule (for [a _anything, b _anything] [a b]))
+; (define rule (validate _anything (partial = 'a)))
 ; (define rule (phrase '[a b]))
 ; (define rule (lit \3))
 ; (define rule (lex (phrase "let 3")))
@@ -381,7 +381,7 @@
 ; (define rule (lex (label "let expr" (phrase "let 3"))))
 ; (define rule (+ (lex (label "let expr" (phrase "let 3")))
 ;                (lit \3)))
-; (define rule emptiness_)
+; (define rule _emptiness)
 ; (define rule (rep* (antilit \3)))
 ; (define rule (rep* decimal-digit))
 ; (define rule (followed-by (phrase "li")))
