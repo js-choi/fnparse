@@ -7,7 +7,7 @@
   (:import [clojure.lang IPersistentMap]))
 
 ; TODO
-; #=, #< reader macros
+; #< reader macros
 
 ;;; HELPER FUNCTIONS AND TYPES.
 
@@ -360,24 +360,35 @@
     parameter-symbol))
 
 (def _anonymous-fn
-  (r/for "an anonymous function"
-    [_ (r/lit \()
-     pre-context r/_fetch-context
-     _ (r/only-when (not (:anonymous-fn-context pre-context))
-         "nested anonymous functions are not allowed")
-     _ (r/alter-context assoc :anonymous-fn-context (AnonymousFnContext [] nil))
-     content _form-series
-     post-context r/_fetch-context
-     _ (r/alter-context assoc :anonymous-fn-context nil)
-     _ (r/lit \))]
+  (r/for [_ (r/lit \()
+          pre-context r/_fetch-context
+          _ (r/only-when (not (:anonymous-fn-context pre-context))
+              "nested anonymous functions are not allowed")
+          _ (r/alter-context assoc
+              :anonymous-fn-context (AnonymousFnContext [] nil))
+          content _form-series
+          post-context r/_fetch-context
+          _ (r/alter-context assoc :anonymous-fn-context nil)
+          _ (r/lit \))]
     (let [anonymous-fn-context (:anonymous-fn-context post-context)
           parameters (make-parameter-vector anonymous-fn-context)]
       (list `fn 'anonymous-fn parameters content))))
 
+;; EvalReaders.
+
+(def _eval-reader
+  (r/for [_ (r/lit \=)
+          context r/_fetch-context
+          _ (r/only-when (:reader-eval? context)
+              "EvalReader forms (i.e. #=(...)) have been prohibited.")
+          content _list]
+    (eval content)))
+
 ;; All forms put together. (Order matters for lexed rules.)
 
 (def _dispatched-inner
-  (r/+ _anonymous-fn _set-inner _fn-inner _var-inner _with-meta-inner))
+  (r/+ _anonymous-fn _set-inner _fn-inner _var-inner _with-meta-inner
+       _eval-reader))
 
 (def _dispatched
   (r/prefix (r/lit \#) _dispatched-inner))
@@ -426,6 +437,8 @@
   (is (match? _form "[#(%) #(apply + % %2 %2 %&)]"
         :context (ClojureContext "user" nil nil nil)
         :product? #(= ((eval (second %)) 3 2 8 1) 16)))
+  (is (match? _form "#=(+ 3 2)" :context (ClojureContext nil nil nil true)
+                                :product? #(= % 5)))
   (is (non-match? _form "17rAZ"
         :position 4
         :labels #{"a base-17 digit" "an indicator" "whitespace"
