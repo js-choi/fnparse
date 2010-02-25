@@ -7,7 +7,7 @@
   (:import [clojure.lang IPersistentMap]))
 
 ; TODO
-; #< reader macros
+; #", #< reader macros
 
 ;;; HELPER FUNCTIONS AND TYPES.
 
@@ -276,7 +276,9 @@
              \t \tab, \n \newline, \\ \\, \" \")
            _unicode-escape-sequence))))
 
-(def _string-char (r/+ _escaped-char (r/antilit \")))
+(def _normal-string-char (r/antilit \"))
+
+(def _string-char (r/+ _escaped-char _normal-string-char))
 
 (def _string
   (r/hook #(->> % seq/flatten str*)
@@ -289,7 +291,7 @@
 (t/do-template [_rule start-token end-token product-fn]
   (def _rule
     (r/for [_ (r/lit start-token)
-            contents (r/opt _form-series)
+            contents _form-series
             _ (r/lit end-token)]
       (product-fn contents)))
   _list \( \) #(apply list %)
@@ -297,7 +299,7 @@
   _map \{ \} #(apply hash-map %)
   _set-inner \{ \} set)
 
-;; Prefix compound forms: syntax-quoted, with-meta, etc.
+;; Simple prefix forms: syntax-quote, deref, etc.
 
 (r/defn padded-lit [token]
   (r/prefix (r/lit token) _opt-ws))
@@ -322,9 +324,7 @@
     (r/effects println
       "WARNING: The ^ indicator is deprecated (since Clojure 1.1).")))
 
-(def _fn-inner
-  (r/hook (prefix-list-fn `mini-fn)
-    (r/circumfix (r/lit \() _form-series (r/lit \)))))
+;; With-meta #^ forms.
 
 (def _tag
   (r/hook #(hash-map :tag %)
@@ -359,7 +359,7 @@
          r/_emptiness)]
     parameter-symbol))
 
-(def _anonymous-fn
+(def _anonymous-fn-inner
   (r/for [_ (r/lit \()
           pre-context r/_fetch-context
           _ (r/only-when (not (:anonymous-fn-context pre-context))
@@ -374,9 +374,15 @@
           parameters (make-parameter-vector anonymous-fn-context)]
       (list `fn 'anonymous-fn parameters content))))
 
-;; EvalReaders.
+;; Regex patterns, EvalReaders, and unreadables.
 
-(def _eval-reader
+(def _pattern-inner
+  (r/hook (comp re-pattern str*)
+    (r/circumfix _string-delimiter
+                 (r/rep* _normal-string-char)
+                 _string-delimiter)))
+
+(def _evaluated-inner
   (r/for [_ (r/lit \=)
           context r/_fetch-context
           _ (r/only-when (:reader-eval? context)
@@ -387,8 +393,8 @@
 ;; All forms put together. (Order matters for lexed rules.)
 
 (def _dispatched-inner
-  (r/+ _anonymous-fn _set-inner _fn-inner _var-inner _with-meta-inner
-       _eval-reader))
+  (r/+ _anonymous-fn-inner _set-inner _var-inner _with-meta-inner _pattern-inner
+       _evaluated-inner))
 
 (def _dispatched
   (r/prefix (r/lit \#) _dispatched-inner))
@@ -439,6 +445,8 @@
         :product? #(= ((eval (second %)) 3 2 8 1) 16)))
   (is (match? _form "#=(+ 3 2)" :context (ClojureContext nil nil nil true)
                                 :product? #(= % 5)))
+  (is (match? _form "#\"\\w+\""
+        :product? #(re-matches % "abc")))
   (is (non-match? _form "17rAZ"
         :position 4
         :labels #{"a base-17 digit" "an indicator" "whitespace"
