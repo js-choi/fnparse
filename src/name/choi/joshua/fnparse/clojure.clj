@@ -11,6 +11,12 @@
 
 ;;; HELPER FUNCTIONS AND TYPES.
 
+(deftype ClojureContext [ns-name ns-aliases anonymous-fn-context reader-eval?]
+  IPersistentMap)
+
+(deftype AnonymousFnContext [normal-parameters slurping-parameter]
+  IPersistentMap)
+
 (defn prefix-list-fn [prefix-rule]
   (fn [product] (list prefix-rule product)))
 
@@ -27,12 +33,6 @@
 
 (defn reduce-hexadecimal-digits [digits]
   (reduce #(+ (* 16 %1) %2) digits))
-
-(deftype ClojureContext [ns-name ns-aliases anonymous-fn-context]
-  IPersistentMap)
-
-(deftype AnonymousFnContext [normal-parameters slurping-parameter]
-  IPersistentMap)
 
 (def peculiar-symbols {"nil" nil, "true" true, "false" false})
 
@@ -411,7 +411,7 @@
                   "a symbol character" "whitespace"}))
   (is (match? _form ":a/b" :product? #(= % :a/b)))
   (is (match? _form "::b"
-        :context (ClojureContext "user" nil nil)
+        :context (ClojureContext "user" nil nil nil)
         :product? #(= % :user/b)))
   (is (non-match? _form "::z/abc"
         :position 3
@@ -424,7 +424,7 @@
   (is (match? _form "[~@a ()]"
         :product? #(= % [(list 'clojure.core/unquote-splicing 'a) ()])))
   (is (match? _form "[#(%) #(apply + % %2 %2 %&)]"
-        :context (ClojureContext "user" nil nil)
+        :context (ClojureContext "user" nil nil nil)
         :product? #(= ((eval (second %)) 3 2 8 1) 16)))
   (is (non-match? _form "17rAZ"
         :position 4
@@ -432,7 +432,7 @@
                   "the end of input"}))
   (is (non-match? _form "#(% #(%))"
         :position 6
-        :context (ClojureContext "user" nil nil)
+        :context (ClojureContext "user" nil nil nil)
         :messages #{"nested anonymous functions are not allowed"}))
   (is (non-match? _form "3/0 3"
         :position 3
