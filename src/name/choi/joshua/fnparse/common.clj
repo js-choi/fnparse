@@ -116,8 +116,10 @@
   The descriptor map should be returned from group-descriptors."
   [position descriptor-map]
   (let [{labels :label, messages :message} descriptor-map
-        expectation-text (->> labels (str/join ", or ") (str "expected "))
-        message-text (->> expectation-text list (concat messages)
+        expectation-text (when (seq labels)
+                           (->> labels (str/join ", or ") (str "expected ")
+                                list))
+        message-text (->> expectation-text (concat messages)
                           (str/join "; "))]
     (format "parse error at position %s: %s" position message-text)))
 
@@ -125,12 +127,12 @@
   "From the given set of descriptors, returns a map with
   messages and labels respectively grouped together.
   If there are no descriptors of a certain descriptor kind,
-  then the map's val for that kind is nil."
+  then the map's val for that kind is the empty set."
   [descriptors]
   (->> descriptors (seq/group-by :kind)
        (map #(vector (key %) (set (map :text (val %)))))
        (filter #(seq (get % 1)))
-       (into {:message nil, :label nil})))
+       (into {:message #{}, :label #{}})))
 
 (defn format-parse-error
   "Returns a formatted string from the given error."
@@ -169,6 +171,11 @@
               '~rule '~input)
             (format-parse-error error#)))))))
 
+(defn nil-or-equal?
+  "Tests if a is nil, or else if a equals b."
+  [a b]
+  (or (nil? a) (= a b)))
+
 (defn non-match-assert-expr
   "The function that's used for (is (non-match? ...)) forms in
   fnparse.hound.test and fnparse.cat.test."
@@ -190,10 +197,12 @@
                 actual-position# actual-product#)))
           (fn failure-nonmatch
             [{actual-position# :position, actual-descriptors# :descriptors}]
-            (let [actual-descriptor-map#
-                   (group-descriptors actual-descriptors#)]
-              (if (and (or (nil? ~position) (== ~position actual-position#))
-                       (= ~descriptor-map actual-descriptor-map#))
+            (let [{actual-labels# :label, actual-messages# :message
+                   :as actual-descriptor-map#}
+                     (group-descriptors actual-descriptors#)]
+              (if (and (nil-or-equal? ~position actual-position#)
+                       (nil-or-equal? ~labels actual-labels#)
+                       (nil-or-equal? ~messages actual-messages#))
                 (report-this# :pass)
                 (report-this# :fail expected-error-str#
                   (format-parse-error-data
