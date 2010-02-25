@@ -220,10 +220,12 @@
     (comp (if big-dec? bigdec double) tail-fn)))
 
 (def _fraction-denominator-tail
-  (r/prefix (r/lit \/)
+  ; Product: a unary function on an integer.
+  (r/prefix
+    (r/lit \/)
     (r/hook (fn [denominator] #(/ % denominator))
-      (r/anti-validate _decimal-natural-number zero?
-        "a fraction's denominator cannot be zero"))))
+      (r/antivalidate zero? "a fraction's denominator cannot be zero"
+        _decimal-natural-number))))
 
 (r/defn radix-coefficient-tail [base]
   (r/hook constantly

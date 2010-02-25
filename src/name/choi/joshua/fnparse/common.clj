@@ -82,7 +82,7 @@
   rule: The rule. It must accept whatever state that
         make-state returns.
   input: The sequence of tokens to parse.
-  context: The initial context for the rule. Can be nil.
+  context: The initial context for the rule.
   success-fn: A function called when the rule matches
               the input.
               (success-fn final-product final-position) is
