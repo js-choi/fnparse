@@ -390,11 +390,19 @@
           content _list]
     (eval content)))
 
+(def _unreadable-inner
+  (r/for [_ (r/lit \<)
+          content (r/rep* (r/antilit \>))
+          _ (r/opt (r/lit \>))
+          _ (r/with-error
+              (format "the data in #<%s> is unrecoverable" (str* content)))]
+    nil))
+
 ;; All forms put together. (Order matters for lexed rules.)
 
 (def _dispatched-inner
   (r/+ _anonymous-fn-inner _set-inner _var-inner _with-meta-inner _pattern-inner
-       _evaluated-inner))
+       _evaluated-inner _unreadable-inner))
 
 (def _dispatched
   (r/prefix (r/lit \#) _dispatched-inner))
@@ -458,6 +466,10 @@
   (is (non-match? _form "3/0 3"
         :position 3
         :labels #{"a base-10 digit"}
-        :messages #{"a fraction's denominator cannot be zero"})))
+        :messages #{"a fraction's denominator cannot be zero"}))
+  (is (non-match? _form "#<java.lang.String@35235>"
+        :position 25
+        :labels #{}
+        :messages #{"the data in #<java.lang.String@35235> is unrecoverable"})))
 
 (run-tests)
