@@ -72,7 +72,7 @@
 
 (def -comment-indicator- (r/+ (r/lit \;) (r/lex (r/phrase "#!"))))
 
-(def -comment-char- (r/antilit \newline))
+(def -comment-char- (r/anti-lit \newline))
 
 (def -comment- (r/cat -comment-indicator- (r/rep* -comment-char-)))
 
@@ -93,7 +93,7 @@
 
 (def -separator- (r/+ -ws- -indicator-))
 
-(def -form-end- (r/+ (r/followed-by -separator-) r/-end-of-input-))
+(def -form-end- (r/+ (r/peek -separator-) r/-end-of-input-))
 
 ;; Symbols.
 
@@ -146,14 +146,14 @@
       (keyword pre-slash post-slash)
       (keyword pre-slash))))
 
-(def -followed-by-ns-separator- (r/followed-by -ns-separator-))
+(def -peek-ns-separator- (r/peek -ns-separator-))
 
 (r/defn fetch-referred-namespace [context namespace-alias]
   (r/only-when (get-in context [:ns-aliases namespace-alias])
     (format "no namespace with alias '%s'" namespace-alias)))
 
 (r/defn ns-qualified-keyword-end-with-slash [pre-slash]
-  (r/for [_ -followed-by-ns-separator-
+  (r/for [_ -peek-ns-separator-
           context r/-fetch-context-
           prefix (fetch-referred-namespace context pre-slash)
           suffix -symbol-suffix-]
@@ -276,7 +276,7 @@
              \t \tab, \n \newline, \\ \\, \" \")
            -unicode-escape-sequence-))))
 
-(def -normal-string-char- (r/antilit \"))
+(def -normal-string-char- (r/anti-lit \"))
 
 (def -string-char- (r/+ -escaped-char- -normal-string-char-))
 
@@ -392,7 +392,7 @@
 
 (def -unreadable-inner-
   (r/for [_ (r/lit \<)
-          content (r/rep* (r/antilit \>))
+          content (r/rep* (r/anti-lit \>))
           _ (r/opt (r/lit \>))
           _ (r/with-error
               (format "the data in #<%s> is unrecoverable" (str* content)))]

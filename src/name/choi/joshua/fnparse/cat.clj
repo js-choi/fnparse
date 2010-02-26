@@ -3,7 +3,7 @@
             [name.choi.joshua.fnparse.common :as c] [clojure.contrib.def :as d]
             [clojure.contrib.seq :as seq])
   (:refer-clojure :rename {defn define-fn, defn- define-fn-}
-                  :exclude #{for + mapcat})
+                  :exclude #{for + mapcat peek})
   (:import [clojure.lang IPersistentMap]))
 
 (defprotocol ABankable
@@ -334,7 +334,7 @@
   [token]
   (term (format "'%s'" token) (partial = token)))
 
-(define-fn antilit [token]
+(define-fn anti-lit [token]
   (term (str "anything except " token) #(not= token %)))
 
 (define-fn set-lit [label-str tokens]
@@ -374,21 +374,21 @@
   [rule]
   (+ rule emptiness_))
 
-(define-fn followed-by [rule]
+(define-fn peek [rule]
   (fn [state]
     (let [result (c/apply state rule)]
       (if (c/success? result)
         ((prod (:product result)) state)
         result))))
 
-(define-fn not-followed-by
+(define-fn anti-peek
   "Creates a rule that does not consume
   any tokens, but fails when the given
   subrule succeeds. On success, the new
   rule's product is always true."
   [rule]
   (label "<not followed by something>"
-    (fn not-followed-by-rule [state]
+    (fn anti-peek-rule [state]
       (let [result (c/apply state rule)]
         (if (c/failure? result)
           (c/Success true state (:error result))
@@ -416,7 +416,7 @@
   (mapcat lit tokens))
 
 (d/defvar end-of-input_
-  (label "the end of input" (not-followed-by anything_))
+  (label "the end of input" (anti-peek anything_))
   "WARNING: Because this is an always succeeding,
   always empty rule, putting this directly into a
   rep*/rep+/etc.-type rule will result in an
@@ -457,7 +457,7 @@
   b fails or c succeeds, then nil is simply returned."
   ([label-str minuend subtrahend]
    (label label-str
-     (for [_ (not-followed-by subtrahend), product minuend]
+     (for [_ (anti-peek subtrahend), product minuend]
        product)))
   ([label-str minuend first-subtrahend & rest-subtrahends]
    (except label-str minuend

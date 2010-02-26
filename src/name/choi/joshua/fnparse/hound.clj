@@ -5,7 +5,7 @@
             [clojure.template :as t]
             [clojure.contrib.def :as d])
   (:refer-clojure :rename {defn define-fn, defn- define-fn-}
-                  :exclude #{for + mapcat})
+                  :exclude #{for + mapcat peek})
   (:import [clojure.lang IPersistentMap]))
 
 (deftype State [remainder position context] :as this
@@ -49,7 +49,7 @@
   "Creates a product rule.
   *   Succeeds? Always.
       *   Product: The given `product`.
-      *   Consumes: Nothing.
+      *   Consumes: Zero tokens.
   *   Fails? Never.
   
   Use the :let modifier in preference to this function
@@ -68,7 +68,7 @@
   
   *   Succeeds? Always.
       *   Product: `nil`.
-      *   Consumes: Nothing.
+      *   Consumes: Zero tokens.
   *   Fails? Never.
   
   Happens to be equivalent to `(prod nil)`.")
@@ -135,7 +135,7 @@
   *   Succeeds? Only if the given `valid?` is
       logical true.
       *   Product: `valid?`.
-      *   Consumes: Nothing.
+      *   Consumes: Zero tokens.
   *   Fails? Only if not `valid?`.
       *   Labels: None.
       *   Messages: The given `message`.
@@ -211,9 +211,11 @@
   Adds the given sub-rules together, forming a new rule.
   The order of the sub-rules matters.
   
-  *This is the FnParse Hound version of +.* It *first*
-  searches for a successful parse from its subrules that
-  *consumed any tokens*. The first such success is
+  *This is the FnParse Hound version of +.* It does *not*
+  backtrack.
+  
+  This means that it *first* searches for a successful parse from its
+  subrules that *consumed any tokens*. The first such success is
   *immediately returned*.
   
   If all sub-rules that consumed tokens failed, then
@@ -318,8 +320,8 @@
       succeeds. The expression can refer
       to any symbol bound to in the `steps`.
   
-  Rule behavior
-  =============
+  Rule behaviour
+  ==============
   If it succeeds or fails and also how many tokens
   it consumes is similar to `cat`. How the final
   product is calculated is similar to `hook`.
@@ -333,8 +335,8 @@
       *   Labels and messages: Whatever is
           returned by the failed rule.
   
-  Misc
-  ====
+  Miscellaneous info
+  ==================
   For examples of for rules, check the example
   libraries like `fnparse.clojure`.
   
@@ -471,14 +473,14 @@
   [token]
   (term (format "'%s'" token) #(= token %)))
 
-(define-fn antilit
+(define-fn anti-lit
   "Creates a rule of an anti-literal.
   A shortcut for the term function. It consumes
   one token, and succeeds only if it *does not
   Its product is the consumed token.
   equal* the given token. It fails otherwise.
   It automatically adds an appropriate label
-  (e.g. `(antilit \\$)` is labelled
+  (e.g. `(anti-lit \\$)` is labelled
   `\"anything except '$'\")."
   [token]
   (term (format "anything except '%s'" token) #(not= token %)))
@@ -516,14 +518,20 @@
   (antiterm label-str (tokens set)))
 
 (define-fn cat
-  "Creates a concatenated rule.
-  Concatenates many rules together. If one of
-  the sub-rules fail, the whole rule fails.
-  Its product is a sequence of the respective
-  products of each sub-rule."
-  [& subrules]
+  "Creates a concatenated rule out of many given `rules`.
+  
+  *   Success: All given `rules` succeed, one after another.
+      *   Product: The sequence of all the `rules`'
+          respective products.
+      *   Consumes: All tokens that each rule in `rules`
+          consecutively consumes.
+  *   Failure: Any rule in the `rule` fails at its
+      respective position.
+      *   Labels and messages: Whatever is
+          returned by the failed rule."
+  [& rules]
   (m/with-monad parser-m
-    (m/m-seq subrules)))
+    (m/m-seq rules)))
 
 (define-fn vcat
   "Exactly like cat, only applies vec to its product."
@@ -533,7 +541,15 @@
 (define-fn opt
   "Creates an optional rule. The new rule
   always succeeds. It is equivalent to the
-  sum of the given rule and the emptiness rule."
+  sum of the given rule and `-emptiness-`.
+  
+  *   Success: Always.
+      *   Product: If `rule` succeeds, whatever
+          product `rule` gives. Otherwise, `nil`.
+      *   Consumes: If `rule` succeeds, whatever
+          `rule` consumed. Otherwise, nothing is
+          consumed.
+  *   Failure: Never."
   [rule]
   (+ rule -emptiness-))
 
@@ -543,12 +559,16 @@
   *backtrack* when it fails, *even* if it consumes
   tokens. (Don't forget, usually *if a rule consumes
   tokens, it cannot backtrack at all*.)
-  HOW IT WORKS:
+  
+  How it works
+  ============
   Rules surrounded by lex count as 'empty' rules—
   rules that don't consume any tokens—regardless
   if they really consume tokens or not. This changes
   the behavior of any summed rules that contain it.
-  WHY YOU WOULD NEED TO USE IT:
+  
+  Why you would need to use it
+  ============================
     (require '[name.choi.joshua.fnparse.hound :as r])
     (def -ws- (r/lit \\space))
     (def -claim- (r/phrase \"x = 1\"))
@@ -566,7 +586,9 @@
   -let-expr- consumed the first three tokens of \"letter\",
   the summed rule -expr- will immediately fail without
   even trying -identifier-.
-  AND SO HOW YOU USE IT:
+  
+  And so how you use it
+  =====================
   Change -let-expr- to use the following:
     (r/cat (r/lex (r/phrase \"let\")) -ws- -let-expr-)
   Now both line one and two will be successful."
@@ -575,13 +597,15 @@
     (-> state subrule
       (assoc :tokens-consumed? false))))
 
-(define-fn followed-by
-  "Creates a lookahead rule. The new rule does
-  not consume any tokens. It succeeds only when
-  the given sub-rule succeeds, and fails when
-  the sub-rule fails.
-  On success, its product is its sub-rule's
-  product."
+(define-fn peek
+  "Creates a lookahead rule. Checks if the given
+  `rule` succeeds, but doesn't actually consume
+  any tokens.
+  
+  *   Success? If `rule` succeeds.
+      *   Product: `rule`'s product.
+      *   Consumes: Zero tokens.
+  *   Failure? If `rule` fails."
   [rule]
   (fn [state]
     (let [result (-> state (c/apply rule) :result force)]
@@ -589,16 +613,20 @@
         (Reply false result)
         ((prod (:product result)) state)))))
 
-(define-fn not-followed-by
-  "Creates a negative lookahead rule. The new
-  rule does not consume any tokens. It succeeds
-  only when the given sub-rule fails, and
-  otherwise succeeds.
-  On success, its product is the boolean true.
-  You must provide a label."
+(define-fn anti-peek
+  "Creates a negative lookahead rule. Checks if
+  the given `rule` fails, but doesn't actually
+  consume any tokens. You must provide a `label-str`
+  describing this rule.
+  
+  *   Success? If `rule` fails.
+      *   Product: `true`.
+      *   Consumes: Zero tokens.
+  *   Failure? If `rule` succeeds.
+      *   Labels: Uses the given `label-str`."
   [label-str rule]
   (label label-str
-    (fn not-followed-by-rule [state]
+    (fn anti-peek-rule [state]
       (let [result (-> state (c/apply rule) :result force)]
         (if (c/failure? result)
           (Reply false (c/Success true state (:error result)))
@@ -648,10 +676,13 @@
   (mapcat lit tokens))
 
 (d/defvar -end-of-input-
-  (not-followed-by "the end of input" -anything-)
-  "The standard end-of-input rule. Matches
-  only when there are no more remaining tokens.
-  Its product is always nil.")
+  (anti-peek "the end of input" -anything-)
+  "The standard end-of-input rule.
+  
+  *   Success? If there are no tokens left.
+      *   Product: `true`.
+      *   Consumes: Zero tokens.
+  *   Failure? If there are any tokens left.")
 
 (define-fn prefix
   "Creates a prefixed rule. Use when you want to
@@ -731,7 +762,7 @@
   Fails?
   :   minuend fails or subtrahend succeeds."
   ([label-str minuend subtrahend]
-   (for [_ (not-followed-by label-str subtrahend)
+   (for [_ (anti-peek label-str subtrahend)
          product (label label-str minuend)]
      product))
   ([label-str minuend first-subtrahend & rest-subtrahends]
