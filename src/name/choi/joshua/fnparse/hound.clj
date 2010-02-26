@@ -392,8 +392,8 @@
   "Creates a lexical rule.
   You use this whenever you want the lexer to
   *backtrack* when it fails, *even* if it consumes
-  tokens. (Don't forget, usually if a rule consumes
-  tokens, it cannot backtrack at all.)
+  tokens. (Don't forget, usually *if a rule consumes
+  tokens, it cannot backtrack at all*.)
   HOW IT WORKS:
   Rules surrounded by lex count as 'empty' rules—
   rules that don't consume any tokens—regardless
@@ -426,7 +426,14 @@
     (-> state subrule
       (assoc :tokens-consumed? false))))
 
-(define-fn followed-by [rule]
+(define-fn followed-by
+  "Creates a lookahead rule. The new rule does
+  not consume any tokens. It succeeds only when
+  the given sub-rule succeeds, and fails when
+  the sub-rule fails.
+  On success, its product is its sub-rule's
+  product."
+  [rule]
   (fn [state]
     (let [result (-> state (c/apply rule) :result force)]
       (if (c/failure? result)
@@ -434,8 +441,14 @@
         ((prod (:product result)) state)))))
 
 (define-fn not-followed-by
-  [rule]
-  (label "<not followed by rule>"
+  "Creates a negative lookahead rule. The new
+  rule does not consume any tokens. It succeeds
+  only when the given sub-rule fails, and
+  otherwise succeeds.
+  On success, its product is the boolean true.
+  You must provide a label."
+  [label-str rule]
+  (label label-str
     (fn not-followed-by-rule [state]
       (let [result (-> state (c/apply rule) :result force)]
         (if (c/failure? result)
@@ -445,7 +458,7 @@
 (define-fn cascading-rep+ [rule unary-hook binary-hook]
   ; TODO: Rewrite to not blow up stack with many valid tokens
   (for [first-token rule
-            rest-tokens (opt (cascading-rep+ rule unary-hook binary-hook))]
+        rest-tokens (opt (cascading-rep+ rule unary-hook binary-hook))]
     (if (nil? rest-tokens)
       (unary-hook first-token)
       (binary-hook first-token rest-tokens))))
@@ -471,7 +484,7 @@
   (mapcat lit tokens))
 
 (d/defvar _end-of-input
-  (label "the end of input" (not-followed-by _anything))
+  (not-followed-by "the end of input" _anything)
   "WARNING: Because this is an always succeeding,
   always empty rule, putting this directly into a
   rep*/rep+/etc.-type rule will result in an
@@ -516,9 +529,9 @@
   The new rule's products would be b-product. If
   b fails or c succeeds, then nil is simply returned."
   ([label-str minuend subtrahend]
-   (label label-str
-     (for [_ (not-followed-by subtrahend), product minuend]
-       product)))
+   (for [_ (not-followed-by label-str subtrahend)
+         product (label label-str minuend)]
+     product))
   ([label-str minuend first-subtrahend & rest-subtrahends]
    (except label-str minuend
      (apply + (cons first-subtrahend rest-subtrahends)))))
