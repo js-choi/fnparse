@@ -24,17 +24,16 @@
 
 (define-fn parse
   "The general parsing function of FnParse Hound.
-  rule: The rule. It must accept whatever state that
-        make-state returns.
-  input: The sequence of tokens to parse.
-  context: The initial context for the rule.
-  success-fn: A function called when the rule matches
-              the input.
-              (success-fn final-product final-position) is
-              called.
-  failure-fn: A function called when the rule does not
-              match the input.
-              (failure-fn final-error) is called."
+  
+  *   `rule`: The rule. It must accept whatever state that
+      make-state returns.
+  *   `input`: The sequence of tokens to parse.
+  *   `context`: The initial context for the rule.
+  *   `success-fn`: A function called when the rule matches
+      the input. `(success-fn final-product final-position)`
+      is called.
+  *   `failure-fn`: A function called when the rule does not
+      match the input. `(failure-fn final-error)` is called."
   [rule input context success-fn failure-fn]
   (c/parse make-state rule input context success-fn failure-fn))
 
@@ -48,11 +47,15 @@
 
 (define-fn prod
   "Creates a product rule.
-  Creates an rule that is empty (i.e. does not
-  consume any tokens) and whose product is always
-  the given product.
-  In for moands, use the :let modifier in preference
-  to this function.
+  *   Succeeds? Always.
+      *   Product: The given `product`.
+      *   Consumes: Nothing.
+  *   Fails? Never.
+  
+  Use the :let modifier in preference to this function
+  when you use this inside rule comprehensions with the
+  for macro.
+  
   Is the result monadic function of the parser monad."
   [product]
   (fn prod-rule [state]
@@ -61,9 +64,14 @@
         (c/ParseError (:position state) nil nil)))))
 
 (d/defvar -emptiness- (prod nil)
-  "The general emptiness rule. Always succeeds.
-  Does not consume any tokens. Its product is
-  always nil.")
+  "The general emptiness rule.
+  
+  *   Succeeds? Always.
+      *   Product: `nil`.
+      *   Consumes: Nothing.
+  *   Fails? Never.
+  
+  Happens to be equivalent to `(prod nil)`.")
 
 (define-fn- make-failed-reply
   "Used to create replies containing failures."
@@ -76,20 +84,31 @@
 
 (d/defvar nothing-descriptors
   #{(c/ErrorDescriptor :label "absolutely nothing")}
-  "The error descriptors that -nothing- uses.")
+  "The error descriptors that `-nothing-` uses.")
 
 (define-fn -nothing-
-  "The general failing rule. It always fails. Use
-  with-error in preference to this rule. (Its error
-  descriptor is 'expected: absolutely nothing'.)
+  "The general failing rule.
+  
+  *   Succeeds? Never.
+  *   Fails? Always.
+      *   Labels: \"absolutely nothing\"
+      *   Message: None.
+  
+  Use `with-error` in preference to this rule,
+  because 
+  
   Is the zero monadic value of the parser monad."
   [state]
   (make-failed-reply state nothing-descriptors))
 
 (define-fn with-error
-  "Creates an always- failing rule with the given
-  message. Rules created with this function always fail.
-  Use this in preference to -nothing-."
+  "Creates an always-failing rule with the given
+  message. Use this in preference to -nothing-.
+  
+  *   Succeeds? Never.
+  *   Fails? Always.
+      *   Labels: None.
+      *   Message: The given `message`."
   [message]
   (fn with-error-rule [state]
     (make-failed-reply state #{(c/ErrorDescriptor :message message)})))
@@ -97,7 +116,7 @@
 (letfn [(delayify [f] (fn [& args] (delay (force (apply f args)))))]
   (defmacro defn
     "Creates a rule-making function. Use this instead of
-    clojure.core/defn whenever you make a rule-making
+    `clojure.core/defn` whenever you make a rule-making
     function. (It does other stuff like memoization and
     delaying and stuff.)"
     [fn-name & forms]
@@ -106,34 +125,58 @@
         (var ~fn-name))))
 
 (defmacro defn-
-  "Like defn, only makes the var private."
+  "Like `defn`, but also makes the var private."
   [fn-name & forms]
   (list* `defn (vary-meta fn-name assoc :private true) forms))
 
 (defn only-when
   "Creates a maybe-failing rule.
-  Creates an either succeeding or a failing rule,
-  depending on if valid? is logical true. If valid?
-  is true, then the rule always succeeds and acts
-  like (prod valid?). If valid? is false, then the
-  rule always fails and acts like (with-error message).
-      This function is very useful for when you want
+  
+  *   Succeeds? Only if the given `valid?` is
+      logical true.
+      *   Product: `valid?`.
+      *   Consumes: Nothing.
+  *   Fails? Only if not `valid?`.
+      *   Labels: None.
+      *   Messages: The given `message`.
+  It creates an either succeeding or a failing rule,
+  depending on if `valid?` is logical true. If
+  `valid?`, then the rule always succeeds and acts
+  like `(prod valid?)`. If not `valid?`, then the
+  rule always fails and acts like `(with-error message)`.
+  
+  This function is very useful for when you want
   to validate a certain rule. For instance:
-    (for [value -number-
-          _ (only-when (< odd 10)
-              \"number must be less than ten\")]
-      value)
-  The example above succeeds only when -number-
+      (for [value -number-
+            _ (only-when (< odd 10)
+                \"number must be less than ten\")]
+        value)
+  The example above succeeds only when `-number-`
   matches and its product is less than 10."
   [valid? message]
   (if-not valid? (with-error message) (prod valid?)))
 
 (define-fn combine
-  "Creates a rule combining the given rule into the
-  product-fn. *Use cat in preference to this function.*
-      The product-fn must return a rule when
-  given the product of the first rule. Is the bind
-  monadic function of the parser monad."
+  "Creates a rule combining the given `rule` into the
+  `product-fn`. *Use `cat` or `for` instead* of
+  this function. You *shouldn't have to use this function*
+  at all, unless you're doing something special.
+
+  The product-fn must return a rule when given the
+  product of the first rule. `combine` is the bind
+  monadic function of the parser monad.
+  
+  Below, the rule returned by `(product-fn
+  state-after-first-rule)` will be referred to as
+  `second-rule`.
+  
+  *   Succeeds? If both `rule` and `second-rule` succeed.
+      *   Product: The product of `second-rule`.
+      *   Consumes: All the tokens that `rule` and then
+          `second-rule` consume.
+  *   Fails? If either `rule` or `second-rule` fail.
+      *   Labels and messages: Whatever the failed rule
+          gives."
   [rule product-fn]
   (letfn [(apply-product-fn [result]
             (c/apply (:state result) (product-fn (:product result))))]
@@ -474,60 +517,113 @@
 (define-fn rep* [rule]
   (opt (rep+ rule)))
 
-(define-fn mapcat [f tokens]
-  (->> tokens (map f) (apply cat)))
+(define-fn mapcat
+  "Returns the result of applying cat to the
+  result of applying map to f and colls.
+  Use the phrase function instead of this
+  function when f is just lit."
+  [f & token-colls]
+  (->> token-colls (apply map f) (apply cat)))
 
-(define-fn mapsum [f tokens]
-  (->> tokens (map f) (apply +)))
+(define-fn mapsum
+  "Returns the result of applying + to the
+  result of applying map to f and colls.
+  Use the set-lit function instead of this
+  function when f is just lit."
+  [f & token-colls]
+  (->> token-colls (apply map f) (apply +)))
 
-(define-fn phrase [tokens]
+(define-fn phrase
+  "Returns a phrase rule, which succeeds
+  only when the next few tokens all
+  consecutively match the given tokens.
+  Actually, it's just (mapcat lit tokens)."
+  [tokens]
   (mapcat lit tokens))
 
 (d/defvar -end-of-input-
   (not-followed-by "the end of input" -anything-)
-  "WARNING: Because this is an always succeeding,
-  always empty rule, putting this directly into a
-  rep*/rep+/etc.-type rule will result in an
-  infinite loop.")
+  "The standard end-of-input rule. Matches
+  only when there are no more remaining tokens.
+  Its product is always nil.")
 
-(define-fn prefix [prefix-rule body-rule]
+(define-fn prefix
+  "Creates a prefixed rule. Use when you want to
+  concatenate two rules, but you don't care about
+  the first rule's product.
+  Its product is always the body-rule's product.
+  A shortcut for:
+    (for [_ prefix-rule, content body-rule] content)."
+  [prefix-rule body-rule]
   (for [_ prefix-rule, content body-rule] content))
 
 (define-fn suffix [body-rule suffix-rule]
+  "Creates a suffixed rule. Use when you want to
+  concatenate two rules, but you don't care about
+  the second rule's product.
+  Its product is always the body-rule's product.
+  A shortcut for:
+    (for [content body-rule, _ suffix-rule] content)."
   (for [content body-rule, _ suffix-rule] content))
 
-(define-fn circumfix [prefix-rule body-rule suffix-rule]
+(define-fn circumfix
+  "Creates a circumfixed rule. Use when you want to
+  concatenate three rules, but you don't care about
+  the first and third rules' products.
+  Its product is always the body-rule's product.
+  A shortcut for:
+    (prefix prefix-rule (suffix body-rule suffix-rule))."
+  [prefix-rule body-rule suffix-rule]
   (prefix prefix-rule (suffix body-rule suffix-rule)))
 
 (define-fn separated-rep [separator element]
   (for [first-element element
-            rest-elements (rep* (prefix separator element))]
+        rest-elements (rep* (prefix separator element))]
     (cons first-element rest-elements)))
 
-(defmacro template-sum [argv expr & values]
+(defmacro template-sum
+  "Creates a summed rule using a template.
+  Acts very similarly to clojure.template/do-template,
+  but instead sums each rule together."
+  [argv expr & values]
   (let [c (count argv)]
    `(+ ~@(map (fn [a] (t/apply-template argv expr a))
            (partition c values)))))
 
-(define-fn case-insensitive-lit [#^Character token]
+(define-fn case-insensitive-lit
+  "Creates a case-insensitive rule using Java's
+  Character/toLowerCase and Character/toUpperCase.
+  Only works with Character-type tokens.
+  Consumes one token. Its product is the token consumed."
+  [#^Character token]
   (+ (lit (Character/toLowerCase token))
      (lit (Character/toUpperCase token))))
 
-(define-fn effects [f & args]
+(define-fn effects
+  "Creates a side-effect rule. Applies the given
+  arguments to the given function. Consumes no
+  tokens. Its product is whatever the side-effect
+  function returns."
+  [f & args]
   (fn effects-rule [state]
-    (apply f args)
-    (c/apply state -emptiness-)))
+    (c/apply state (prod (apply f args)))))
 
 (define-fn except
-  "Creates a rule that is the exception from
-  the first given subrules with the second given
-  subrule--that is, it accepts only tokens that
-  fulfill the first subrule but fails the
-  second of the subrules.
-  (define a (except b c)) would be equivalent to the EBNF
-    a = b - c;
-  The new rule's products would be b-product. If
-  b fails or c succeeds, then nil is simply returned."
+  "Creates a subtracted rule. Matches using
+  the given minuend rule, but only when the
+  subtrahend rule does not also match.
+  
+  Succeeds?
+  :   minuend succeeds.
+      
+      Product
+      :   minuend's product.
+      
+      Consumes
+      :   whatever minuend consumes.
+  
+  Fails?
+  :   minuend fails or subtrahend succeeds."
   ([label-str minuend subtrahend]
    (for [_ (not-followed-by label-str subtrahend)
          product (label label-str minuend)]
