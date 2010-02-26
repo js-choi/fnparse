@@ -66,67 +66,67 @@
 
 ;;; RULES START HERE.
 
-(declare _form)
+(declare -form-)
 
 ;; Whitespace.
 
-(def _comment-indicator (r/+ (r/lit \;) (r/lex (r/phrase "#!"))))
+(def -comment-indicator- (r/+ (r/lit \;) (r/lex (r/phrase "#!"))))
 
-(def _comment-char (r/antilit \newline))
+(def -comment-char- (r/antilit \newline))
 
-(def _comment (r/cat _comment-indicator (r/rep* _comment-char)))
+(def -comment- (r/cat -comment-indicator- (r/rep* -comment-char-)))
 
-(def _discarded (r/prefix (r/lex (r/phrase "#_")) #'_form))
+(def -discarded- (r/prefix (r/lex (r/phrase "#_")) #'-form-))
 
-(def _normal-ws-char
+(def -normal-ws-char-
   (r/term "a whitespace character" ws-set))
 
-(def _ws
+(def -ws-
   (r/label "whitespace"
-    (r/rep+ (r/+ _normal-ws-char _comment _discarded))))
+    (r/rep+ (r/+ -normal-ws-char- -comment- -discarded-))))
 
-(def _opt-ws (r/opt _ws))
+(def -opt-ws- (r/opt -ws-))
 
 ;; Indicators and form separators.
 
-(def _indicator (r/term "an indicator" indicator-set))
+(def -indicator- (r/term "an indicator" indicator-set))
 
-(def _separator (r/+ _ws _indicator))
+(def -separator- (r/+ -ws- -indicator-))
 
-(def _form-end (r/+ (r/followed-by _separator) r/_end-of-input))
+(def -form-end- (r/+ (r/followed-by -separator-) r/-end-of-input-))
 
 ;; Symbols.
 
-(def _ns-separator (r/lit \/))
+(def -ns-separator- (r/lit \/))
 
-(def _non-alphanumeric-symbol-char
-  (r/set-lit "a non-alphanumeric symbol character" "*+!_-?."))
+(def -non-alphanumeric-symbol-char-
+  (r/set-lit "a non-alphanumeric symbol character" "*+!---?."))
 
-(def _symbol-first-char
-  (r/+ r/_ascii-letter _non-alphanumeric-symbol-char))
+(def -symbol-first-char-
+  (r/+ r/-ascii-letter- -non-alphanumeric-symbol-char-))
 
-(def _symbol-char
+(def -symbol-char-
   (r/label "a symbol character"
-    (r/+ _symbol-first-char r/_decimal-digit)))
+    (r/+ -symbol-first-char- r/-decimal-digit-)))
 
-(def _symbol-char-series
-  (r/hook str* (r/rep+ _symbol-char)))
+(def -symbol-char-series-
+  (r/hook str* (r/rep+ -symbol-char-)))
 
-(def _symbol-end
-  (r/annotate-error annotate-symbol-end _form-end))
+(def -symbol-end-
+  (r/annotate-error annotate-symbol-end -form-end-))
 
-(def _slash-symbol-suffix
-  (r/chook "/" _ns-separator))
+(def -slash-symbol-suffix-
+  (r/chook "/" -ns-separator-))
 
-(def _symbol-suffix
-  (r/prefix _ns-separator (r/+ _symbol-char-series _slash-symbol-suffix)))
+(def -symbol-suffix-
+  (r/prefix -ns-separator- (r/+ -symbol-char-series- -slash-symbol-suffix-)))
 
-(def _symbol
+(def -symbol-
   (r/for "a symbol"
-    [first-char _symbol-first-char
-     rest-pre-slash (r/opt _symbol-char-series)
-     post-slash (r/opt _symbol-suffix)
-     _ _symbol-end]
+    [first-char -symbol-first-char-
+     rest-pre-slash (r/opt -symbol-char-series-)
+     post-slash (r/opt -symbol-suffix-)
+     _ -symbol-end-]
     (let [pre-slash (str first-char rest-pre-slash)]
       (if post-slash
         (symbol pre-slash post-slash)
@@ -135,48 +135,48 @@
 
 ;; Keywords.
 
-(def _keyword-indicator (r/lit \:))
+(def -keyword-indicator- (r/lit \:))
 
-(def _normal-keyword
-  (r/for [_ _keyword-indicator
-          pre-slash (r/opt _symbol-char-series)
-          post-slash (r/opt _symbol-suffix)
-          _ _symbol-end]
+(def -normal-keyword-
+  (r/for [_ -keyword-indicator-
+          pre-slash (r/opt -symbol-char-series-)
+          post-slash (r/opt -symbol-suffix-)
+          _ -symbol-end-]
     (if post-slash
       (keyword pre-slash post-slash)
       (keyword pre-slash))))
 
-(def _followed-by-ns-separator (r/followed-by _ns-separator))
+(def -followed-by-ns-separator- (r/followed-by -ns-separator-))
 
 (r/defn fetch-referred-namespace [context namespace-alias]
   (r/only-when (get-in context [:ns-aliases namespace-alias])
     (format "no namespace with alias '%s'" namespace-alias)))
 
 (r/defn ns-qualified-keyword-end-with-slash [pre-slash]
-  (r/for [_ _followed-by-ns-separator
-          context r/_fetch-context
+  (r/for [_ -followed-by-ns-separator-
+          context r/-fetch-context-
           prefix (fetch-referred-namespace context pre-slash)
-          suffix _symbol-suffix]
+          suffix -symbol-suffix-]
     [prefix suffix]))
 
 (r/defn ns-qualified-keyword-empty-end [pre-slash]
-  (r/for [context r/_fetch-context]
+  (r/for [context r/-fetch-context-]
     [(:ns-name context) pre-slash]))
 
 (r/defn ns-resolved-keyword-end [pre-slash]
   (r/+ (ns-qualified-keyword-end-with-slash pre-slash)
        (ns-qualified-keyword-empty-end pre-slash)))
 
-(def _ns-resolved-keyword
-  (r/for [_ (r/lex (r/factor= 2 _keyword-indicator))
-          pre-slash _symbol-char-series
+(def -ns-resolved-keyword-
+  (r/for [_ (r/lex (r/factor= 2 -keyword-indicator-))
+          pre-slash -symbol-char-series-
           [prefix suffix] (ns-resolved-keyword-end pre-slash)
-          _ _form-end]
+          _ -form-end-]
     (keyword prefix suffix)))
 
-(def _keyword
+(def -keyword-
   (r/label "a keyword"
-    (r/+ _ns-resolved-keyword _normal-keyword)))
+    (r/+ -ns-resolved-keyword- -normal-keyword-)))
 
 ;; Numbers.
 
@@ -184,48 +184,48 @@
   (r/cascading-rep+ (r/radix-digit (if (<= base 36) base 36))
     identity #(+ (* base %1) %2)))
 
-(def _decimal-natural-number
+(def -decimal-natural-number-
   (radix-natural-number 10))
 
-(def _number-sign
+(def -number-sign-
   (r/template-sum [label token product]
     (r/label label (r/chook product (r/lit token)))
     "positive sign" \+ 1, "negative sign" \- -1))
 
-(def _empty-number-tail
-  (r/chook identity r/_emptiness))
+(def -empty-number-tail-
+  (r/chook identity r/-emptiness-))
 
-(def _imprecise-fractional-part
+(def -imprecise-fractional-part-
   (r/prefix
     (r/lit \.)
     (r/+ (r/hook #(partial + %)
-           (r/cascading-rep+ r/_decimal-digit #(/ % 10) #(/ (+ %1 %2) 10)))
-         _empty-number-tail)))
+           (r/cascading-rep+ r/-decimal-digit- #(/ % 10) #(/ (+ %1 %2) 10)))
+         -empty-number-tail-)))
 
-(def _exponential-part
+(def -exponential-part-
   (r/prefix
     (r/set-lit "exponent indicator" "eE")
       ; If I wasn't worrying about pure Clojure,
       ; use (r/case-insensitive-lit \e) above instead.
-    (r/hook #(partial * (expt-int 10 %)) _decimal-natural-number)))
+    (r/hook #(partial * (expt-int 10 %)) -decimal-natural-number-)))
 
-(def _fractional-exponential-part
-  (r/for [frac-fn _imprecise-fractional-part
-          exp-fn (r/+ _exponential-part _empty-number-tail)]
+(def -fractional-exponential-part-
+  (r/for [frac-fn -imprecise-fractional-part-
+          exp-fn (r/+ -exponential-part- -empty-number-tail-)]
     (comp exp-fn frac-fn)))
 
-(def _imprecise-number-tail
-  (r/for [tail-fn (r/+ _fractional-exponential-part _exponential-part)
+(def -imprecise-number-tail-
+  (r/for [tail-fn (r/+ -fractional-exponential-part- -exponential-part-)
           big-dec? (r/opt (r/lit \M))]
     (comp (if big-dec? bigdec double) tail-fn)))
 
-(def _fraction-denominator-tail
+(def -fraction-denominator-tail-
   ; Product: a unary function on an integer.
   (r/prefix
     (r/lit \/)
     (r/hook (fn [denominator] #(/ % denominator))
       (r/antivalidate zero? "a fraction's denominator cannot be zero"
-        _decimal-natural-number))))
+        -decimal-natural-number-))))
 
 (r/defn radix-coefficient-tail [base]
   (r/hook constantly
@@ -236,138 +236,138 @@
       (radix-natural-number base))))
 
 (r/defn number-tail [base]
-  (r/+ _imprecise-number-tail _fraction-denominator-tail
-       (radix-coefficient-tail base) _empty-number-tail))
+  (r/+ -imprecise-number-tail- -fraction-denominator-tail-
+       (radix-coefficient-tail base) -empty-number-tail-))
 
-(def _number
+(def -number-
   (r/for "a number"
-    [sign (r/opt _number-sign)
-     prefix-number _decimal-natural-number
+    [sign (r/opt -number-sign-)
+     prefix-number -decimal-natural-number-
      tail-fn (number-tail prefix-number)
-     _ _form-end]
+     _ -form-end-]
     (tail-fn (* (or sign 1) prefix-number))))
 
 ;; Unicode escape sequences for chars and strings.
 
-(def _unicode-escape-sequence
+(def -unicode-escape-sequence-
   (r/prefix (r/lit \u)
     (r/hook (comp char reduce-hexadecimal-digits)
-      (r/factor= 4 r/_hexadecimal-digit))))
+      (r/factor= 4 r/-hexadecimal-digit-))))
 
 ;; Characters.
 
-(def _character-indicator (r/lit \\))
+(def -character-indicator- (r/lit \\))
 
-(def _character-name
+(def -character-name-
   (r/+ (r/mapsum #(r/chook (key %) (r/phrase (val %))) char-name-string)
-       _unicode-escape-sequence))
+       -unicode-escape-sequence-))
 
-(def _character (r/prefix _character-indicator _character-name))
+(def -character- (r/prefix -character-indicator- -character-name-))
 
 ;; Strings.
 
-(def _string-delimiter (r/lit \"))
+(def -string-delimiter- (r/lit \"))
 
-(def _escaped-char
-  (r/prefix _character-indicator
+(def -escaped-char-
+  (r/prefix -character-indicator-
     (r/label "a valid escape sequence"
       (r/+ (r/template-sum [token character]
              (r/chook character (r/lit token))
              \t \tab, \n \newline, \\ \\, \" \")
-           _unicode-escape-sequence))))
+           -unicode-escape-sequence-))))
 
-(def _normal-string-char (r/antilit \"))
+(def -normal-string-char- (r/antilit \"))
 
-(def _string-char (r/+ _escaped-char _normal-string-char))
+(def -string-char- (r/+ -escaped-char- -normal-string-char-))
 
-(def _string
+(def -string-
   (r/hook #(->> % seq/flatten str*)
-    (r/circumfix _string-delimiter (r/rep* _string-char) _string-delimiter)))
+    (r/circumfix -string-delimiter- (r/rep* -string-char-) -string-delimiter-)))
 
 ;; Circumflex compound forms: lists, vectors, maps, and sets.
 
-(def _form-series (r/suffix (r/rep* #'_form) _opt-ws))
+(def -form-series- (r/suffix (r/rep* #'-form-) -opt-ws-))
 
-(t/do-template [_rule start-token end-token product-fn]
-  (def _rule
+(t/do-template [-rule- start-token end-token product-fn]
+  (def -rule-
     (r/for [_ (r/lit start-token)
-            contents _form-series
+            contents -form-series-
             _ (r/lit end-token)]
       (product-fn contents)))
-  _list \( \) #(apply list %)
-  _vector \[ \] vec
-  _map \{ \} #(apply hash-map %)
-  _set-inner \{ \} set)
+  -list- \( \) #(apply list %)
+  -vector- \[ \] vec
+  -map- \{ \} #(apply hash-map %)
+  -set-inner- \{ \} set)
 
 ;; Simple prefix forms: syntax-quote, deref, etc.
 
 (r/defn padded-lit [token]
-  (r/prefix (r/lit token) _opt-ws))
+  (r/prefix (r/lit token) -opt-ws-))
 
-(t/do-template [_rule prefix product-fn-symbol]
-  (def _rule
+(t/do-template [-rule- prefix product-fn-symbol]
+  (def -rule-
     (r/hook (prefix-list-fn product-fn-symbol)
-      (r/prefix (r/cat (padded-lit prefix) _opt-ws) #'_form)))
-  _quoted \' `quote
-  _syntax-quoted \` `syntax-quote
-  _unquoted \~ `unquote
-  _derefed \@ `deref
-  _var-inner \' `var
-  _deprecated-meta \^ `meta)
+      (r/prefix (r/cat (padded-lit prefix) -opt-ws-) #'-form-)))
+  -quoted- \' `quote
+  -syntax-quoted- \` `syntax-quote
+  -unquoted- \~ `unquote
+  -derefed- \@ `deref
+  -var-inner- \' `var
+  -deprecated-meta- \^ `meta)
 
-(def _unquote-spliced
+(def -unquote-spliced-
   (r/hook (prefix-list-fn `unquote-splicing)
-    (r/prefix (r/cat (r/lex (r/phrase "~@")) _opt-ws) #'_form)))
+    (r/prefix (r/cat (r/lex (r/phrase "~@")) -opt-ws-) #'-form-)))
 
-(def _deprecated-meta
-  (r/suffix _deprecated-meta
+(def -deprecated-meta-
+  (r/suffix -deprecated-meta-
     (r/effects println
       "WARNING: The ^ indicator is deprecated (since Clojure 1.1).")))
 
 ;; With-meta #^ forms.
 
-(def _tag
+(def -tag-
   (r/hook #(hash-map :tag %)
-    (r/+ _keyword _symbol)))
+    (r/+ -keyword- -symbol-)))
 
-(def _metadata
-  (r/+ _map _tag))
+(def -metadata-
+  (r/+ -map- -tag-))
 
-(def _with-meta-inner
+(def -with-meta-inner-
   (r/prefix (padded-lit \^)
-    (r/for [metadata _metadata, _ _opt-ws, content #'_form]
+    (r/for [metadata -metadata-, _ -opt-ws-, content #'-form-]
       (list `with-meta content metadata))))
 
 ;; Anonymous functions.
 
-(def _anonymous-fn-parameter-suffix
-  (r/+ _decimal-natural-number (r/lit \&) (r/chook 1 r/_emptiness)))
+(def -anonymous-fn-parameter-suffix-
+  (r/+ -decimal-natural-number- (r/lit \&) (r/chook 1 r/-emptiness-)))
 
-(def _anonymous-fn-parameter
+(def -anonymous-fn-parameter-
   (r/for "a parameter"
     [_ (r/lit \%)
-     context r/_fetch-context
+     context r/-fetch-context-
      :let [fn-context (:anonymous-fn-context context)]
      _ (r/only-when fn-context
          "a parameter literals must be inside an anonymous function")
-     suffix _anonymous-fn-parameter-suffix
+     suffix -anonymous-fn-parameter-suffix-
      :let [already-existing-symbol (get-already-existing-symbol fn-context
                                                                 suffix)
            parameter-symbol (or already-existing-symbol (gensym "parameter"))]
      _ (if (nil? already-existing-symbol)
          (r/alter-context update-fn-context suffix parameter-symbol)
-         r/_emptiness)]
+         r/-emptiness-)]
     parameter-symbol))
 
-(def _anonymous-fn-inner
+(def -anonymous-fn-inner-
   (r/for [_ (r/lit \()
-          pre-context r/_fetch-context
+          pre-context r/-fetch-context-
           _ (r/only-when (not (:anonymous-fn-context pre-context))
               "nested anonymous functions are not allowed")
           _ (r/alter-context assoc
               :anonymous-fn-context (AnonymousFnContext [] nil))
-          content _form-series
-          post-context r/_fetch-context
+          content -form-series-
+          post-context r/-fetch-context-
           _ (r/alter-context assoc :anonymous-fn-context nil)
           _ (r/lit \))]
     (let [anonymous-fn-context (:anonymous-fn-context post-context)
@@ -376,21 +376,21 @@
 
 ;; Regex patterns, EvalReaders, and unreadables.
 
-(def _pattern-inner
+(def -pattern-inner-
   (r/hook (comp re-pattern str*)
-    (r/circumfix _string-delimiter
-                 (r/rep* _normal-string-char)
-                 _string-delimiter)))
+    (r/circumfix -string-delimiter-
+                 (r/rep* -normal-string-char-)
+                 -string-delimiter-)))
 
-(def _evaluated-inner
+(def -evaluated-inner-
   (r/for [_ (r/lit \=)
-          context r/_fetch-context
+          context r/-fetch-context-
           _ (r/only-when (:reader-eval? context)
               "EvalReader forms (i.e. #=(...)) have been prohibited.")
-          content _list]
+          content -list-]
     (eval content)))
 
-(def _unreadable-inner
+(def -unreadable-inner-
   (r/for [_ (r/lit \<)
           content (r/rep* (r/antilit \>))
           _ (r/opt (r/lit \>))
@@ -400,20 +400,20 @@
 
 ;; All forms put together. (Order matters for lexed rules.)
 
-(def _dispatched-inner
-  (r/+ _anonymous-fn-inner _set-inner _var-inner _with-meta-inner _pattern-inner
-       _evaluated-inner _unreadable-inner))
+(def -dispatched-inner-
+  (r/+ -anonymous-fn-inner- -set-inner- -var-inner- -with-meta-inner- -pattern-inner-
+       -evaluated-inner- -unreadable-inner-))
 
-(def _dispatched
-  (r/prefix (r/lit \#) _dispatched-inner))
+(def -dispatched-
+  (r/prefix (r/lit \#) -dispatched-inner-))
 
-(def _form-content
-  (r/+ _list _vector _map _dispatched _string _syntax-quoted
-       _unquote-spliced _unquoted _deprecated-meta _character _keyword
-       _anonymous-fn-parameter _symbol _number))
+(def -form-content-
+  (r/+ -list- -vector- -map- -dispatched- -string- -syntax-quoted-
+       -unquote-spliced- -unquoted- -deprecated-meta- -character- -keyword-
+       -anonymous-fn-parameter- -symbol- -number-))
 
-(def _form
-  (r/label "a form" (r/prefix _opt-ws _form-content)))
+(def -form-
+  (r/label "a form" (r/prefix -opt-ws- -form-content-)))
 
 ;;; THE FINAL READ FUNCTION.
 
@@ -435,7 +435,7 @@
                 Defaults to *read-eval*."
   [input & opts]
   (let [{:keys #{ns-name ns-aliases reader-eval?}} (apply hash-map opts)]
-    (r/parse _form input (ClojureContext ns-name ns-aliases nil reader-eval?)
+    (r/parse -form- input (ClojureContext ns-name ns-aliases nil reader-eval?)
       (fn [product position] product)
       (fn [error] (throw (Exception. (r/format-parse-error error)))))))
   
@@ -443,56 +443,56 @@
 ;;; TESTS.
 
 (deftest various-rules
-  (is (match? _form "55.2e2" :product? #(== % 5520.)))
-  (is (match? _form "16rFF" :product? #(== % 255)))
-  (is (match? _form "16." :product? #(== % 16.)))
-  (is (match? _form "true" :product? true?))
-  (is (= (with-out-str (r/parse _form "^()" {} list list))
+  (is (match? -form- "55.2e2" :product? #(== % 5520.)))
+  (is (match? -form- "16rFF" :product? #(== % 255)))
+  (is (match? -form- "16." :product? #(== % 16.)))
+  (is (match? -form- "true" :product? true?))
+  (is (= (with-out-str (r/parse -form- "^()" {} list list))
          "WARNING: The ^ indicator is deprecated (since Clojure 1.1).\n"))
-  (is (match? _form "[()]" :product? #(= % [()])))
-  (is (match? _form "\"\\na\\u3333\"" :product? #(= % "\na\u3333")))
-  (is (non-match? _form "([1 32]"
+  (is (match? -form- "[()]" :product? #(= % [()])))
+  (is (match? -form- "\"\\na\\u3333\"" :product? #(= % "\na\u3333")))
+  (is (non-match? -form- "([1 32]"
         :position 7
         :labels #{"a form" "')'" "whitespace"}))
-  (is (non-match? _form "a/b/c"
+  (is (non-match? -form- "a/b/c"
         :position 3
         :messages #{"multiple slashes aren't allowed in symbols"}
         :labels #{"an indicator" "the end of input"
                   "a symbol character" "whitespace"}))
-  (is (match? _form ":a/b" :product? #(= % :a/b)))
-  (is (match? _form "::b"
+  (is (match? -form- ":a/b" :product? #(= % :a/b)))
+  (is (match? -form- "::b"
         :context (ClojureContext "user" nil nil nil)
         :product? #(= % :user/b)))
-  (is (non-match? _form "::z/abc"
+  (is (non-match? -form- "::z/abc"
         :position 3
         :messages #{"no namespace with alias 'z'"}
         :labels #{"the end of input" "a symbol character" "an indicator"
                   "whitespace"}))
-  (is (match? _form "+" :product? #(= % '+)))
-  (is (match? _form "clojure.core//" :product? #(= % 'clojure.core//)))
-  (is (match? _form "#!/usr/bin/clojure\n\"a\\n\"" :product? #(= % "a\n")))
-  (is (match? _form "[~@a ()]"
+  (is (match? -form- "+" :product? #(= % '+)))
+  (is (match? -form- "clojure.core//" :product? #(= % 'clojure.core//)))
+  (is (match? -form- "#!/usr/bin/clojure\n\"a\\n\"" :product? #(= % "a\n")))
+  (is (match? -form- "[~@a ()]"
         :product? #(= % [(list 'clojure.core/unquote-splicing 'a) ()])))
-  (is (match? _form "[#(%) #(apply + % %2 %2 %&)]"
+  (is (match? -form- "[#(%) #(apply + % %2 %2 %&)]"
         :context (ClojureContext "user" nil nil nil)
         :product? #(= ((eval (second %)) 3 2 8 1) 16)))
-  (is (match? _form "#=(+ 3 2)" :context (ClojureContext nil nil nil true)
+  (is (match? -form- "#=(+ 3 2)" :context (ClojureContext nil nil nil true)
                                 :product? #(= % 5)))
-  (is (match? _form "#\"\\w+\""
+  (is (match? -form- "#\"\\w+\""
         :product? #(re-matches % "abc")))
-  (is (non-match? _form "17rAZ"
+  (is (non-match? -form- "17rAZ"
         :position 4
         :labels #{"a base-17 digit" "an indicator" "whitespace"
                   "the end of input"}))
-  (is (non-match? _form "#(% #(%))"
+  (is (non-match? -form- "#(% #(%))"
         :position 6
         :context (ClojureContext "user" nil nil nil)
         :messages #{"nested anonymous functions are not allowed"}))
-  (is (non-match? _form "3/0 3"
+  (is (non-match? -form- "3/0 3"
         :position 3
         :labels #{"a base-10 digit"}
         :messages #{"a fraction's denominator cannot be zero"}))
-  (is (non-match? _form "#<java.lang.String@35235>"
+  (is (non-match? -form- "#<java.lang.String@35235>"
         :position 25
         :labels #{}
         :messages #{"the data in #<java.lang.String@35235> is unrecoverable"}))

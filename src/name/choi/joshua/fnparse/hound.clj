@@ -60,7 +60,7 @@
       (c/Success product state
         (c/ParseError (:position state) nil nil)))))
 
-(d/defvar _emptiness (prod nil)
+(d/defvar -emptiness- (prod nil)
   "The general emptiness rule. Always succeeds.
   Does not consume any tokens. Its product is
   always nil.")
@@ -76,9 +76,9 @@
 
 (d/defvar nothing-descriptors
   #{(c/ErrorDescriptor :label "absolutely nothing")}
-  "The error descriptors that _nothing uses.")
+  "The error descriptors that -nothing- uses.")
 
-(define-fn _nothing
+(define-fn -nothing-
   "The general failing rule. It always fails. Use
   with-error in preference to this rule. (Its error
   descriptor is 'expected: absolutely nothing'.)
@@ -89,7 +89,7 @@
 (define-fn with-error
   "Creates an always- failing rule with the given
   message. Rules created with this function always fail.
-  Use this in preference to _nothing."
+  Use this in preference to -nothing-."
   [message]
   (fn with-error-rule [state]
     (make-failed-reply state #{(c/ErrorDescriptor :message message)})))
@@ -119,11 +119,11 @@
   rule always fails and acts like (with-error message).
       This function is very useful for when you want
   to validate a certain rule. For instance:
-    (for [value _number
+    (for [value -number-
           _ (only-when (< odd 10)
               \"number must be less than ten\")]
       value)
-  The example above succeeds only when _number
+  The example above succeeds only when -number-
   matches and its product is less than 10."
   [valid? message]
   (if-not valid? (with-error message) (prod valid?)))
@@ -184,7 +184,7 @@
               (seq/separate :tokens-consumed?))]
       (if (empty? consuming-replies)
         (if (empty? empty-replies)
-          (c/apply _nothing state)
+          (c/apply -nothing- state)
           (let [empty-replies (seq/reductions merge-replies empty-replies)]
             (or (first (drop-while #(-> % :result force c/failure?)
                          empty-replies))
@@ -193,7 +193,7 @@
 
 (m/defmonad parser-m
   "The monad that FnParse uses."
-  [m-zero _nothing
+  [m-zero -nothing-
    m-result prod
    m-bind combine
    m-plus +])
@@ -277,7 +277,7 @@
   * If you want to use the complement of the predicate,
     use antiterm.
   * If you don't care about what token is consumed,
-    just as long as a token is consumed, use _anything."
+    just as long as a token is consumed, use -anything-."
   [label-str predicate]
   (label label-str
     (fn terminal-rule [state]
@@ -300,7 +300,7 @@
   [label-str pred]
   (term label-str (complement pred)))
 
-(d/defvar _anything (term "anything" (constantly true))
+(d/defvar -anything- (term "anything" (constantly true))
   "The generic terminal rule. It consumes one token.
   It fails only when it's at the end of the input and
   there are no more tokens. Its product is the very token
@@ -386,7 +386,7 @@
   always succeeds. It is equivalent to the
   sum of the given rule and the emptiness rule."
   [rule]
-  (+ rule _emptiness))
+  (+ rule -emptiness-))
 
 (define-fn lex
   "Creates a lexical rule.
@@ -401,25 +401,25 @@
   the behavior of any summed rules that contain it.
   WHY YOU WOULD NEED TO USE IT:
     (require '[name.choi.joshua.fnparse.hound :as r])
-    (def _ws (r/lit \\space))
-    (def _claim (r/phrase \"x = 1\"))
-    (def _let-expr (r/cat (r/phrase \"let\") _ws _let-expr))
-    (def _identifier (r/rep+ r/_ascii-letter))
-    (def _expr (r/+ _let-expr _identifier))
-    (parse _let-expr \"number\" nil) ; Line one
-    (parse _let-expr \"letter\" nil) ; Line two
+    (def -ws- (r/lit \\space))
+    (def -claim- (r/phrase \"x = 1\"))
+    (def -let-expr- (r/cat (r/phrase \"let\") -ws- -let-expr-))
+    (def -identifier- (r/rep+ r/-ascii-letter-))
+    (def -expr- (r/+ -let-expr- -identifier-))
+    (parse -let-expr- \"number\" nil) ; Line one
+    (parse -let-expr- \"letter\" nil) ; Line two
   In the code above, line one will give a successful
   parse, because the input \"number\" matches
-  _indentifier.
+  -indentifier-.
       But line two will give a failure. This is because
-  (r/phrase \"let\") will match, but the _ws after it
-  will not match. Thus, _let-expr fails. Also, because
-  _let-expr consumed the first three tokens of \"letter\",
-  the summed rule _expr will immediately fail without
-  even trying _identifier.
+  (r/phrase \"let\") will match, but the -ws- after it
+  will not match. Thus, -let-expr- fails. Also, because
+  -let-expr- consumed the first three tokens of \"letter\",
+  the summed rule -expr- will immediately fail without
+  even trying -identifier-.
   AND SO HOW YOU USE IT:
-  Change _let-expr to use the following:
-    (r/cat (r/lex (r/phrase \"let\")) _ws _let-expr)
+  Change -let-expr- to use the following:
+    (r/cat (r/lex (r/phrase \"let\")) -ws- -let-expr-)
   Now both line one and two will be successful."
   [subrule]
   (fn [state]
@@ -453,7 +453,7 @@
       (let [result (-> state (c/apply rule) :result force)]
         (if (c/failure? result)
           (Reply false (c/Success true state (:error result)))
-          (-> state (c/apply _nothing) (assoc :error (:error result))))))))
+          (-> state (c/apply -nothing-) (assoc :error (:error result))))))))
 
 (define-fn cascading-rep+ [rule unary-hook binary-hook]
   ; TODO: Rewrite to not blow up stack with many valid tokens
@@ -483,8 +483,8 @@
 (define-fn phrase [tokens]
   (mapcat lit tokens))
 
-(d/defvar _end-of-input
-  (not-followed-by "the end of input" _anything)
+(d/defvar -end-of-input-
+  (not-followed-by "the end of input" -anything-)
   "WARNING: Because this is an always succeeding,
   always empty rule, putting this directly into a
   rep*/rep+/etc.-type rule will result in an
@@ -516,7 +516,7 @@
 (define-fn effects [f & args]
   (fn effects-rule [state]
     (apply f args)
-    (c/apply state _emptiness)))
+    (c/apply state -emptiness-)))
 
 (define-fn except
   "Creates a rule that is the exception from
@@ -551,14 +551,14 @@
 (define-fn factor= [n rule]
   (->> rule (replicate n) (apply cat)))
 
-(define-fn _fetch-context [state]
+(define-fn -fetch-context- [state]
   (c/apply state (prod (:context state))))
 
 (define-fn alter-context [f & args]
   (fn context-altering-rule [state]
     (let [altered-state (apply update-in state [:context] f args)]
-      ; (prn (c/apply altered-state _fetch-context))
-      (c/apply altered-state _fetch-context))))
+      ; (prn (c/apply altered-state -fetch-context-))
+      (c/apply altered-state -fetch-context-))))
 
 (def ascii-digits "0123456789")
 (def lowercase-ascii-alphabet "abcdefghijklmnopqrstuvwxyz")
@@ -573,22 +573,22 @@
      (mapsum (fn [[index token]] (chook index (case-insensitive-lit token))))
      (label label-str))))
 
-(def _decimal-digit
+(def -decimal-digit-
   (radix-digit "a decimal digit" 10))
 
-(def _hexadecimal-digit
+(def -hexadecimal-digit-
   (radix-digit "a hexadecimal digit" 16))
 
-(def _uppercase-ascii-letter
+(def -uppercase-ascii-letter-
   (set-lit "an uppercase ASCII letter" uppercase-ascii-alphabet))
 
-(def _lowercase-ascii-letter
+(def -lowercase-ascii-letter-
   (set-lit "a lowercase ASCII letter" lowercase-ascii-alphabet))
 
-(def _ascii-letter
+(def -ascii-letter-
   (label "an ASCII letter"
-    (+ _uppercase-ascii-letter _lowercase-ascii-letter)))
+    (+ -uppercase-ascii-letter- -lowercase-ascii-letter-)))
 
-(def _ascii-alphanumeric
+(def -ascii-alphanumeric-
   (label "an alphanumeric ASCII character"
-    (+ _ascii-letter _decimal-digit)))
+    (+ -ascii-letter- -decimal-digit-)))
