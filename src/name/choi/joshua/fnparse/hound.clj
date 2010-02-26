@@ -720,7 +720,7 @@
 
 (defmacro template-sum
   "Creates a summed rule using a template.
-  Acts very similarly to clojure.template/do-template,
+  Acts very similarly to `clojure.template/do-template`,
   but instead sums each rule together."
   [argv expr & values]
   (let [c (count argv)]
@@ -729,18 +729,29 @@
 
 (define-fn case-insensitive-lit
   "Creates a case-insensitive rule using Java's
-  Character/toLowerCase and Character/toUpperCase.
-  Only works with Character-type tokens.
-  Consumes one token. Its product is the token consumed."
+  `Character/toLowerCase` and `Character/toUpperCase`
+  methods. Only works with `Character`-type tokens.
+  
+  *   Succeeds? If there is a next token and it's
+      equal to either the lower- or upper-case of
+      the given `token`.
+      *   Product: The consumed token.
+      *   Consumes: One token.
+  *   Failure? If there are no more tokens or if
+      the next token doesn't equal the upper- or
+      lower-case of the given `token`."
   [#^Character token]
   (+ (lit (Character/toLowerCase token))
      (lit (Character/toUpperCase token))))
 
 (define-fn effects
   "Creates a side-effect rule. Applies the given
-  arguments to the given function. Consumes no
-  tokens. Its product is whatever the side-effect
-  function returns."
+  arguments to the given function.
+  
+  *   Succeeds? Always.
+      *   Product: The result of `(apply f args)`.
+      *   Consumes: No tokens.
+  *   Failure? Never."
   [f & args]
   (fn effects-rule [state]
     (c/apply state (prod (apply f args)))))
@@ -750,17 +761,12 @@
   the given minuend rule, but only when the
   subtrahend rule does not also match.
   
-  Succeeds?
-  :   minuend succeeds.
-      
-      Product
-      :   minuend's product.
-      
-      Consumes
-      :   whatever minuend consumes.
-  
-  Fails?
-  :   minuend fails or subtrahend succeeds."
+  *   Succeeds? `minuend` succeeds and
+      `subtrahend` fails.
+      *   Product: `minuend`'s product.
+      *   Consumes: Whatever `minuend` consumes.
+  *   Fails? `minuend` fails or `subtrahend`
+      succeeds."
   ([label-str minuend subtrahend]
    (for [_ (anti-peek label-str subtrahend)
          product (label label-str minuend)]
@@ -769,7 +775,17 @@
    (except label-str minuend
      (apply + (cons first-subtrahend rest-subtrahends)))))
 
-(define-fn annotate-error [message-fn rule]
+(define-fn annotate-error
+  "Creates an error-annotating rule. Whenever
+  the given `rule` fails, the error is passed
+  into the `message-fn` function. This can be
+  useful to add a message with more info to an
+  error when certain conditions are met.
+  
+  The result that `message-fn` receives is of the
+  type `::name.choi.joshua.fnparse.common/ParseError`.
+  See its documentation for more information."
+  [message-fn rule]
   (letfn [(annotate [result]
             (delay (let [{error :error, :as forced-result} (force result)
                          new-message (message-fn error)]
@@ -781,16 +797,32 @@
       (let [reply (c/apply state rule)]
         (update-in reply [:result] annotate)))))
 
-(define-fn factor= [n rule]
+(define-fn factor=
+  "Creates a non-greedy repetition rule.
+  Concatenates the given `rule` to itself `n` times."
+  [n rule]
   (->> rule (replicate n) (apply cat)))
 
-(define-fn -fetch-context- [state]
+(define-fn -fetch-context-
+  "A rule that fetches the current context.
+  
+  *   Success? Always.
+      *   Product: The current context.
+      *   Consumes: Zero tokens.
+  *   Failure? Never."
+  [state]
   (c/apply state (prod (:context state))))
 
-(define-fn alter-context [f & args]
+(define-fn alter-context
+  "A rule that alters the curent context.
+  
+  *   Success? Always.
+      *   Product: The new context.
+      *   Consumes: Zero tokens.
+  *   Failure? Never."
+  [f & args]
   (fn context-altering-rule [state]
     (let [altered-state (apply update-in state [:context] f args)]
-      ; (prn (c/apply altered-state -fetch-context-))
       (c/apply altered-state -fetch-context-))))
 
 (def ascii-digits "0123456789")
@@ -798,30 +830,69 @@
 (def uppercase-ascii-alphabet "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 (def base-36-digits (str ascii-digits lowercase-ascii-alphabet))
 
+(define-fn radix-label
+  "The function used by radix-digit to smartly
+  create digit labels for the given `base`."
+  [base]
+  (case base
+    10 "a decimal digit"
+    16 "a hexadecimal digit"
+    8 "an octal digit"
+    2 "a binary digit"
+    (format "a base-%s digit" base)))
+
 (defn radix-digit
-  ([base] (radix-digit (format "a base-%s digit" base) base))
-  ([label-str base]
-   {:pre #{(integer? base) (> base 0)}}
-   (->> base-36-digits (take base) seq/indexed
-     (mapsum (fn [[index token]] (chook index (case-insensitive-lit token))))
-     (label label-str))))
+  "Returns a rule that accepts one digit character
+  token in the number system with the given `base`.
+  For instance, `(radix-digit 12)` is a rule
+  of a single duodecimal digit.
+  
+  Digits past 9 are case-insensitive letters:
+  11, for instance, is \\b or \\B. Bases above
+  36 are accepted, but there's no way to use
+  digits beyond \\Z (which corresponds to 36).
+  
+  The rules `-decimal-digit-` and
+  `-hexadecimal-digit-` are already provided.
+  
+  *   Success? If the next token is a digit
+      character in the given `base`'s number
+      system.
+      *   Product: The digit's corresponding
+          integer.
+      *   Consumes: One token."
+  [base]
+  {:pre #{(integer? base) (> base 0)}}
+  (->> base-36-digits (take base) seq/indexed
+    (mapsum (fn [[index token]] (chook index (case-insensitive-lit token))))
+    (label (radix-label base))))
 
-(def -decimal-digit-
-  (radix-digit "a decimal digit" 10))
+(d/defvar -decimal-digit-
+  (radix-digit 10)
+  "A rule matching a single base-10 digit
+  character token (i.e. \\0–\\9). Its product
+  is the digit's corresponding integer.")
 
-(def -hexadecimal-digit-
-  (radix-digit "a hexadecimal digit" 16))
+(d/defvar -hexadecimal-digit-
+  (radix-digit 16)
+  "A rule matching a single base-16 digit
+  character token (i.e. \\0–\\F). Its product
+  is the digit's corresponding integer.")
 
-(def -uppercase-ascii-letter-
-  (set-lit "an uppercase ASCII letter" uppercase-ascii-alphabet))
+(d/defvar -uppercase-ascii-letter-
+  (set-lit "an uppercase ASCII letter" uppercase-ascii-alphabet)
+  "A rule matching a single uppercase ASCII letter.")
 
-(def -lowercase-ascii-letter-
-  (set-lit "a lowercase ASCII letter" lowercase-ascii-alphabet))
+(d/defvar -lowercase-ascii-letter-
+  (set-lit "a lowercase ASCII letter" lowercase-ascii-alphabet)
+  "A rule matching a single lowercase ASCII letter.")
 
-(def -ascii-letter-
+(d/defvar -ascii-letter-
   (label "an ASCII letter"
-    (+ -uppercase-ascii-letter- -lowercase-ascii-letter-)))
+    (+ -uppercase-ascii-letter- -lowercase-ascii-letter-))
+  "A rule matching a single upper- or lower-case ASCII letter.")
 
-(def -ascii-alphanumeric-
+(d/defvar -ascii-alphanumeric-
   (label "an alphanumeric ASCII character"
-    (+ -ascii-letter- -decimal-digit-)))
+    (+ -ascii-letter- -decimal-digit-))
+  "A rule matching an ASCII alphanumeric character.")

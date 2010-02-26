@@ -490,7 +490,7 @@
         :messages #{"nested anonymous functions are not allowed"}))
   (is (non-match? -form- "3/0 3"
         :position 3
-        :labels #{"a base-10 digit"}
+        :labels #{"a decimal digit"}
         :messages #{"a fraction's denominator cannot be zero"}))
   (is (non-match? -form- "#<java.lang.String@35235>"
         :position 25
