@@ -242,7 +242,7 @@
   {:pre #{(string? label-str)}}
   (fn labelled-rule [state]
     (let [result (c/apply state rule), initial-position (:position state)]
-      (if-not (-> result :error :position (> initial-position))
+      (if (-> result :error :position (<= initial-position))
         (assoc-in result [:error :descriptors]
           #{(c/ErrorDescriptor :label label-str)})
         result))))

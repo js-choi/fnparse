@@ -207,18 +207,41 @@
 
 (defn +
   "Creates a summed rule.
+  
   Adds the given sub-rules together, forming a new rule.
   The order of the sub-rules matters.
-      *This is the FnParse Hound version of +.* It first
+  
+  *This is the FnParse Hound version of +.* It *first*
   searches for a successful parse from its subrules that
-  consumed any tokens. The first such success is
-  immediately returned.
+  *consumed any tokens*. The first such success is
+  *immediately returned*.
+  
   If all sub-rules that consumed tokens failed, then
-  the first successful parse that didn't consume any
+  the first successful parse that *didn't* consume any
   tokens is returned.
+  
   Otherwise, if every sub-rule failed, then a failure
   is returned with the proper error descriptors.
-      This is the plus monadic operator of the parser monad."
+  
+  This is the plus monadic operator of the parser monad.
+  
+  *   Success?
+      *   If *either* of the following is true:
+          1. Any sub-rule both consumes tokens and succeeds.
+          2. Any sub-rule succeeds without consuming any
+             tokens, *and* no sub-rule that consumes tokens
+             also succeeds.
+      *   The first sub-rule that fulfills #1, or else #2,
+          above is used.
+      *   Product: The product of that first sub-rule.
+      *   Consumes: Whatever tokens that first sub-rule
+          consumes too.
+  *   Failure?
+      *   If *either* of the following is true:
+          1. Any sub-rule both consumes tokens and fails.
+          2. Not a single sub-rule succeeds.
+      *   Descriptors: The descriptors of all failed rules
+          are combined in an intelligent way."
   [& rules]
   (fn summed-rule [state]
     (let [[consuming-replies empty-replies]
@@ -243,10 +266,22 @@
 
 (define-fn label
   "Creates a labelled rule.
+  
   Labels the given rule with the given string, returning
   a new rule. The given label will appear in the descriptors
   of any parse errors that expected the given rule to
-  succeed."
+  succeed.
+  
+  *   Success? If `rule` succeeds.
+      *   Product: `rule`'s product.
+      *   Consumes: Whatever `rule` consumes.
+  *   Failure? If `rule` fails.
+      *   Labels: All of `rule`'s labels are overrided
+          with `label-str`, but only if `rule` consumed
+          no tokens. (If `rule` did consume tokens, then
+          its labels contain more specific information
+          than `label-str`.)
+      *   Messages: Whatever `rule` returns."
   [label-str rule]
   (letfn [(assoc-label [result]
             (-> result force
@@ -261,26 +296,48 @@
 
 (defmacro for
   "Creates a rule comprehension, very much like
-  clojure.core/for.
-  label-str: An optional label string. See the
-             label function for more info.
-  steps: A binding vector containing binding-form/
-         rule pairs followed by optional modifiers.
-         The given rules in each pair are conca-
-         tenated together in sequence to create
-         the new rule. Each binding-form is bound
-         to the product of its corresponding rule.
-         The rule expressions can refer to any
-         symbol bound to in a previous pair.
-         The only current recommended modifier
-         is :let, which works like how it does it
-         clojure.core/for.
-  product-expr: The final product of the new rule.
-                Only is reached after every sub-rule
-                succeeds. The expression can refer
-                to any symbol bound to in the steps.
+  `clojure.core/for`.
+  
+  Arguments
+  =========
+  *   label-str: An optional label string. See the
+      label function for more info.
+  *   steps: A binding vector containing binding-form/
+      rule pairs followed by optional modifiers.
+      The given rules in each pair are conca-
+      tenated together in sequence to create
+      the new rule. Each binding-form is bound
+      to the product of its corresponding rule.
+      The rule expressions can refer to any
+      symbol bound to in a previous pair.
+      The only current recommended modifier
+      is `:let`, which works like how it does it
+      `clojure.core/for`.
+  *   product-expr: The final product of the new rule.
+      Only is reached after every sub-rule
+      succeeds. The expression can refer
+      to any symbol bound to in the `steps`.
+  
+  Rule behavior
+  =============
+  If it succeeds or fails and also how many tokens
+  it consumes is similar to `cat`. How the final
+  product is calculated is similar to `hook`.
+  *   Success: All sub-rules in the `steps`
+      succeed, in order.
+      *   Product: Whatever is calculated by
+          `product-expr`.
+      *   Consumes: All tokens that each step
+          consumes.
+  *   Failure: Any sub-rule in the `steps` fails.
+      *   Labels and messages: Whatever is
+          returned by the failed rule.
+  
+  Misc
+  ====
   For examples of for rules, check the example
-  libraries like fnparse.clojure.
+  libraries like `fnparse.clojure`.
+  
   This macro is equivalent to the domonad form of
   the parser monad."
   ([label-str steps product-expr]
@@ -290,13 +347,18 @@
 
 (define-fn validate
   "Creates a validating rule.
+  
   A convenience function. Returns a new rule that
-  acts like the given sub-rule, but also validates
-  the sub-rule's products with the given predicate.
-  If (pred product) is false, then the rule fails
-  with the given message as an error.
-      Basically just a shortcut for the for macro
-  and only-when function."
+  acts like the given `rule`, but also validates
+  `rule`'s products with the given predicate.
+  Basically just a shortcut for `for` and `only-when`.
+  
+  *   Success: When `rule` succeeds and its product
+      fulfills `(pred product)`.
+      *   Product: `rule`'s product.
+      *   Consumes: What `rule` consumes.
+  *   Failure: When `rule` fails or `(pred product)`
+      is false."
   [pred message rule]
   (for [product rule, _ (only-when (pred product) message)]
     product))
@@ -309,10 +371,24 @@
 
 (define-fn term
   "Creates a terminal rule.
+  
   The new rule either consumes one token or fails.
-  It must have a label-str that describes it
-  and a predicate to test if the token it consumes is
-  valid. Its product is the token it consumes.
+  It must have a `label-str` that describes it
+  and a `pred`icate to test if the token it consumes is
+  valid.
+  
+  *   Success: When there are still tokens left in
+      the input, and the next such token fulfills
+      `(pred token)`.
+      *   Product: The consumed token.
+      *   Consumes: One and only one token.
+  *   Failure: When there are no tokens left, or
+      `(pred next-token)` is false.
+      *   Labels: The given `label-str`.
+      *   Messages: None.
+  
+  Notes
+  =====
   * If you just want to make sure that the consumed
     token equals something, use lit instead.
   * If you just want to make sure that the consumed
@@ -345,16 +421,20 @@
 
 (d/defvar -anything- (term "anything" (constantly true))
   "The generic terminal rule. It consumes one token.
-  It fails only when it's at the end of the input and
-  there are no more tokens. Its product is the very token
-  it consumed.")
+  
+  *   Success: If there are any tokens left.
+      *   Product: The token it consumes.
+      *   Consumes: One token.
+  *   Failure: If it's at the end of input.")
 
 (define-fn hook
   "Creates a rule with a semantic hook.
-  A shortcut for the for macro. Creates a
-  new rule. If the given sub-rule succeeds,
-  then it succeeds, but its product is
-  (semantic-hook sub-rule-product) instead."
+  A shortcut for the `for` macro.
+  
+  *   Success: If `rule` succeeds.
+      *   Product: `(semantic-hook rule-product)`.
+      *   Consumes: Whatever `rule` consumes.
+  *   Failure: If `rule` fails."
   [semantic-hook rule]
   (for [product rule] (semantic-hook product)))
 
@@ -363,17 +443,31 @@
   A shortcut for the for macro. The name
   stands for 'constant-hook'. It's exactly like
   hook, only the product is a constant; its
-  product is always the given object."
+  product is always the given object.
+  
+  *   Success: If `rule` succeeds.
+      *   Product: Always is `product`.
+      *   Consumes: Whatever `rule` consumes.
+  *   Failure: If `rule` fails."
   [product subrule]
   (for [_ subrule] product))
 
 (define-fn lit
-  "Creates a rule of a literal.
-  A shortcut for the term function. It consumes
-  one token, and succeeds only if it equals the
-  given token. Otherwise, it fails.
-  Its product is the token.
-  It automatically adds an appropriate label."
+  "Creates a rule of a literal. A shortcut for
+  the term function. It automatically adds an
+  appropriate label.
+  
+  *   Success? If there are tokens left, and
+      the first remaining token is equal to
+      the given `token`.
+      *   Product: The consumed token.
+      *   Consumes: One token.
+  *   Failure? If it's at the end of input, or
+      the next token is not equal to the given
+      `token`.
+      *   Labels: The given `token` in single-
+          quotes. For instance, (lit \\$) has
+          the label `\"'$'\"`."
   [token]
   (term (format "'%s'" token) #(= token %)))
 
@@ -383,9 +477,11 @@
   one token, and succeeds only if it *does not
   Its product is the consumed token.
   equal* the given token. It fails otherwise.
-  It automatically adds an appropriate label."
+  It automatically adds an appropriate label
+  (e.g. `(antilit \\$)` is labelled
+  `\"anything except '$'\")."
   [token]
-  (term (str "anything except " token) #(not= token %)))
+  (term (format "anything except '%s'" token) #(not= token %)))
 
 (define-fn set-lit
   "Creates a rule of a literal of a set.
@@ -394,7 +490,17 @@
   new rule consumes one token and succeeds only
   if the token is one of the given tokens.
   Its product is the consumed token.
-  You must provide an appropriate label."
+  You must provide an appropriate label.
+
+  *   Success? If there are tokens left, and
+      the first remaining token is in the
+      given set of `tokens`.
+      *   Product: The consumed token.
+      *   Consumes: One token.
+  *   Failure? If it's at the end of input, or
+      the next token is not in the given set of
+      `tokens`.
+      *   Labels: The given `label-str`."
   [label-str tokens]
   (term label-str (set tokens)))
 
