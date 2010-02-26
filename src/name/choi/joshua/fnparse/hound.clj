@@ -47,9 +47,12 @@
       c/merge-parse-errors (-> mergee :result force :error))))
 
 (define-fn prod
-  "Creates an rule that is empty (i.e. does not
+  "Creates a product rule.
+  Creates an rule that is empty (i.e. does not
   consume any tokens) and whose product is always
   the given product.
+  In for moands, use the :let modifier in preference
+  to this function.
   Is the result monadic function of the parser monad."
   [product]
   (fn prod-rule [state]
@@ -84,8 +87,8 @@
   (make-failed-reply state nothing-descriptors))
 
 (define-fn with-error
-  "Creates a failing rule with the given message.
-  Rules created with this function always fail.
+  "Creates an always- failing rule with the given
+  message. Rules created with this function always fail.
   Use this in preference to _nothing."
   [message]
   (fn with-error-rule [state]
@@ -108,7 +111,8 @@
   (list* `defn (vary-meta fn-name assoc :private true) forms))
 
 (defn only-when
-  "Creates an either succeeding or a failing rule,
+  "Creates a maybe-failing rule.
+  Creates an either succeeding or a failing rule,
   depending on if valid? is logical true. If valid?
   is true, then the rule always succeeds and acts
   like (prod valid?). If valid? is false, then the
@@ -126,7 +130,7 @@
 
 (define-fn combine
   "Creates a rule combining the given rule into the
-  product-fn. Use cat in preference to this function.
+  product-fn. *Use cat in preference to this function.*
       The product-fn must return a rule when
   given the product of the first rule. Is the bind
   monadic function of the parser monad."
@@ -159,7 +163,8 @@
               (Reply false first-result))))))))
 
 (defn +
-  "Adds the given sub-rules together, forming a new rule.
+  "Creates a summed rule.
+  Adds the given sub-rules together, forming a new rule.
   The order of the sub-rules matters.
       *This is the FnParse Hound version of +.* It first
   searches for a successful parse from its subrules that
@@ -194,7 +199,8 @@
    m-plus +])
 
 (define-fn label
-  "Labels the given rule with the given string, returning
+  "Creates a labelled rule.
+  Labels the given rule with the given string, returning
   a new rule. The given label will appear in the descriptors
   of any parse errors that expected the given rule to
   succeed."
@@ -223,6 +229,9 @@
          to the product of its corresponding rule.
          The rule expressions can refer to any
          symbol bound to in a previous pair.
+         The only current recommended modifier
+         is :let, which works like how it does it
+         clojure.core/for.
   product-expr: The final product of the new rule.
                 Only is reached after every sub-rule
                 succeeds. The expression can refer
@@ -237,7 +246,8 @@
   `(m/domonad parser-m ~steps ~product-expr)))
 
 (define-fn validate
-  "A convenience function. Returns a new rule that
+  "Creates a validating rule.
+  A convenience function. Returns a new rule that
   acts like the given sub-rule, but also validates
   the sub-rule's products with the given predicate.
   If (pred product) is false, then the rule fails
@@ -255,8 +265,9 @@
   (validate (complement pred) message rule))
 
 (define-fn term
-  "Creates a new rule that either consumes one token
-  or fails. It must have a label-str that describes it
+  "Creates a terminal rule.
+  The new rule either consumes one token or fails.
+  It must have a label-str that describes it
   and a predicate to test if the token it consumes is
   valid. Its product is the token it consumes.
   * If you just want to make sure that the consumed
@@ -296,7 +307,8 @@
   it consumed.")
 
 (define-fn hook
-  "A shortcut for using the for macro. Creates a
+  "Creates a rule with a semantic hook.
+  A shortcut for the for macro. Creates a
   new rule. If the given sub-rule succeeds,
   then it succeeds, but its product is
   (semantic-hook sub-rule-product) instead."
@@ -304,36 +316,112 @@
   (for [product rule] (semantic-hook product)))
 
 (define-fn chook
-  "A shortcut for using the for macro. The name
+  "Creates a rule with a constant semantic hook.
+  A shortcut for the for macro. The name
   stands for 'constant-hook'. It's exactly like
   hook, only the product is a constant; its
   product is always the given object."
   [product subrule]
   (for [_ subrule] product))
 
-(define-fn lit [token]
+(define-fn lit
+  "Creates a rule of a literal.
+  A shortcut for the term function. It consumes
+  one token, and succeeds only if it equals the
+  given token. Otherwise, it fails.
+  Its product is the token.
+  It automatically adds an appropriate label."
+  [token]
   (term (format "'%s'" token) #(= token %)))
 
-(define-fn antilit [token]
+(define-fn antilit
+  "Creates a rule of an anti-literal.
+  A shortcut for the term function. It consumes
+  one token, and succeeds only if it *does not
+  Its product is the consumed token.
+  equal* the given token. It fails otherwise.
+  It automatically adds an appropriate label."
+  [token]
   (term (str "anything except " token) #(not= token %)))
 
-(define-fn set-lit [label-str tokens]
+(define-fn set-lit
+  "Creates a rule of a literal of a set.
+  A shortcut for the term function. It creates
+  a set from the given sequence of tokens. The
+  new rule consumes one token and succeeds only
+  if the token is one of the given tokens.
+  Its product is the consumed token.
+  You must provide an appropriate label."
+  [label-str tokens]
   (term label-str (set tokens)))
 
-(define-fn anti-set-lit [label-str tokens]
+(define-fn anti-set-lit
+  "Creates a rule of a anti-literal of a set.
+  A shortcut for the term function. It creates
+  a set from the given sequence of tokens. The
+  new rule consumes one token and succeeds only
+  if the token *is not* one of the given tokens.
+  Its product is the consumed token.
+  You must provide an appropriate label."
+  [label-str tokens]
   (antiterm label-str (tokens set)))
 
-(define-fn cat [& subrules]
+(define-fn cat
+  "Creates a concatenated rule.
+  Concatenates many rules together. If one of
+  the sub-rules fail, the whole rule fails.
+  Its product is a sequence of the respective
+  products of each sub-rule."
+  [& subrules]
   (m/with-monad parser-m
     (m/m-seq subrules)))
 
-(define-fn vcat [& subrules]
+(define-fn vcat
+  "Exactly like cat, only applies vec to its product."
+  [& subrules]
   (hook vec (apply cat subrules)))
 
-(define-fn opt [rule]
+(define-fn opt
+  "Creates an optional rule. The new rule
+  always succeeds. It is equivalent to the
+  sum of the given rule and the emptiness rule."
+  [rule]
   (+ rule _emptiness))
 
-(define-fn lex [subrule]
+(define-fn lex
+  "Creates a lexical rule.
+  You use this whenever you want the lexer to
+  *backtrack* when it fails, *even* if it consumes
+  tokens. (Don't forget, usually if a rule consumes
+  tokens, it cannot backtrack at all.)
+  HOW IT WORKS:
+  Rules surrounded by lex count as 'empty' rules—
+  rules that don't consume any tokens—regardless
+  if they really consume tokens or not. This changes
+  the behavior of any summed rules that contain it.
+  WHY YOU WOULD NEED TO USE IT:
+    (require '[name.choi.joshua.fnparse.hound :as r])
+    (def _ws (r/lit \\space))
+    (def _claim (r/phrase \"x = 1\"))
+    (def _let-expr (r/cat (r/phrase \"let\") _ws _let-expr))
+    (def _identifier (r/rep+ r/_ascii-letter))
+    (def _expr (r/+ _let-expr _identifier))
+    (parse _let-expr \"number\" nil) ; Line one
+    (parse _let-expr \"letter\" nil) ; Line two
+  In the code above, line one will give a successful
+  parse, because the input \"number\" matches
+  _indentifier.
+      But line two will give a failure. This is because
+  (r/phrase \"let\") will match, but the _ws after it
+  will not match. Thus, _let-expr fails. Also, because
+  _let-expr consumed the first three tokens of \"letter\",
+  the summed rule _expr will immediately fail without
+  even trying _identifier.
+  AND SO HOW YOU USE IT:
+  Change _let-expr to use the following:
+    (r/cat (r/lex (r/phrase \"let\")) _ws _let-expr)
+  Now both line one and two will be successful."
+  [subrule]
   (fn [state]
     (-> state subrule
       (assoc :tokens-consumed? false))))
