@@ -4,8 +4,8 @@
             [clojure.contrib.monads :as m]
             [clojure.template :as t]
             [clojure.contrib.def :as d])
-  (:refer-clojure :rename {defn define-fn, defn- define-fn-}
-                  :exclude #{for + mapcat peek})
+  (:refer-clojure :rename {defn define-fn, defn- define-fn-, mapcat seq-mapcat}
+                  :exclude #{for + peek})
   (:import [clojure.lang IPersistentMap]))
 
 (deftype State [remainder position context] :as this
@@ -371,6 +371,25 @@
   [pred message rule]
   (validate (complement pred) message rule))
 
+(define-fn- term-
+  "All terminal rules, including `term` and
+  `term*`, are based on this function."
+  [pred-product? label-str f]
+  (label label-str
+    (fn terminal-rule [state]
+      (let [position (:position state)]
+        (if-let [remainder (-> state :remainder seq)]
+          (let [first-token (first remainder), f-result (f first-token)]
+            (if f-result
+              (Reply true
+                (delay
+                  (c/Success (if pred-product? f-result first-token)
+                    (assoc state :remainder (next remainder)
+                                 :position (inc position))
+                    (c/ParseError position nil nil))))
+              (make-failed-reply state first-token nil)))
+          (make-failed-reply state ::c/end-of-input nil))))))
+
 (define-fn term
   "Creates a terminal rule.
   
@@ -392,28 +411,25 @@
   Notes
   =====
   * If you just want to make sure that the consumed
-    token equals something, use lit instead.
+    token equals something, use `lit` instead.
   * If you just want to make sure that the consumed
-    token equals one of a bunch of things, use set-lit.
+    token equals one of a bunch of things, use `term`
+    on a set of tokens.
   * If you want to use the complement of the predicate,
-    use antiterm.
+    use `antiterm`.
   * If you don't care about what token is consumed,
-    just as long as a token is consumed, use -anything-."
+    just as long as a token is consumed, use `-anything-`.
+  * If you want a terminal rule, but you want the result
+    of the predicate to be the rule's product instead of
+    the token itself, use `term*`."
   [label-str predicate]
-  (label label-str
-    (fn terminal-rule [state]
-      (let [position (:position state)]
-        (if-let [remainder (-> state :remainder seq)]
-          (let [first-token (first remainder)]
-            (if (predicate first-token)
-              (Reply true
-                (delay
-                  (c/Success first-token
-                    (assoc state :remainder (next remainder)
-                                 :position (inc position))
-                    (c/ParseError position nil nil))))
-              (make-failed-reply state first-token nil)))
-          (make-failed-reply state ::c/end-of-input nil))))))
+  (term- false label-str predicate))
+
+(define-fn term*
+  "Exactly like term, only its product is the result of
+  `(f token)` rather than `token`."
+  [label-str f]
+  (term- true label-str f))
 
 (define-fn antiterm
   "Exactly like term, only uses the complement of the
@@ -827,8 +843,16 @@
 
 (def ascii-digits "0123456789")
 (def lowercase-ascii-alphabet "abcdefghijklmnopqrstuvwxyz")
-(def uppercase-ascii-alphabet "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
-(def base-36-digits (str ascii-digits lowercase-ascii-alphabet))
+(def uppercase-ascii-alphabet
+  (map #(Character/toUpperCase %) lowercase-ascii-alphabet))
+(def base-36-digits (concat ascii-digits lowercase-ascii-alphabet))
+(set! *warn-on-reflection* true)
+(def base-36-digit-map
+  (letfn [(digit-entries [[index digit-char]]
+            (let [digit-char (char digit-char)]
+              [[(Character/toUpperCase digit-char) index]
+               [(Character/toLowerCase digit-char) index]]))]
+    (->> base-36-digits seq/indexed (seq-mapcat digit-entries) (into {}))))
 
 (define-fn radix-label
   "The function used by radix-digit to smartly
@@ -863,9 +887,8 @@
       *   Consumes: One token."
   [base]
   {:pre #{(integer? base) (> base 0)}}
-  (->> base-36-digits (take base) seq/indexed
-    (mapsum (fn [[index token]] (chook index (case-insensitive-lit token))))
-    (label (radix-label base))))
+  (->> base-36-digit-map (filter #(< (val %) base)) (into {})
+    (term* (radix-label base))))
 
 (d/defvar -decimal-digit-
   (radix-digit 10)

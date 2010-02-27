@@ -22,7 +22,7 @@
   (apply str chars))
 
 (defn expt-int [base pow]
-  (loop [n pow, y 1, z base]
+  (loop [n (int pow), y 1, z base]
     (let [t (bit-and n 1), n (bit-shift-right n 1)]
       (cond
         (zero? t) (recur n y (* z z))
@@ -444,7 +444,7 @@
 
 (deftest various-rules
   (is (match? -form- "55.2e2" :product? #(== % 5520.)))
-  (is (match? -form- "16rFF" :product? #(== % 255)))
+  (is (match? -form- "16r3AF" :product? #(== % 943)))
   (is (match? -form- "16." :product? #(== % 16.)))
   (is (match? -form- "true" :product? true?))
   (is (= (with-out-str (r/parse -form- "^()" {} list list))
