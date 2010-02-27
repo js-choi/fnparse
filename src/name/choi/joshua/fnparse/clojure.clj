@@ -100,7 +100,7 @@
 (def -ns-separator- (r/lit \/))
 
 (def -non-alphanumeric-symbol-char-
-  (r/set-lit "a non-alphanumeric symbol character" "*+!---?."))
+  (r/set-term "a non-alphanumeric symbol character" "*+!---?."))
 
 (def -symbol-first-char-
   (r/+ r/-ascii-letter- -non-alphanumeric-symbol-char-))
@@ -181,8 +181,7 @@
 ;; Numbers.
 
 (r/defn radix-natural-number [base]
-  (r/cascading-rep+ (r/radix-digit (if (<= base 36) base 36))
-    identity #(+ (* base %1) %2)))
+  (r/cascading-rep+ (r/radix-digit base) identity #(+ (* base %1) %2)))
 
 (def -decimal-natural-number-
   (radix-natural-number 10))
@@ -204,7 +203,7 @@
 
 (def -exponential-part-
   (r/prefix
-    (r/set-lit "exponent indicator" "eE")
+    (r/set-term "exponent indicator" "eE")
       ; If I wasn't worrying about pure Clojure,
       ; use (r/case-insensitive-lit \e) above instead.
     (r/hook #(partial * (expt-int 10 %)) -decimal-natural-number-)))
@@ -230,7 +229,7 @@
 (r/defn radix-coefficient-tail [base]
   (r/hook constantly
     (r/prefix
-      (r/set-lit "radix indicator" "rR")
+      (r/set-term "radix indicator" "rR")
         ; If I wasn't worrying about pure Clojure,
         ; use (case-insensitive-r/lit \r) above instead.
       (radix-natural-number base))))

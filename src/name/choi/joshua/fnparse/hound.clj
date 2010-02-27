@@ -414,7 +414,8 @@
     token equals something, use `lit` instead.
   * If you just want to make sure that the consumed
     token equals one of a bunch of things, use `term`
-    on a set of tokens.
+    on a set of tokens, or `set-term` on a sequence of
+    tokens.
   * If you want to use the complement of the predicate,
     use `antiterm`.
   * If you don't care about what token is consumed,
@@ -501,35 +502,15 @@
   [token]
   (term (format "anything except '%s'" token) #(not= token %)))
 
-(define-fn set-lit
-  "Creates a rule of a literal of a set.
-  A shortcut for the term function. It creates
-  a set from the given sequence of tokens. The
-  new rule consumes one token and succeeds only
-  if the token is one of the given tokens.
-  Its product is the consumed token.
-  You must provide an appropriate label.
-
-  *   Success? If there are tokens left, and
-      the first remaining token is in the
-      given set of `tokens`.
-      *   Product: The consumed token.
-      *   Consumes: One token.
-  *   Failure? If it's at the end of input, or
-      the next token is not in the given set of
-      `tokens`.
-      *   Labels: The given `label-str`."
+(define-fn set-term
+  "Creates a terminal rule with a set.
+  A shortcut for `(term label-str (set tokens))`."
   [label-str tokens]
   (term label-str (set tokens)))
 
-(define-fn anti-set-lit
-  "Creates a rule of a anti-literal of a set.
-  A shortcut for the term function. It creates
-  a set from the given sequence of tokens. The
-  new rule consumes one token and succeeds only
-  if the token *is not* one of the given tokens.
-  Its product is the consumed token.
-  You must provide an appropriate label."
+(define-fn antiset-lit
+  "Creates a terminal rule with an anti-set.
+  A shortcut for `(antiterm label-str (set tokens))`."
   [label-str tokens]
   (antiterm label-str (tokens set)))
 
@@ -668,18 +649,18 @@
   (opt (rep+ rule)))
 
 (define-fn mapcat
-  "Returns the result of applying cat to the
-  result of applying map to f and colls.
-  Use the phrase function instead of this
-  function when f is just lit."
+  "Returns the result of applying `cat` to the
+  result of applying map to `f` and `colls`.
+  Use the `phrase` function instead of this
+  function when `f` is just `lit`."
   [f & token-colls]
   (->> token-colls (apply map f) (apply cat)))
 
 (define-fn mapsum
-  "Returns the result of applying + to the
-  result of applying map to f and colls.
-  Use the set-lit function instead of this
-  function when f is just lit."
+  "Returns the result of applying `+` to the
+  result of applying map to `f` and `colls`.
+  Use the `set-term` function instead of this
+  function when `f` is just `lit`."
   [f & token-colls]
   (->> token-colls (apply map f) (apply +)))
 
@@ -687,7 +668,7 @@
   "Returns a phrase rule, which succeeds
   only when the next few tokens all
   consecutively match the given tokens.
-  Actually, it's just (mapcat lit tokens)."
+  Actually, it's just `(mapcat lit tokens)`."
   [tokens]
   (mapcat lit tokens))
 
@@ -903,11 +884,11 @@
   is the digit's corresponding integer.")
 
 (d/defvar -uppercase-ascii-letter-
-  (set-lit "an uppercase ASCII letter" uppercase-ascii-alphabet)
+  (set-term "an uppercase ASCII letter" uppercase-ascii-alphabet)
   "A rule matching a single uppercase ASCII letter.")
 
 (d/defvar -lowercase-ascii-letter-
-  (set-lit "a lowercase ASCII letter" lowercase-ascii-alphabet)
+  (set-term "a lowercase ASCII letter" lowercase-ascii-alphabet)
   "A rule matching a single lowercase ASCII letter.")
 
 (d/defvar -ascii-letter-
