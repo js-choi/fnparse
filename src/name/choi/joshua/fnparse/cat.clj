@@ -2,8 +2,8 @@
   (:require [clojure.contrib.monads :as m] [clojure.template :as template]
             [name.choi.joshua.fnparse.common :as c] [clojure.contrib.def :as d]
             [clojure.contrib.seq :as seq])
-  (:refer-clojure :rename {defn define-fn, defn- define-fn-}
-                  :exclude #{for + mapcat peek})
+  (:refer-clojure :rename {defn define-fn, defn- define-fn-, peek vec-peek}
+                  :exclude #{for + mapcat})
   (:import [clojure.lang IPersistentMap]))
 
 (defprotocol ABankable
@@ -66,7 +66,7 @@
 (defmacro defrm- [& forms]
   `(defrm ~@forms))
 
-(d/defvar emptiness_
+(d/defvar <emptiness>
   (prod nil)
   "A rule that matches emptiness--that
   is, it always matches with every given
@@ -83,7 +83,7 @@
       (c/ParseError (:position state) unexpected-token descriptors))
     (get-bank state)))
 
-(define-fn nothing_ [state]
+(define-fn <nothing> [state]
   (make-failure state nil #{}))
 
 (define-fn with-error [message]
@@ -175,7 +175,7 @@
         (if-not (or memory
                     (-> lr-node :rule (= subrule))
                     (-> head :involved-rules (contains? subrule)))
-          (set-bank (nothing_ state) bank)
+          (set-bank (<nothing> state) bank)
           (if (-> head :rules-to-be-evaluated (contains? subrule))
             (let [bank (update-in [:lr-stack node-index :rules-to-be-evalated]
                          disj subrule)
@@ -192,7 +192,7 @@
         (if (integer? found-memory-val)
           (let [bank (update-in bank [:lr-stack]
                        setup-lr found-memory-val)
-                new-failure (set-bank (nothing_ state) bank)]
+                new-failure (set-bank (<nothing> state) bank)]
             new-failure)
           (set-bank found-memory-val bank))
         (let [bank (store-memory bank subrule state-position
@@ -203,8 +203,7 @@
               subresult (c/apply  state-0b subrule)
               bank (get-bank subresult)
               submemory (get-memory bank subrule state-position)
-              current-lr-node (-> bank :lr-stack peek)
-              ; bank (update-in bank [:lr-stack] pop)
+              current-lr-node (-> bank :lr-stack vec-peek)
               bank (store-memory bank subrule state-position
                      (clear-bank subresult))
               new-state (set-bank state bank)
@@ -225,7 +224,7 @@
                  (c/apply next-rule)
                  (update-in [:error]
                    #(c/merge-parse-errors (:error prev-result) %))))
-            initial-result (emptiness_ state)
+            initial-result (<emptiness> state)
             results (rest (seq/reductions apply-next-rule
                             initial-result rules))]
         #_ (str results) #_ (prn "results" results)
@@ -233,7 +232,7 @@
 
 (m/defmonad parser-m
   "The monad that FnParse uses."
-  [m-zero nothing_
+  [m-zero <nothing>
    m-result prod
    m-bind combine
    m-plus +])
@@ -298,7 +297,7 @@
 (define-fn antiterm [label-str pred]
   (term label-str (complement pred)))
 
-(d/defvar anything_
+(d/defvar <anything>
   (term "anything" (constantly true))
   "A rule that matches anything--that is, it matches
   the first token of the tokens it is given.
@@ -372,7 +371,7 @@
   (def a (opt b)) would be equivalent to the EBNF:
     a = b?;"
   [rule]
-  (+ rule emptiness_))
+  (+ rule <emptiness>))
 
 (define-fn peek [rule]
   (fn [state]
@@ -392,7 +391,7 @@
       (let [result (c/apply state rule)]
         (if (c/failure? result)
           (c/Success true state (:error result))
-          (-> state nothing_ (assoc :error (:error result))))))))
+          (-> state <nothing> (assoc :error (:error result))))))))
 
 (define-fn mapcat [f tokens]
   (->> tokens (map f) (apply cat)))
@@ -415,8 +414,8 @@
   [tokens]
   (mapcat lit tokens))
 
-(d/defvar end-of-input_
-  (label "the end of input" (anti-peek anything_))
+(d/defvar <end-of-input>
+  (label "the end of input" (anti-peek <anything>))
   "WARNING: Because this is an always succeeding,
   always empty rule, putting this directly into a
   rep*/rep+/etc.-type rule will result in an
@@ -443,7 +442,7 @@
 (define-fn effects [f & args]
   (fn effects-rule [state]
     (apply f args)
-    (c/apply state emptiness_)))
+    (c/apply state <emptiness>)))
 
 (define-fn except
   "Creates a rule that is the exception from
@@ -487,22 +486,22 @@
      (mapsum (fn [[index token]] (chook index (case-insensitive-lit token))))
      (label label-str))))
 
-(def decimal-digit_
+(def <decimal-digit>
   (radix-digit "a decimal digit" 10))
 
-(def hexadecimal-digit_
+(def <hexadecimal-digit>
   (radix-digit "a hexadecimal digit" 16))
 
-(def uppercase-ascii-letter_
+(def <uppercase-ascii-letter>
   (set-lit "an uppercase ASCII letter" uppercase-ascii-alphabet))
 
-(def lowercase-ascii-letter_
+(def <lowercase-ascii-letter>
   (set-lit "a lowercase ASCII letter" lowercase-ascii-alphabet))
 
-(def ascii-letter_
+(def <ascii-letter>
   (label "an ASCII letter"
-    (+ uppercase-ascii-letter_ lowercase-ascii-letter_)))
+    (+ <uppercase-ascii-letter> <lowercase-ascii-letter>)))
 
-(def ascii-alphanumeric_
+(def <ascii-alphanumeric>
   (label "an alphanumeric ASCII character"
-    (+ ascii-letter_ decimal-digit_)))
+    (+ <ascii-letter> <decimal-digit>)))

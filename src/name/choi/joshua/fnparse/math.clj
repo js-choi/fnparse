@@ -6,77 +6,79 @@
 
 (set! *warn-on-reflection* true)
 
-(declare expr_)
+(declare <expr>)
 
-(def digit_
+(def <digit>
   (r/hook #(Integer/parseInt (str %))
     (r/term "a decimal digit" #(Character/isDigit (char %)))))
 
+(def <ws?> (r/opt (r/set-lit "whitespace" " \n\t")))
+
 (template/do-template [rule-name token]
-  (def rule-name (r/lit token))
-  plus-sign_ \+, minus-sign_ \-, multiplication-sign_ \*, division-sign_ \/,
-  opening-parenthesis_ \(, closing-parenthesis_ \))
+  (def rule-name (r/circumfix <ws?> (r/lit token) <ws?>))
+  <plus-sign> \+, <minus-sign> \-, <multiplication-sign> \*, <division-sign> \/,
+  <opening-parenthesis> \(, <closing-parenthesis> \))
 
-(def indicator
+(def <indicator>
   (r/label "an indicator"
-    (r/+ plus-sign_ minus-sign_ multiplication-sign_ division-sign_
-         opening-parenthesis_ closing-parenthesis_)))
+    (r/+ <plus-sign> <minus-sign> <multiplication-sign> <division-sign>
+         <opening-parenthesis> <closing-parenthesis>)))
 
-(def number_
+(def <number>
   (r/label "a number"
-    (r/+ (r/for [first-digits #'number_, next-digit digit_]
+    (r/+ (r/for [first-digits #'<number>, next-digit <digit>]
            (r/+ (* 10 first-digits) next-digit))
-         digit_)))
+         <digit>)))
 
-(def symbol-char_ (r/except "a symbol character" r/anything_ indicator))
+(def <symbol-char> (r/except "a symbol character" r/<anything> <indicator>))
 
-(def symbol-content_
-  (r/+ (r/for [first-char symbol-char_, next-chars #'symbol-content_]
+(def <symbol-content>
+  (r/+ (r/for [first-char <symbol-char>, next-chars #'<symbol-content>]
          (cons first-char next-chars))
-       (r/hook list symbol-char_)))
+       (r/hook list <symbol-char>)))
 
-(def symbol_
-  (r/label "a symbol" (r/hook #(apply str %) symbol-content_)))
+(def <symbol>
+  (r/label "a symbol" (r/hook #(apply str %) <symbol-content>)))
 
-(def terminal-level_
-  (r/+ number_ symbol_))
+(def <terminal-level>
+  (r/+ <number> <symbol>))
 
-(def parenthesized_
-  (r/circumfix opening-parenthesis_ #'expr_ closing-parenthesis_))
+(def <parenthesized>
+  (r/circumfix <opening-parenthesis> #'<expr> <closing-parenthesis>))
 
-(def function_ (r/vcat symbol_ parenthesized_))
+(def <function> (r/vcat <symbol> <parenthesized>))
 
-(def parenthesized-level_
-  (r/+ parenthesized_ terminal-level_))
+(def <parenthesized-level>
+  (r/+ <parenthesized> <terminal-level>))
 
-(def function-level_
-  (r/+ function_ parenthesized-level_))
+(def <function-level>
+  (r/+ <function> <parenthesized-level>))
 
-(def pos-neg-level_
-  (r/+ (r/vcat (r/+ plus-sign_ minus-sign_) function-level_)
-       function-level_))
+(def <pos-neg-level>
+  (r/+ (r/vcat (r/+ <plus-sign> <minus-sign>) <function-level>)
+       <function-level>))
 
-(def multiplication-level_
+(def <multiplication-level>
   (r/+ (r/vcat
-         #'multiplication-level_
-         (r/+ multiplication-sign_ division-sign_)
-         pos-neg-level_)
-       pos-neg-level_))
+         #'<multiplication-level>
+         (r/+ <multiplication-sign> <division-sign>)
+         <pos-neg-level>)
+       <pos-neg-level>))
 
-(def addition-level_
+(def <addition-level>
   (r/+ (r/vcat
-         #'addition-level_
-         (r/+ plus-sign_ minus-sign_)
-         multiplication-level_)
-       multiplication-level_))
+         #'<addition-level>
+         (r/+ <plus-sign> <minus-sign>)
+         <multiplication-level>)
+       <multiplication-level>))
 
-(def expr_ addition-level_)
+(def <expr> <addition-level>)
 
-(deftest various_s
-  (is (match? expr_ "3+1*cos(-(-5)+sin(2))"
+(deftest various-tests
+  (is (match? <expr> "3 + 1 * cos(-(-5) + sin(2))"
         :product? #(= % [3 \+ [1 \* ["cos" [[\- [\- 5]] \+ ["sin" 2]]]]])))
-  (is (non-match? expr_ "*3+1*cos(-(-5)+sin(2))"
-        :labels #{"a number" "a symbol" "'-'" "'+'" "'('"}
+  (is (non-match? <expr> "*3+1*cos(-(-5)+sin(2))"
+        :labels #{"a number" "a symbol" "'-'" "'+'" "'('" "whitespace"}
         :position 0)))
 
 (run-tests)
