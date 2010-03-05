@@ -63,7 +63,7 @@
       (c/Success product state
         (c/ParseError (:position state) nil nil)))))
 
-(d/defvar -emptiness- (prod nil)
+(d/defvar <emptiness> (prod nil)
   "The general emptiness rule.
   
   *   Succeeds? Always.
@@ -86,7 +86,7 @@
   #{(c/ErrorDescriptor :label "absolutely nothing")}
   "The error descriptors that `-nothing-` uses.")
 
-(define-fn -nothing-
+(define-fn <nothing>
   "The general failing rule.
   
   *   Succeeds? Never.
@@ -103,7 +103,7 @@
 
 (define-fn with-error
   "Creates an always-failing rule with the given
-  message. Use this in preference to -nothing-.
+  message. Use this in preference to <nothing-.
   
   *   Succeeds? Never.
   *   Fails? Always.
@@ -147,7 +147,7 @@
   
   This function is very useful for when you want
   to validate a certain rule. For instance:
-      (for [value -number-
+      (for [value <number>
             _ (only-when (< odd 10)
                 \"number must be less than ten\")]
         value)
@@ -252,7 +252,7 @@
               (seq/separate :tokens-consumed?))]
       (if (empty? consuming-replies)
         (if (empty? empty-replies)
-          (c/apply -nothing- state)
+          (c/apply <nothing> state)
           (let [empty-replies (seq/reductions merge-replies empty-replies)]
             (or (first (drop-while #(-> % :result force c/failure?)
                          empty-replies))
@@ -261,7 +261,7 @@
 
 (m/defmonad parser-m
   "The monad that FnParse uses."
-  [m-zero -nothing-
+  [m-zero <nothing>
    m-result prod
    m-bind combine
    m-plus +])
@@ -306,7 +306,7 @@
       label function for more info.
   *   steps: A binding vector containing binding-form/
       rule pairs followed by optional modifiers.
-      The given rules in each pair are conca-
+      The given rules in each pair are conca>
       tenated together in sequence to create
       the new rule. Each binding-form is bound
       to the product of its corresponding rule.
@@ -371,7 +371,7 @@
   [pred message rule]
   (validate (complement pred) message rule))
 
-(define-fn- term-
+(define-fn- term>
   "All terminal rules, including `term` and
   `term*`, are based on this function."
   [pred-product? label-str f]
@@ -424,13 +424,13 @@
     of the predicate to be the rule's product instead of
     the token itself, use `term*`."
   [label-str predicate]
-  (term- false label-str predicate))
+  (term> false label-str predicate))
 
 (define-fn term*
   "Exactly like term, only its product is the result of
   `(f token)` rather than `token`."
   [label-str f]
-  (term- true label-str f))
+  (term> true label-str f))
 
 (define-fn antiterm
   "Exactly like term, only uses the complement of the
@@ -438,7 +438,7 @@
   [label-str pred]
   (term label-str (complement pred)))
 
-(d/defvar -anything- (term "anything" (constantly true))
+(d/defvar <anything> (term "anything" (constantly true))
   "The generic terminal rule. It consumes one token.
   
   *   Success: If there are any tokens left.
@@ -484,7 +484,7 @@
   *   Failure? If it's at the end of input, or
       the next token is not equal to the given
       `token`.
-      *   Labels: The given `token` in single-
+      *   Labels: The given `token` in single>
           quotes. For instance, (lit \\$) has
           the label `\"'$'\"`."
   [token]
@@ -548,7 +548,7 @@
           consumed.
   *   Failure: Never."
   [rule]
-  (+ rule -emptiness-))
+  (+ rule <emptiness>))
 
 (define-fn lex
   "Creates a lexical rule.
@@ -567,27 +567,27 @@
   Why you would need to use it
   ============================
     (require '[name.choi.joshua.fnparse.hound :as r])
-    (def -ws- (r/lit \\space))
-    (def -claim- (r/phrase \"x = 1\"))
-    (def -let-expr- (r/cat (r/phrase \"let\") -ws- -let-expr-))
-    (def -identifier- (r/rep+ r/-ascii-letter-))
-    (def -expr- (r/+ -let-expr- -identifier-))
-    (parse -let-expr- \"number\" nil) ; Line one
-    (parse -let-expr- \"letter\" nil) ; Line two
+    (def <ws> (r/lit \\space))
+    (def <claim> (r/phrase \"x = 1\"))
+    (def <let-expr> (r/cat (r/phrase \"let\") <ws> <let-expr>))
+    (def <identifier> (r/rep+ r/<ascii-letter>))
+    (def <expr> (r/+ <let-expr> <identifier>))
+    (parse <let-expr> \"number\" nil) ; Line one
+    (parse <let-expr> \"letter\" nil) ; Line two
   In the code above, line one will give a successful
   parse, because the input \"number\" matches
-  -indentifier-.
+  <indentifier-.
       But line two will give a failure. This is because
-  (r/phrase \"let\") will match, but the -ws- after it
-  will not match. Thus, -let-expr- fails. Also, because
-  -let-expr- consumed the first three tokens of \"letter\",
-  the summed rule -expr- will immediately fail without
-  even trying -identifier-.
+  (r/phrase \"let\") will match, but the <ws> after it
+  will not match. Thus, <let-expr> fails. Also, because
+  <let-expr> consumed the first three tokens of \"letter\",
+  the summed rule <expr> will immediately fail without
+  even trying <identifier-.
   
   And so how you use it
   =====================
-  Change -let-expr- to use the following:
-    (r/cat (r/lex (r/phrase \"let\")) -ws- -let-expr-)
+  Change <let-expr> to use the following:
+    (r/cat (r/lex (r/phrase \"let\")) <ws> <let-expr>)
   Now both line one and two will be successful."
   [subrule]
   (fn [state]
@@ -627,7 +627,7 @@
       (let [result (-> state (c/apply rule) :result force)]
         (if (c/failure? result)
           (Reply false (c/Success true state (:error result)))
-          (-> state (c/apply -nothing-) (assoc :error (:error result))))))))
+          (-> state (c/apply <nothing>) (assoc :error (:error result))))))))
 
 (define-fn cascading-rep+ [rule unary-hook binary-hook]
   ; TODO: Rewrite to not blow up stack with many valid tokens
@@ -672,8 +672,8 @@
   [tokens]
   (mapcat lit tokens))
 
-(d/defvar -end-of-input-
-  (anti-peek "the end of input" -anything-)
+(d/defvar <end-of-input>
+  (anti-peek "the end of input" <anything>)
   "The standard end-of-input rule.
   
   *   Success? If there are no tokens left.
@@ -730,12 +730,12 @@
   methods. Only works with `Character`-type tokens.
   
   *   Succeeds? If there is a next token and it's
-      equal to either the lower- or upper-case of
+      equal to either the lower> or upper-case of
       the given `token`.
       *   Product: The consumed token.
       *   Consumes: One token.
   *   Failure? If there are no more tokens or if
-      the next token doesn't equal the upper- or
+      the next token doesn't equal the upper> or
       lower-case of the given `token`."
   [#^Character token]
   (+ (lit (Character/toLowerCase token))
@@ -800,7 +800,7 @@
   [n rule]
   (->> rule (replicate n) (apply cat)))
 
-(define-fn -fetch-context-
+(define-fn <fetch-context>
   "A rule that fetches the current context.
   
   *   Success? Always.
@@ -820,7 +820,7 @@
   [f & args]
   (fn context-altering-rule [state]
     (let [altered-state (apply update-in state [:context] f args)]
-      (c/apply altered-state -fetch-context-))))
+      (c/apply altered-state <fetch-context>))))
 
 (def ascii-digits "0123456789")
 (def lowercase-ascii-alphabet "abcdefghijklmnopqrstuvwxyz")
@@ -871,32 +871,32 @@
   (->> base-36-digit-map (filter #(< (val %) base)) (into {})
     (term* (radix-label base))))
 
-(d/defvar -decimal-digit-
+(d/defvar <decimal-digit>
   (radix-digit 10)
   "A rule matching a single base-10 digit
   character token (i.e. \\0–\\9). Its product
   is the digit's corresponding integer.")
 
-(d/defvar -hexadecimal-digit-
+(d/defvar <hexadecimal-digit>
   (radix-digit 16)
   "A rule matching a single base-16 digit
   character token (i.e. \\0–\\F). Its product
   is the digit's corresponding integer.")
 
-(d/defvar -uppercase-ascii-letter-
+(d/defvar <uppercase-ascii-letter>
   (set-term "an uppercase ASCII letter" uppercase-ascii-alphabet)
   "A rule matching a single uppercase ASCII letter.")
 
-(d/defvar -lowercase-ascii-letter-
+(d/defvar <lowercase-ascii-letter>
   (set-term "a lowercase ASCII letter" lowercase-ascii-alphabet)
   "A rule matching a single lowercase ASCII letter.")
 
-(d/defvar -ascii-letter-
+(d/defvar <ascii-letter>
   (label "an ASCII letter"
-    (+ -uppercase-ascii-letter- -lowercase-ascii-letter-))
-  "A rule matching a single upper- or lower-case ASCII letter.")
+    (+ <uppercase-ascii-letter> <lowercase-ascii-letter>))
+  "A rule matching a single upper> or lower-case ASCII letter.")
 
-(d/defvar -ascii-alphanumeric-
+(d/defvar <ascii-alphanumeric>
   (label "an alphanumeric ASCII character"
-    (+ -ascii-letter- -decimal-digit-))
+    (+ <ascii-letter> <decimal-digit>))
   "A rule matching an ASCII alphanumeric character.")
