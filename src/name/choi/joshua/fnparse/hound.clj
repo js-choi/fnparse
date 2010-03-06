@@ -158,8 +158,10 @@
 
 (define-fn combine
   "Creates a rule combining the given `rule` into the
-  `product-fn`. *Use `cat` or `for` instead* of
-  this function. You *shouldn't have to use this function*
+  `product-fn`.
+  
+  *Use `cat` or `for` instead* of this function.
+  You *shouldn't have to use this function*
   at all, unless you're doing something special.
 
   The product-fn must return a rule when given the
@@ -490,14 +492,14 @@
   [token]
   (term (format "'%s'" token) #(= token %)))
 
-(define-fn anti-lit
-  "Creates a rule of an anti-literal.
+(define-fn antilit
+  "Creates a rule of an antiliteral.
   A shortcut for the term function. It consumes
   one token, and succeeds only if it *does not
   Its product is the consumed token.
   equal* the given token. It fails otherwise.
   It automatically adds an appropriate label
-  (e.g. `(anti-lit \\$)` is labelled
+  (e.g. `(antilit \\$)` is labelled
   `\"anything except '$'\")."
   [token]
   (term (format "anything except '%s'" token) #(not= token %)))
@@ -509,7 +511,7 @@
   (term label-str (set tokens)))
 
 (define-fn antiset-lit
-  "Creates a terminal rule with an anti-set.
+  "Creates a terminal rule with an antiset.
   A shortcut for `(antiterm label-str (set tokens))`."
   [label-str tokens]
   (antiterm label-str (tokens set)))
@@ -610,7 +612,7 @@
         (Reply false result)
         ((prod (:product result)) state)))))
 
-(define-fn anti-peek
+(define-fn antipeek
   "Creates a negative lookahead rule. Checks if
   the given `rule` fails, but doesn't actually
   consume any tokens. You must provide a `label-str`
@@ -623,11 +625,11 @@
       *   Labels: Uses the given `label-str`."
   [label-str rule]
   (label label-str
-    (fn anti-peek-rule [state]
+    (fn antipeek-rule [state]
       (let [result (-> state (c/apply rule) :result force)]
         (if (c/failure? result)
           (Reply false (c/Success true state (:error result)))
-          (-> state (c/apply <nothing>) (assoc :error (:error result))))))))
+          (-> state (c/apply <nothing>)))))))
 
 (define-fn cascading-rep+ [rule unary-hook binary-hook]
   ; TODO: Rewrite to not blow up stack with many valid tokens
@@ -673,7 +675,7 @@
   (mapcat lit tokens))
 
 (d/defvar <end-of-input>
-  (anti-peek "the end of input" <anything>)
+  (antipeek "the end of input" <anything>)
   "The standard end-of-input rule.
   
   *   Success? If there are no tokens left.
@@ -765,7 +767,7 @@
   *   Fails? `minuend` fails or `subtrahend`
       succeeds."
   ([label-str minuend subtrahend]
-   (for [_ (anti-peek label-str subtrahend)
+   (for [_ (antipeek label-str subtrahend)
          product (label label-str minuend)]
      product))
   ([label-str minuend first-subtrahend & rest-subtrahends]

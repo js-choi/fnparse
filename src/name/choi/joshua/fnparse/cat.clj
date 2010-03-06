@@ -49,7 +49,7 @@
   {:get-bank meta
    :set-bank with-meta})
 
-(define-fn- make-state [input context]
+(define-fn make-state [input context]
   (State input 0 context (Bank {} [] {}) nil))
 
 (define-fn parse [rule input context success-fn failure-fn]
@@ -96,13 +96,15 @@
 (define-fn combine [rule product-fn]
   (fn [state]
     (let [{first-error :error, :as first-result} (c/apply state rule)]
+      ;(prn ">" first-result)
       (if (c/success? first-result)
-        (let [next-rule
-                (-> first-result :product product-fn)
-              {next-error :error, :as next-result}
-                (-> first-result :state (c/apply next-rule))]
-          (assoc next-result
-            :error (c/merge-parse-errors first-error next-error)))
+        (let [next-rule (-> first-result :product product-fn)
+              next-result (-> first-result :state (c/apply next-rule))
+              next-error (:error next-result)]
+          ;(prn ">>" next-result)
+          ;(prn ">>>" (c/merge-parse-errors first-error next-error))
+          (assoc next-result :error
+            (c/merge-parse-errors first-error next-error)))
         first-result))))
 
 (define-fn- get-memory [bank subrule state-position]
@@ -215,20 +217,21 @@
           result)))))
 
 (define-fn + [& rules]
-  (remember
-    (fn summed-rule [state]
-      (let [apply-next-rule
-             (fn apply-next-rule [prev-result next-rule]
-               (-> state
-                 (set-bank (get-bank prev-result))
-                 (c/apply next-rule)
-                 (update-in [:error]
-                   #(c/merge-parse-errors (:error prev-result) %))))
-            initial-result (<emptiness> state)
-            results (rest (seq/reductions apply-next-rule
-                            initial-result rules))]
-        #_ (str results) #_ (prn "results" results)
-        (or (seq/find-first c/success? results) (last results))))))
+  (letfn [(merge-result-errors [prev-result next-error]
+            (c/merge-parse-errors (:error prev-result) next-error))
+          (apply-next-rule [state prev-result next-rule]
+            (-> state
+              (set-bank (get-bank prev-result))
+              (c/apply next-rule)
+              (update-in [:error] (partial merge-result-errors prev-result))))]
+    (remember
+      (fn summed-rule [state]
+        (let [apply-next-rule (partial apply-next-rule state)
+              initial-result (<emptiness> state)
+              results (rest (seq/reductions apply-next-rule
+                              initial-result rules))]
+          #_ (str results) #_ (prn "results" results)
+          (or (seq/find-first c/success? results) (last results)))))))
 
 (m/defmonad parser-m
   "The monad that FnParse uses."
@@ -333,13 +336,13 @@
   [token]
   (term (format "'%s'" token) (partial = token)))
 
-(define-fn anti-lit [token]
+(define-fn antilit [token]
   (term (str "anything except " token) #(not= token %)))
 
 (define-fn set-lit [label-str tokens]
   (term label-str (set tokens)))
 
-(define-fn anti-set-lit [label-str tokens]
+(define-fn antiset-lit [label-str tokens]
   (antiterm label-str (tokens set)))
 
 (define-fn cat
@@ -380,18 +383,18 @@
         ((prod (:product result)) state)
         result))))
 
-(define-fn anti-peek
+(define-fn antipeek
   "Creates a rule that does not consume
   any tokens, but fails when the given
   subrule succeeds. On success, the new
   rule's product is always true."
   [rule]
   (label "<not followed by something>"
-    (fn anti-peek-rule [state]
+    (fn antipeek-rule [state]
       (let [result (c/apply state rule)]
         (if (c/failure? result)
           (c/Success true state (:error result))
-          (-> state <nothing> (assoc :error (:error result))))))))
+          (c/apply state <nothing>))))))
 
 (define-fn mapcat [f tokens]
   (->> tokens (map f) (apply cat)))
@@ -415,7 +418,7 @@
   (mapcat lit tokens))
 
 (d/defvar <end-of-input>
-  (label "the end of input" (anti-peek <anything>))
+  (label "the end of input" (antipeek <anything>))
   "WARNING: Because this is an always succeeding,
   always empty rule, putting this directly into a
   rep*/rep+/etc.-type rule will result in an
@@ -456,7 +459,7 @@
   b fails or c succeeds, then nil is simply returned."
   ([label-str minuend subtrahend]
    (label label-str
-     (for [_ (anti-peek subtrahend), product minuend]
+     (for [_ (antipeek subtrahend), product minuend]
        product)))
   ([label-str minuend first-subtrahend & rest-subtrahends]
    (except label-str minuend

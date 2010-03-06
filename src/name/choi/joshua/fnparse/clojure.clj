@@ -72,7 +72,7 @@
 
 (def <comment-indicator> (r/+ (r/lit \;) (r/lex (r/phrase "#!"))))
 
-(def <comment-char> (r/anti-lit \newline))
+(def <comment-char> (r/antilit \newline))
 
 (def <comment> (r/cat <comment-indicator> (r/rep* <comment-char>)))
 
@@ -275,7 +275,7 @@
              \t \tab, \n \newline, \\ \\, \" \")
            <unicode-escape-sequence>))))
 
-(def <normal-string-char> (r/anti-lit \"))
+(def <normal-string-char> (r/antilit \"))
 
 (def <string-char> (r/+ <escaped-char> <normal-string-char>))
 
@@ -391,7 +391,7 @@
 
 (def <unreadable-inner>
   (r/for [_ (r/lit \<)
-          content (r/rep* (r/anti-lit \>))
+          content (r/rep* (r/antilit \>))
           _ (r/opt (r/lit \>))
           _ (r/with-error
               (format "the data in #<%s> is unrecoverable" (str* content)))]
@@ -436,8 +436,7 @@
   (let [{:keys #{ns-name ns-aliases reader-eval?}} (apply hash-map opts)]
     (r/parse <form> input (ClojureContext ns-name ns-aliases nil reader-eval?)
       (fn [product position] product)
-      (fn [error] (throw (Exception. (r/format-parse-error error)))))))
-  
+      (fn [error] (throw (Exception. (r/format-parse-error error)))))))  
 
 ;;; TESTS.
 
