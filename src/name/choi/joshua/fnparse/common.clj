@@ -73,44 +73,6 @@
   [state rule]
   ((force rule) state))
 
-(defn parse
-  "Parses the given input using the given rule.
-  *Use the parse function in fnparse.cat or fnparse.hound
-  in preference to this function.*
-  make-state: A function to create a state for the rule
-              from the given input and context.
-  rule: The rule. It must accept whatever state that
-        make-state returns.
-  input: The sequence of tokens to parse.
-  context: The initial context for the rule.
-  success-fn: A function called when the rule matches
-              the input.
-              (success-fn final-product final-position) is
-              called.
-  failure-fn: A function called when the rule does not
-              match the input.
-              (failure-fn final-error) is called."
-  [make-state rule input context success-fn failure-fn]
-  (let [state (make-state input context)
-        result (-> state (apply rule) answer-result)]
-    (if (failure? result)
-      (failure-fn (:error result))
-      (success-fn (:product result) (-> result :state position)))))
-
-(defn merge-parse-errors
-  "Merges two Errors together. If the two errors are at the same
-  position, their descriptors are combined. If one of the errors
-  is at a further position than the other, than that first error
-  is returned instead."
-  [error-a error-b]
-  (let [{position-a :position, descriptors-a :descriptors} error-a
-        {position-b :position, descriptors-b :descriptors} error-b]
-    (cond
-      (or (> position-b position-a) (empty? descriptors-a)) error-b
-      (or (< position-b position-a) (empty? descriptors-b)) error-a
-      true (assoc error-a :descriptors
-             (set/union descriptors-a descriptors-b)))))
-
 (defn format-parse-error-data
   "Returns a formatted string with the given error data.
   The descriptor map should be returned from group-descriptors."
@@ -139,6 +101,68 @@
   [error]
   (let [{:keys #{position descriptors}} error]
     (format-parse-error-data position (group-descriptors descriptors))))
+
+(defn print-success [input context product position]
+  (printf
+    "PARSE SUCCESS
+=============
+* Input: %s
+* Initial context: %s
+* Final product: %s
+* Final product type: %s
+* Final position: %s
+"
+    (pr-str input) (pr-str context) (pr-str product) (type product) position))
+
+(defn print-failure [input context error]
+  (printf
+    "PARSE FAILURE
+=============
+* Input: %s
+* Initial context: %s
+* Error: %s
+"
+    (pr-str input) (pr-str context) error))
+
+(defn parse
+  "Parses the given input using the given rule.
+  *Use the parse function in fnparse.cat or fnparse.hound
+  in preference to this function.*
+  make-state: A function to create a state for the rule
+              from the given input and context.
+  rule: The rule. It must accept whatever state that
+        make-state returns.
+  input: The sequence of tokens to parse.
+  context: The initial context for the rule.
+  success-fn: A function called when the rule matches
+              the input.
+              (success-fn final-product final-position) is
+              called.
+  failure-fn: A function called when the rule does not
+              match the input.
+              (failure-fn final-error) is called."
+  [make-state rule input context success-fn failure-fn]
+  (let [success-fn (or success-fn (partial print-success input context))
+        failure-fn (or failure-fn (partial print-failure input context))
+        state (make-state input context)
+        result (-> state (apply rule) answer-result)]
+    (if (failure? result)
+      (failure-fn (:error result))
+      (success-fn (:product result) (-> result :state position)))))
+
+(defn merge-parse-errors
+  "Merges two Errors together. If the two errors are at the same
+  position, their descriptors are combined. If one of the errors
+  is at a further position than the other, than that first error
+  is returned instead."
+  [error-a error-b]
+  (let [{position-a :position, descriptors-a :descriptors} error-a
+        {position-b :position, descriptors-b :descriptors} error-b]
+    (cond
+      (or (> position-b position-a) (empty? descriptors-a)) error-b
+      (or (< position-b position-a) (empty? descriptors-b)) error-a
+      true (assoc error-a :descriptors
+             (set/union descriptors-a descriptors-b)))))
 
 (defn match-assert-expr
   "The function that's used for (is (match? ...)) forms in

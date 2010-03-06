@@ -3,7 +3,8 @@
             [clojure.contrib.seq :as seq]
             [clojure.contrib.monads :as m]
             [clojure.template :as t]
-            [clojure.contrib.def :as d])
+            [clojure.contrib.def :as d]
+            [clojure.contrib.except :as except])
   (:refer-clojure :rename {defn define-fn, defn- define-fn-, mapcat seq-mapcat}
                   :exclude #{for + peek})
   (:import [clojure.lang IPersistentMap]))
@@ -33,9 +34,14 @@
       the input. `(success-fn final-product final-position)`
       is called.
   *   `failure-fn`: A function called when the rule does not
-      match the input. `(failure-fn final-error)` is called."
-  [rule input context success-fn failure-fn]
-  (c/parse make-state rule input context success-fn failure-fn))
+      match the input. `(failure-fn final-error)` is called.
+  
+  If `success-fn` and `failure-fn` aren't included, then
+  parse will print out a report of the parsing result."
+  ([rule input context success-fn failure-fn]
+   (c/parse make-state rule input context success-fn failure-fn))
+  ([rule input context]
+   (parse rule input context nil nil)))
 
 (define-fn format-parse-error [error]
   (c/format-parse-error error))
@@ -373,7 +379,7 @@
   [pred message rule]
   (validate (complement pred) message rule))
 
-(define-fn- term>
+(define-fn- term-
   "All terminal rules, including `term` and
   `term*`, are based on this function."
   [pred-product? label-str f]
@@ -426,13 +432,13 @@
     of the predicate to be the rule's product instead of
     the token itself, use `term*`."
   [label-str predicate]
-  (term> false label-str predicate))
+  (term- false label-str predicate))
 
 (define-fn term*
   "Exactly like term, only its product is the result of
   `(f token)` rather than `token`."
   [label-str f]
-  (term> true label-str f))
+  (term- true label-str f))
 
 (define-fn antiterm
   "Exactly like term, only uses the complement of the
@@ -631,6 +637,14 @@
           (Reply false (c/Success true state (:error result)))
           (-> state (c/apply <nothing>)))))))
 
+(define-fn- apply-reply-and-rule [f prev-reply next-rule]
+  (c/apply nil
+    (combine (constantly prev-reply)
+      (fn [prev-product]
+        (combine next-rule
+          (fn [next-product]
+            (prod (f prev-product next-product))))))))
+
 (define-fn cascading-rep+ [rule unary-hook binary-hook]
   ; TODO: Rewrite to not blow up stack with many valid tokens
   (for [first-token rule
@@ -639,13 +653,32 @@
       (unary-hook first-token)
       (binary-hook first-token rest-tokens))))
 
-(define-fn rep+ [rule]
-  ; TODO: Rewrite to not blow up stack with many valid tokens
-  (cascading-rep+ rule list cons))
+(define-fn- hooked-rep- [reduced-fn initial-product-fn rule]
+  (let [apply-reduced-fn (partial apply-reply-and-rule reduced-fn)]
+    (fn hooked-repeating-rule [state]
+      (let [initial-product (initial-product-fn)
+            first-fn (partial reduced-fn initial-product)
+            first-reply (c/apply state (hook first-fn rule))]
+        (if (:tokens-consumed? first-reply)
+          (Reply true
+            (delay
+              (let [[last-success first-failure]
+                    (->> rule repeat
+                      (seq/reductions apply-reduced-fn first-reply)
+                      (partition 2 1)
+                      (take-while #(-> % first :result force c/success?))
+                      last)]
+                (-> last-success :result force
+                  (assoc :error (-> first-failure :result force :error))))))
+          (if (-> first-reply :result force c/success?)
+            (except/throwf "empty rules cannot be greedily repeated")
+            first-reply))))))
 
-; (define-fn rep* [rule]
-;   (with-monad parser-m
-;     (m-seq-while (complement failure?) (repeat 10 rule))))
+(define-fn hooked-rep [f initial-product rule]
+  (hooked-rep- f (constantly initial-product) rule))
+
+(define-fn rep+ [rule]
+  (->> rule (hooked-rep- conj! #(transient [])) (hook persistent!)))
 
 (define-fn rep* [rule]
   (opt (rep+ rule)))

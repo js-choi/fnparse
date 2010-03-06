@@ -2,8 +2,9 @@
   (:require [name.choi.joshua.fnparse.hound :as r]
             [clojure.template :as t] [clojure.set :as set]
             [clojure.contrib.seq :as seq]
+            [clojure.contrib.except :as except]
             name.choi.joshua.fnparse.hound.test)
-  (:use [clojure.test :only #{deftest is run-tests}])
+  (:use [clojure.test :only #{set-test is run-tests}])
   (:refer-clojure :exclude #{read-string})
   (:import [clojure.lang IPersistentMap]))
 
@@ -181,7 +182,7 @@
 ;; Numbers.
 
 (r/defn radix-natural-number [base]
-  (r/cascading-rep+ (r/radix-digit base) identity #(+ (* base %1) %2)))
+  (r/hooked-rep #(+ (* base %1) %2) 0 (r/radix-digit base)))
 
 (def <decimal-natural-number>
   (radix-natural-number 10))
@@ -371,7 +372,7 @@
           _ (r/lit \))]
     (let [anonymous-fn-context (:anonymous-fn-context post-context)
           parameters (make-parameter-vector anonymous-fn-context)]
-      (list `fn 'anonymous-fn parameters content))))
+      (list `fn 'anonymous-fn parameters (apply list content)))))
 
 ;; Regex patterns, EvalReaders, and unreadables.
 
@@ -400,8 +401,8 @@
 ;; All forms put together. (Order matters for lexed rules.)
 
 (def <dispatched-inner>
-  (r/+ <anonymous-fn-inner> <set-inner> <var-inner> <with-meta-inner> <pattern-inner>
-       <evaluated-inner> <unreadable-inner>))
+  (r/+ <anonymous-fn-inner> <set-inner> <var-inner> <with-meta-inner>
+       <pattern-inner> <evaluated-inner> <unreadable-inner>))
 
 (def <dispatched>
   (r/prefix (r/lit \#) <dispatched-inner>))
@@ -430,17 +431,20 @@
               to (ns-aliases *ns*).
   reader-eval?: A boolean. If logical true, allows
                 ReaderEval forms (i.e. #=(...)),
-                which can be a security hole.
+                which can create security holes.
                 Defaults to *read-eval*."
   [input & opts]
   (let [{:keys #{ns-name ns-aliases reader-eval?}} (apply hash-map opts)]
     (r/parse <form> input (ClojureContext ns-name ns-aliases nil reader-eval?)
       (fn [product position] product)
-      (fn [error] (throw (Exception. (r/format-parse-error error)))))))  
+      (fn [error]
+        (except/throwf "FnParse parsing error: %s"
+          (r/format-parse-error error))))))
 
 ;;; TESTS.
 
-(deftest various-rules
+(set-test <form>
+  (is (match? <form> "123" :product? #(== % 123)))
   (is (match? <form> "55.2e2" :product? #(== % 5520.)))
   (is (match? <form> "16r3AF" :product? #(== % 943)))
   (is (match? <form> "16." :product? #(== % 16.)))
@@ -493,7 +497,9 @@
   (is (non-match? <form> "#<java.lang.String@35235>"
         :position 25
         :labels #{}
-        :messages #{"the data in #<java.lang.String@35235> is unrecoverable"}))
+        :messages #{"the data in #<java.lang.String@35235> is unrecoverable"})))
+
+(set-test read-string
   (is (= (read-string "[3 2 5]") [3 2 5])))
 
-(run-tests)
+#_ (run-tests)
