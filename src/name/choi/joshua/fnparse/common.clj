@@ -71,7 +71,7 @@
 (defn apply
   "Applies the given rule to the given state."
   [state rule]
-  ((force rule) state))
+  (rule state))
 
 (defn format-parse-error-data
   "Returns a formatted string with the given error data.

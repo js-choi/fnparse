@@ -202,9 +202,9 @@
             [(+ (* next-digit multiplier) prev-num) (/ multiplier 10)])]
     (p/prefix
       (p/lit \.)
-      (p/+ (->> r/<decimal-digit>
-             (r/hooked-rep reduce-digit-accumulator [0 0.1])
-             (r/hook #(partial + (get % 0))))
+      (p/+ (->> p/<decimal-digit>
+             (p/hooked-rep reduce-digit-accumulator [0 0.1])
+             (p/hook #(partial + (get % 0))))
            (p/hook #(partial + (/ % 10.)) <decimal-natural-number>)
            <empty-number-tail>))))
 

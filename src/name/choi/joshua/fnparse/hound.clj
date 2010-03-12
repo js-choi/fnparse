@@ -139,23 +139,28 @@
         (apply str (str original-doc rule-doc-summary-header "\n")))
       original-doc)))
 
-(defmacro defr
-  ([rule-name form] `(defr ~rule-name nil ~form))
-  ([rule-name doc-string form] `(defr ~rule-name ~doc-string nil ~form))
+(defmacro defrule
+  ([rule-name form] `(defrule ~rule-name nil ~form))
+  ([rule-name doc-string form] `(defrule ~rule-name ~doc-string nil ~form))
   ([rule-name doc-string meta-opts form]
   `(let [rule-var# (d/defvar ~rule-name ~form ~doc-string)]
-     (alter-meta! rule-var# update-in [:doc] rule-doc-str ~meta-opts))))
+     (alter-meta! rule-var# update-in [:doc] rule-doc-str ~meta-opts)
+     rule-var#)))
 
-(letfn [(delayify [f] (fn [& args] (delay (force (apply f args)))))]
-  (defmacro defmaker
-    "Creates a rule-making function. Use this instead of
-    `clojure.core/defmaker` whenever you make a rule-making
-    function. (It does other stuff like memoization and
-    delaying and stuff.)"
-    [fn-name & forms]
-   `(do (d/defn-memo ~fn-name ~@forms)
-        (alter-var-root (var ~fn-name) ~delayify)
-        (var ~fn-name))))
+(defmacro defmaker
+  "Creates a rule-making function. Use this instead of
+  `clojure.core/defmaker` whenever you make a rule-making
+  function. (It does other stuff like memoization and
+  delaying and stuff.)"
+  [fn-name & forms]
+ `(let [maker-var# (defn ~fn-name ~@forms)]
+    (alter-var-root maker-var# identity)
+    ; Add extended documentation.
+    (alter-meta! maker-var# update-in [:doc] rule-doc-str (meta maker-var#))
+    ; Memoize unless the :no-memoize meta flag is true.
+    (if-not (:no-memoize? (meta maker-var#))
+      (alter-var-root maker-var# memoize))
+    maker-var#))
 
 (defmacro defmaker-
   "Like `defmaker`, but also makes the var private."
@@ -473,7 +478,7 @@
   [label-str pred]
   (term label-str (complement pred)))
 
-(defr <anything>
+(defrule <anything>
   "The generic terminal rule that matches any one token."
   {:success "If there are any tokens left."
    :failure "If it's at the end of input."
@@ -726,7 +731,7 @@
   [tokens]
   (mapcat lit tokens))
 
-(defr <end-of-input>
+(defrule <end-of-input>
   "The standard end-of-input rule."
   {:success "If there are no tokens left."
    :failure "If there are any tokens left."
@@ -878,9 +883,8 @@
 (def ascii-digits "0123456789")
 (def lowercase-ascii-alphabet "abcdefghijklmnopqrstuvwxyz")
 (def uppercase-ascii-alphabet
-  (map #(Character/toUpperCase %) lowercase-ascii-alphabet))
+  (map #(Character/toUpperCase (char %)) lowercase-ascii-alphabet))
 (def base-36-digits (concat ascii-digits lowercase-ascii-alphabet))
-(set! *warn-on-reflection* true)
 (def base-36-digit-map
   (letfn [(digit-entries [[index digit-char]]
             (let [digit-char (char digit-char)]
@@ -911,53 +915,51 @@
   digits beyond \\Z (which corresponds to 36).
   
   The rules `-decimal-digit-` and
-  `-hexadecimal-digit-` are already provided.
-  
-  *   Success? If the next token is a digit
-      character in the given `base`'s number
-      system.
-      *   Product: The digit's corresponding
-          integer.
-      *   Consumes: One token."
+  `-hexadecimal-digit-` are already provided."
+  {:success "If the next token is a digit
+    character in the given `base`'s number
+    system."
+   :product "The digit's corresponding integer."
+   :consumes "One Character."}
   [base]
   {:pre #{(integer? base) (> base 0)}}
   (->> base-36-digit-map (filter #(< (val %) base)) (into {})
     (term* (radix-label base))))
 
-(defr <decimal-digit>
+(defrule <decimal-digit>
   "A rule matching a single base-10 digit
   character token (i.e. \\0 through \\9)."
   {:product "The matching digit's corresponding Integer object, 0 through 9."
    :consumes "One character."}
   (radix-digit 10))
 
-(defr <hexadecimal-digit>
+(defrule <hexadecimal-digit>
   "A rule matching a single base-16 digit
   character token (i.e. \\0 through \\F)."
   {:product "The matching digit's corresponding Integer object, 0 through 15."
    :consumes "One character."}
   (radix-digit 16))
 
-(defr <uppercase-ascii-letter>
+(defrule <uppercase-ascii-letter>
   "A rule matching a single uppercase ASCII letter."
   {:product "The matching character itself."
    :consumes "One Character."}
   (set-term "an uppercase ASCII letter" uppercase-ascii-alphabet))
 
-(defr <lowercase-ascii-letter>
+(defrule <lowercase-ascii-letter>
   "A rule matching a single lowercase ASCII letter."
   {:product "The matching character itself."
    :consumes "One Character."}
   (set-term "a lowercase ASCII letter" lowercase-ascii-alphabet))
 
-(defr <ascii-letter>
+(defrule <ascii-letter>
   "A rule matching a single uppercase or lowercase ASCII letter."
   {:product "The matching character itself."
    :consumes "One Character."}
   (label "an ASCII letter"
     (+ <uppercase-ascii-letter> <lowercase-ascii-letter>)))
 
-(defr <ascii-digit>
+(defrule <ascii-digit>
   "A rule matching a single ASCII numeric digit. You may
   want to use instead `decimal-digit`, which automatically
   converts digits to Integer objects."
@@ -965,7 +967,7 @@
    :consumes "One Character."}
   (set-term "an ASCII digit" ascii-digits))
 
-(defr <ascii-alphanumeric>
+(defrule <ascii-alphanumeric>
   "A rule matching a single alphanumeric ASCII letter."
   {:product "The matching character itself."
    :consumes "One Character."}
