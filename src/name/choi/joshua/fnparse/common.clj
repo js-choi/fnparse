@@ -6,7 +6,7 @@
   {:author "Joshua Choi"}
   (:require [clojure.contrib.string :as str] [clojure.template :as temp]
             [clojure.set :as set] [clojure.test :as test]
-            [clojure.contrib.seq :as seq])
+            [clojure.contrib.seq :as seq] [clojure.contrib.monads :as m])
   (:refer-clojure :rename {apply apply-seq})
   (:import [clojure.lang IPersistentMap]))
 

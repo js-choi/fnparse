@@ -348,7 +348,7 @@
   For examples of for rules, check the example
   libraries like `fnparse.clojure`.
   
-  This macro is equivalent to the domonad form of
+  This macro is equivalent to the `domonad` form of
   the parser monad."
   ([label-str steps product-expr]
    `(->> (for ~steps ~product-expr) (label ~label-str)))
@@ -578,7 +578,7 @@
     (def <ws> (r/lit \\space))
     (def <claim> (r/phrase \"x = 1\"))
     (def <let-expr> (r/cat (r/phrase \"let\") <ws> <let-expr>))
-    (def <identifier> (r/rep+ r/<ascii-letter>))
+    (def <identifier> (r/rep r/<ascii-letter>))
     (def <expr> (r/+ <let-expr> <identifier>))
     (parse <let-expr> \"number\" nil) ; Line one
     (parse <let-expr> \"letter\" nil) ; Line two
@@ -645,14 +645,6 @@
           (fn [next-product]
             (prod (f prev-product next-product))))))))
 
-(define-fn cascading-rep+ [rule unary-hook binary-hook]
-  ; TODO: Rewrite to not blow up stack with many valid tokens
-  (for [first-token rule
-        rest-tokens (opt (cascading-rep+ rule unary-hook binary-hook))]
-    (if (nil? rest-tokens)
-      (unary-hook first-token)
-      (binary-hook first-token rest-tokens))))
-
 (define-fn- hooked-rep- [reduced-fn initial-product-fn rule]
   (let [apply-reduced-fn (partial apply-reply-and-rule reduced-fn)]
     (fn hooked-repeating-rule [state]
@@ -677,11 +669,11 @@
 (define-fn hooked-rep [f initial-product rule]
   (hooked-rep- f (constantly initial-product) rule))
 
-(define-fn rep+ [rule]
+(define-fn rep [rule]
   (->> rule (hooked-rep- conj! #(transient [])) (hook persistent!)))
 
 (define-fn rep* [rule]
-  (opt (rep+ rule)))
+  (opt (rep rule)))
 
 (define-fn mapcat
   "Returns the result of applying `cat` to the

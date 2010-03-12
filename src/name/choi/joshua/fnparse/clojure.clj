@@ -84,7 +84,7 @@
 
 (def <ws>
   (r/label "whitespace"
-    (r/rep+ (r/+ <normal-ws-char> <comment> <discarded>))))
+    (r/rep (r/+ <normal-ws-char> <comment> <discarded>))))
 
 (def <opt-ws> (r/opt <ws>))
 
@@ -111,7 +111,7 @@
     (r/+ <symbol-first-char> r/<decimal-digit>)))
 
 (def <symbol-char-series>
-  (r/hook str* (r/rep+ <symbol-char>)))
+  (r/hook str* (r/rep <symbol-char>)))
 
 (def <symbol-end>
   (r/annotate-error annotate-symbol-end <form-end>))
@@ -199,7 +199,8 @@
   (r/prefix
     (r/lit \.)
     (r/+ (r/hook #(partial + %)
-           (r/cascading-rep+ r/<decimal-digit> #(/ % 10) #(/ (+ %1 %2) 10)))
+           (r/hooked-rep #(/ 
+           #_(r/cascading-rep r/<decimal-digit> #(/ % 10) #(/ (+ %1 %2) 10)))
          <empty-number-tail>)))
 
 (def <exponential-part>
@@ -502,4 +503,4 @@
 (set-test read-string
   (is (= (read-string "[3 2 5]") [3 2 5])))
 
-#_ (run-tests)
+(run-tests)
