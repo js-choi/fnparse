@@ -5,7 +5,7 @@
             [clojure.template :as t]
             [clojure.contrib.def :as d]
             [clojure.contrib.except :as except])
-  (:refer-clojure :rename {defn define-fn, defn- define-fn-, mapcat seq-mapcat}
+  (:refer-clojure :rename {mapcat seq-mapcat}
                   :exclude #{for + peek})
   (:import [clojure.lang IPersistentMap]))
 
@@ -18,12 +18,12 @@
   IPersistentMap
   c/AParseAnswer (answer-result [] (-> this :result force)))
 
-(define-fn make-state
+(defn make-state
   "Creates a state with the given remainder and context."
   [remainder context]
   (State remainder 0 context))
 
-(define-fn parse
+(defn parse
   "The general parsing function of FnParse Hound.
   
   *   `rule`: The rule. It must accept whatever state that
@@ -43,26 +43,26 @@
   ([rule input context]
    (parse rule input context nil nil)))
 
-(define-fn format-parse-error [error]
+(defn format-parse-error [error]
   (c/format-parse-error error))
 
-(define-fn merge-replies [mergee merger]
+(defn merge-replies [mergee merger]
   (assoc merger :result
     (update-in (-> merger :result force) [:error]
       c/merge-parse-errors (-> mergee :result force :error))))
 
-(define-fn prod
+(defn prod
   "Creates a product rule.
   *   Succeeds? Always.
       *   Product: The given `product`.
       *   Consumes: Zero tokens.
   *   Fails? Never.
   
-  Use the :let modifier in preference to this function
+  Use the `:let` modifier in preference to this function
   when you use this inside rule comprehensions with the
   for macro.
   
-  Is the result monadic function of the parser monad."
+  Is the result monadic function of the `parser-m` monad."
   [product]
   (fn prod-rule [state]
     (Reply false
@@ -79,7 +79,7 @@
   
   Happens to be equivalent to `(prod nil)`.")
 
-(define-fn- make-failed-reply
+(defn- make-failed-reply
   "Used to create replies containing failures."
   ([state descriptors]
    (make-failed-reply state (first (:remainder state)) descriptors))
@@ -92,7 +92,7 @@
   #{(c/ErrorDescriptor :label "absolutely nothing")}
   "The error descriptors that `-nothing-` uses.")
 
-(define-fn <nothing>
+(defn <nothing>
   "The general failing rule.
   
   *   Succeeds? Never.
@@ -107,7 +107,7 @@
   [state]
   (make-failed-reply state nothing-descriptors))
 
-(define-fn with-error
+(defn with-error
   "Creates an always-failing rule with the given
   message. Use this in preference to <nothing-.
   
@@ -119,10 +119,16 @@
   (fn with-error-rule [state]
     (make-failed-reply state #{(c/ErrorDescriptor :message message)})))
 
+(defmacro defr
+  ([rule-name form] (defr rule-name ))
+  ([rule-name doc-string form] (defr rule-name doc-string nil form))
+  ([rule-name doc-string opts form]
+   
+
 (letfn [(delayify [f] (fn [& args] (delay (force (apply f args)))))]
-  (defmacro defn
+  (defmacro defmaker
     "Creates a rule-making function. Use this instead of
-    `clojure.core/defn` whenever you make a rule-making
+    `clojure.core/defmaker` whenever you make a rule-making
     function. (It does other stuff like memoization and
     delaying and stuff.)"
     [fn-name & forms]
@@ -130,12 +136,12 @@
         (alter-var-root (var ~fn-name) ~delayify)
         (var ~fn-name))))
 
-(defmacro defn-
-  "Like `defn`, but also makes the var private."
+(defmacro defmaker-
+  "Like `defmaker`, but also makes the var private."
   [fn-name & forms]
-  (list* `defn (vary-meta fn-name assoc :private true) forms))
+  (list* `defmaker (vary-meta fn-name assoc :private true) forms))
 
-(defn only-when
+(defmaker only-when
   "Creates a maybe-failing rule.
   
   *   Succeeds? Only if the given `valid?` is
@@ -162,7 +168,7 @@
   [valid? message]
   (if-not valid? (with-error message) (prod valid?)))
 
-(define-fn combine
+(defn combine
   "Creates a rule combining the given `rule` into the
   `product-fn`.
   
@@ -213,7 +219,7 @@
                         (c/merge-parse-errors first-error next-error))))))
               (Reply false first-result))))))))
 
-(defn +
+(defmaker +
   "Creates a summed rule.
   
   Adds the given sub-rules together, forming a new rule.
@@ -274,7 +280,7 @@
    m-bind combine
    m-plus +])
 
-(define-fn label
+(defn label
   "Creates a labelled rule.
   
   Labels the given rule with the given string, returning
@@ -355,7 +361,7 @@
   ([steps product-expr]
   `(m/domonad parser-m ~steps ~product-expr)))
 
-(define-fn validate
+(defn validate
   "Creates a validating rule.
   
   A convenience function. Returns a new rule that
@@ -373,13 +379,13 @@
   (for [product rule, _ (only-when (pred product) message)]
     product))
 
-(define-fn antivalidate
+(defn antivalidate
   "Exactly like the validate function, except that
   it uses the complement of pred instead."
   [pred message rule]
   (validate (complement pred) message rule))
 
-(define-fn- term-
+(defn- term-
   "All terminal rules, including `term` and
   `term*`, are based on this function."
   [pred-product? label-str f]
@@ -398,7 +404,7 @@
               (make-failed-reply state first-token nil)))
           (make-failed-reply state ::c/end-of-input nil))))))
 
-(define-fn term
+(defn term
   "Creates a terminal rule.
   
   The new rule either consumes one token or fails.
@@ -434,13 +440,13 @@
   [label-str predicate]
   (term- false label-str predicate))
 
-(define-fn term*
+(defn term*
   "Exactly like term, only its product is the result of
   `(f token)` rather than `token`."
   [label-str f]
   (term- true label-str f))
 
-(define-fn antiterm
+(defn antiterm
   "Exactly like term, only uses the complement of the
   given predicate instead."
   [label-str pred]
@@ -454,7 +460,7 @@
       *   Consumes: One token.
   *   Failure: If it's at the end of input.")
 
-(define-fn hook
+(defn hook
   "Creates a rule with a semantic hook.
   A shortcut for the `for` macro.
   
@@ -465,7 +471,7 @@
   [semantic-hook rule]
   (for [product rule] (semantic-hook product)))
 
-(define-fn chook
+(defn chook
   "Creates a rule with a constant semantic hook.
   A shortcut for the for macro. The name
   stands for 'constant-hook'. It's exactly like
@@ -479,7 +485,7 @@
   [product subrule]
   (for [_ subrule] product))
 
-(define-fn lit
+(defn lit
   "Creates a rule of a literal. A shortcut for
   the term function. It automatically adds an
   appropriate label.
@@ -498,7 +504,7 @@
   [token]
   (term (format "'%s'" token) #(= token %)))
 
-(define-fn antilit
+(defn antilit
   "Creates a rule of an antiliteral.
   A shortcut for the term function. It consumes
   one token, and succeeds only if it *does not
@@ -510,19 +516,19 @@
   [token]
   (term (format "anything except '%s'" token) #(not= token %)))
 
-(define-fn set-term
+(defn set-term
   "Creates a terminal rule with a set.
   A shortcut for `(term label-str (set tokens))`."
   [label-str tokens]
   (term label-str (set tokens)))
 
-(define-fn antiset-lit
+(defn antiset-lit
   "Creates a terminal rule with an antiset.
   A shortcut for `(antiterm label-str (set tokens))`."
   [label-str tokens]
   (antiterm label-str (tokens set)))
 
-(define-fn cat
+(defn cat
   "Creates a concatenated rule out of many given `rules`.
   
   *   Success: All given `rules` succeed, one after another.
@@ -538,12 +544,12 @@
   (m/with-monad parser-m
     (m/m-seq rules)))
 
-(define-fn vcat
+(defn vcat
   "Exactly like cat, only applies vec to its product."
   [& subrules]
   (hook vec (apply cat subrules)))
 
-(define-fn opt
+(defn opt
   "Creates an optional rule. The new rule
   always succeeds. It is equivalent to the
   sum of the given rule and `-emptiness-`.
@@ -558,7 +564,7 @@
   [rule]
   (+ rule <emptiness>))
 
-(define-fn lex
+(defn lex
   "Creates a lexical rule.
   You use this whenever you want the lexer to
   *backtrack* when it fails, *even* if it consumes
@@ -602,7 +608,7 @@
     (-> state subrule
       (assoc :tokens-consumed? false))))
 
-(define-fn peek
+(defn peek
   "Creates a lookahead rule. Checks if the given
   `rule` succeeds, but doesn't actually consume
   any tokens.
@@ -618,7 +624,7 @@
         (Reply false result)
         ((prod (:product result)) state)))))
 
-(define-fn antipeek
+(defn antipeek
   "Creates a negative lookahead rule. Checks if
   the given `rule` fails, but doesn't actually
   consume any tokens. You must provide a `label-str`
@@ -637,7 +643,7 @@
           (Reply false (c/Success true state (:error result)))
           (-> state (c/apply <nothing>)))))))
 
-(define-fn- apply-reply-and-rule [f prev-reply next-rule]
+(defn- apply-reply-and-rule [f prev-reply next-rule]
   (c/apply nil
     (combine (constantly prev-reply)
       (fn [prev-product]
@@ -645,7 +651,7 @@
           (fn [next-product]
             (prod (f prev-product next-product))))))))
 
-(define-fn- hooked-rep- [reduced-fn initial-product-fn rule]
+(defn- hooked-rep- [reduced-fn initial-product-fn rule]
   (let [apply-reduced-fn (partial apply-reply-and-rule reduced-fn)]
     (fn hooked-repeating-rule [state]
       (let [initial-product (initial-product-fn)
@@ -666,16 +672,16 @@
             (except/throwf "empty rules cannot be greedily repeated")
             first-reply))))))
 
-(define-fn hooked-rep [f initial-product rule]
+(defn hooked-rep [f initial-product rule]
   (hooked-rep- f (constantly initial-product) rule))
 
-(define-fn rep [rule]
+(defn rep [rule]
   (->> rule (hooked-rep- conj! #(transient [])) (hook persistent!)))
 
-(define-fn rep* [rule]
+(defn rep* [rule]
   (opt (rep rule)))
 
-(define-fn mapcat
+(defn mapcat
   "Returns the result of applying `cat` to the
   result of applying map to `f` and `colls`.
   Use the `phrase` function instead of this
@@ -683,7 +689,7 @@
   [f & token-colls]
   (->> token-colls (apply map f) (apply cat)))
 
-(define-fn mapsum
+(defn mapsum
   "Returns the result of applying `+` to the
   result of applying map to `f` and `colls`.
   Use the `set-term` function instead of this
@@ -691,7 +697,7 @@
   [f & token-colls]
   (->> token-colls (apply map f) (apply +)))
 
-(define-fn phrase
+(defn phrase
   "Returns a phrase rule, which succeeds
   only when the next few tokens all
   consecutively match the given tokens.
@@ -708,7 +714,7 @@
       *   Consumes: Zero tokens.
   *   Failure? If there are any tokens left.")
 
-(define-fn prefix
+(defn prefix
   "Creates a prefixed rule. Use when you want to
   concatenate two rules, but you don't care about
   the first rule's product.
@@ -718,7 +724,7 @@
   [prefix-rule body-rule]
   (for [_ prefix-rule, content body-rule] content))
 
-(define-fn suffix [body-rule suffix-rule]
+(defn suffix [body-rule suffix-rule]
   "Creates a suffixed rule. Use when you want to
   concatenate two rules, but you don't care about
   the second rule's product.
@@ -727,7 +733,7 @@
     (for [content body-rule, _ suffix-rule] content)."
   (for [content body-rule, _ suffix-rule] content))
 
-(define-fn circumfix
+(defn circumfix
   "Creates a circumfixed rule. Use when you want to
   concatenate three rules, but you don't care about
   the first and third rules' products.
@@ -737,7 +743,7 @@
   [prefix-rule body-rule suffix-rule]
   (prefix prefix-rule (suffix body-rule suffix-rule)))
 
-(define-fn separated-rep [separator element]
+(defn separated-rep [separator element]
   (for [first-element element
         rest-elements (rep* (prefix separator element))]
     (cons first-element rest-elements)))
@@ -751,7 +757,7 @@
    `(+ ~@(map (fn [a] (t/apply-template argv expr a))
            (partition c values)))))
 
-(define-fn case-insensitive-lit
+(defn case-insensitive-lit
   "Creates a case-insensitive rule using Java's
   `Character/toLowerCase` and `Character/toUpperCase`
   methods. Only works with `Character`-type tokens.
@@ -768,7 +774,7 @@
   (+ (lit (Character/toLowerCase token))
      (lit (Character/toUpperCase token))))
 
-(define-fn effects
+(defn effects
   "Creates a side-effect rule. Applies the given
   arguments to the given function.
   
@@ -780,7 +786,7 @@
   (fn effects-rule [state]
     (c/apply state (prod (apply f args)))))
 
-(define-fn except
+(defn except
   "Creates a subtracted rule. Matches using
   the given minuend rule, but only when the
   subtrahend rule does not also match.
@@ -799,7 +805,7 @@
    (except label-str minuend
      (apply + (cons first-subtrahend rest-subtrahends)))))
 
-(define-fn annotate-error
+(defn annotate-error
   "Creates an error-annotating rule. Whenever
   the given `rule` fails, the error is passed
   into the `message-fn` function. This can be
@@ -821,13 +827,13 @@
       (let [reply (c/apply state rule)]
         (update-in reply [:result] annotate)))))
 
-(define-fn factor=
+(defn factor=
   "Creates a non-greedy repetition rule.
   Concatenates the given `rule` to itself `n` times."
   [n rule]
   (->> rule (replicate n) (apply cat)))
 
-(define-fn <fetch-context>
+(defn <fetch-context>
   "A rule that fetches the current context.
   
   *   Success? Always.
@@ -837,7 +843,7 @@
   [state]
   (c/apply state (prod (:context state))))
 
-(define-fn alter-context
+(defn alter-context
   "A rule that alters the curent context.
   
   *   Success? Always.
@@ -862,7 +868,7 @@
                [(Character/toLowerCase digit-char) index]]))]
     (->> base-36-digits seq/indexed (seq-mapcat digit-entries) (into {}))))
 
-(define-fn radix-label
+(defn radix-label
   "The function used by radix-digit to smartly
   create digit labels for the given `base`."
   [base]
@@ -873,7 +879,7 @@
     2 "a binary digit"
     (format "a base-%s digit" base)))
 
-(defn radix-digit
+(defmaker radix-digit
   "Returns a rule that accepts one digit character
   token in the number system with the given `base`.
   For instance, `(radix-digit 12)` is a rule

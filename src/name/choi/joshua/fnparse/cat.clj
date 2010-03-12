@@ -52,10 +52,39 @@
 (define-fn make-state [input context]
   (State input 0 context (Bank {} [] {}) nil))
 
-(define-fn parse [rule input context success-fn failure-fn]
-  (c/parse make-state rule input context success-fn failure-fn))
+(define-fn parse
+  "The general parsing function of FnParse Hound.
+  
+  *   `rule`: The rule. It must accept whatever state that
+      make-state returns.
+  *   `input`: The sequence of tokens to parse.
+  *   `context`: The initial context for the rule.
+  *   `success-fn`: A function called when the rule matches
+      the input. `(success-fn final-product final-position)`
+      is called.
+  *   `failure-fn`: A function called when the rule does not
+      match the input. `(failure-fn final-error)` is called.
+  
+  If `success-fn` and `failure-fn` aren't included, then
+  parse will print out a report of the parsing result."
+  ([rule input context success-fn failure-fn]
+   (c/parse make-state rule input context success-fn failure-fn))
+  ([rule input context]
+   (parse rule input context nil nil)))
 
-(define-fn prod [product]
+(define-fn prod
+  "Creates a product rule.
+  *   Succeeds? Always.
+      *   Product: The given `product`.
+      *   Consumes: Zero tokens.
+  *   Fails? Never.
+  
+  Use the `:let` modifier in preference to this function
+  when you use this inside rule comprehensions with the
+  for macro.
+  
+  Is the result monadic function of the `parser-m` monad."
+  [product]
   (fn product-rule [state]
     (c/Success product state
       (c/ParseError (:position state) nil nil))))
@@ -66,16 +95,15 @@
 (defmacro defrm- [& forms]
   `(defrm ~@forms))
 
-(d/defvar <emptiness>
-  (prod nil)
-  "A rule that matches emptiness--that
-  is, it always matches with every given
-  token sequence, and it always returns
-  [nil given-state].
-  (def a emptiness) would be equivalent
-  to the EBNF a = ; This rule's product
-  is always nil, and it therefore always
-  returns [nil given-state].")
+(d/defvar <emptiness> (prod nil)
+  "The general emptiness rule.
+  
+  *   Succeeds? Always.
+      *   Product: `nil`.
+      *   Consumes: Zero tokens.
+  *   Fails? Never.
+  
+  Happens to be equivalent to `(prod nil)`.")
 
 (define-fn- make-failure [state unexpected-token descriptors]
   (set-bank
@@ -83,7 +111,19 @@
       (c/ParseError (:position state) unexpected-token descriptors))
     (get-bank state)))
 
-(define-fn <nothing> [state]
+(define-fn <nothing>
+  "The general failing rule.
+  
+  *   Succeeds? Never.
+  *   Fails? Always.
+      *   Labels: \"absolutely nothing\"
+      *   Message: None.
+  
+  Use `with-error` in preference to this rule,
+  because 
+  
+  Is the zero monadic value of the parser monad."
+  [state]
   (make-failure state nil #{}))
 
 (define-fn with-error [message]
