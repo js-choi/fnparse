@@ -119,11 +119,32 @@
   (fn with-error-rule [state]
     (make-failed-reply state #{(c/ErrorDescriptor :message message)})))
 
+(def rule-doc-summary-header "\n
+  Rule Summary
+  ============")
+
+(def rule-doc-info
+  {:success "Success"
+   :failure "Failure"
+   :product "Product"
+   :consumes "Consumes"})
+
+(defn rule-doc-str [original-doc meta-opts]
+  (let [doc-opts (select-keys meta-opts (keys rule-doc-info))
+        opt-seq (seq doc-opts)]
+    (if opt-seq
+      (->> doc-opts sort
+        (map #(format "  * %s: %s" (rule-doc-info (key %)) (val %)))
+        (interpose "\n")
+        (apply str (str original-doc rule-doc-summary-header "\n")))
+      original-doc)))
+
 (defmacro defr
-  ([rule-name form] (defr rule-name ))
-  ([rule-name doc-string form] (defr rule-name doc-string nil form))
-  ([rule-name doc-string opts form]
-   
+  ([rule-name form] `(defr ~rule-name nil ~form))
+  ([rule-name doc-string form] `(defr ~rule-name ~doc-string nil ~form))
+  ([rule-name doc-string meta-opts form]
+  `(let [rule-var# (d/defvar ~rule-name ~form ~doc-string)]
+     (alter-meta! rule-var# update-in [:doc] rule-doc-str ~meta-opts))))
 
 (letfn [(delayify [f] (fn [& args] (delay (force (apply f args)))))]
   (defmacro defmaker
@@ -452,13 +473,13 @@
   [label-str pred]
   (term label-str (complement pred)))
 
-(d/defvar <anything> (term "anything" (constantly true))
-  "The generic terminal rule. It consumes one token.
-  
-  *   Success: If there are any tokens left.
-      *   Product: The token it consumes.
-      *   Consumes: One token.
-  *   Failure: If it's at the end of input.")
+(defr <anything>
+  "The generic terminal rule that matches any one token."
+  {:success "If there are any tokens left."
+   :failure "If it's at the end of input."
+   :product "The token it consumes."
+   :consumes "One token, any type."}
+  (term "anything" (constantly true)))
 
 (defn hook
   "Creates a rule with a semantic hook.
@@ -705,14 +726,13 @@
   [tokens]
   (mapcat lit tokens))
 
-(d/defvar <end-of-input>
-  (antipeek "the end of input" <anything>)
-  "The standard end-of-input rule.
-  
-  *   Success? If there are no tokens left.
-      *   Product: `true`.
-      *   Consumes: Zero tokens.
-  *   Failure? If there are any tokens left.")
+(defr <end-of-input>
+  "The standard end-of-input rule."
+  {:success "If there are no tokens left."
+   :failure "If there are any tokens left."
+   :product "`true`."
+   :consumes "No tokens."}
+  (antipeek "the end of input" <anything>))
 
 (defn prefix
   "Creates a prefixed rule. Use when you want to
@@ -904,32 +924,50 @@
   (->> base-36-digit-map (filter #(< (val %) base)) (into {})
     (term* (radix-label base))))
 
-(d/defvar <decimal-digit>
-  (radix-digit 10)
+(defr <decimal-digit>
   "A rule matching a single base-10 digit
-  character token (i.e. \\0–\\9). Its product
-  is the digit's corresponding integer.")
+  character token (i.e. \\0 through \\9)."
+  {:product "The matching digit's corresponding Integer object, 0 through 9."
+   :consumes "One character."}
+  (radix-digit 10))
 
-(d/defvar <hexadecimal-digit>
-  (radix-digit 16)
+(defr <hexadecimal-digit>
   "A rule matching a single base-16 digit
-  character token (i.e. \\0–\\F). Its product
-  is the digit's corresponding integer.")
+  character token (i.e. \\0 through \\F)."
+  {:product "The matching digit's corresponding Integer object, 0 through 15."
+   :consumes "One character."}
+  (radix-digit 16))
 
-(d/defvar <uppercase-ascii-letter>
-  (set-term "an uppercase ASCII letter" uppercase-ascii-alphabet)
-  "A rule matching a single uppercase ASCII letter.")
+(defr <uppercase-ascii-letter>
+  "A rule matching a single uppercase ASCII letter."
+  {:product "The matching character itself."
+   :consumes "One Character."}
+  (set-term "an uppercase ASCII letter" uppercase-ascii-alphabet))
 
-(d/defvar <lowercase-ascii-letter>
-  (set-term "a lowercase ASCII letter" lowercase-ascii-alphabet)
-  "A rule matching a single lowercase ASCII letter.")
+(defr <lowercase-ascii-letter>
+  "A rule matching a single lowercase ASCII letter."
+  {:product "The matching character itself."
+   :consumes "One Character."}
+  (set-term "a lowercase ASCII letter" lowercase-ascii-alphabet))
 
-(d/defvar <ascii-letter>
+(defr <ascii-letter>
+  "A rule matching a single uppercase or lowercase ASCII letter."
+  {:product "The matching character itself."
+   :consumes "One Character."}
   (label "an ASCII letter"
-    (+ <uppercase-ascii-letter> <lowercase-ascii-letter>))
-  "A rule matching a single upper> or lower-case ASCII letter.")
+    (+ <uppercase-ascii-letter> <lowercase-ascii-letter>)))
 
-(d/defvar <ascii-alphanumeric>
+(defr <ascii-digit>
+  "A rule matching a single ASCII numeric digit. You may
+  want to use instead `decimal-digit`, which automatically
+  converts digits to Integer objects."
+  {:product "The matching character itself."
+   :consumes "One Character."}
+  (set-term "an ASCII digit" ascii-digits))
+
+(defr <ascii-alphanumeric>
+  "A rule matching a single alphanumeric ASCII letter."
+  {:product "The matching character itself."
+   :consumes "One Character."}
   (label "an alphanumeric ASCII character"
-    (+ <ascii-letter> <decimal-digit>))
-  "A rule matching an ASCII alphanumeric character.")
+    (+ <ascii-letter> <ascii-digit>)))

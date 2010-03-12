@@ -198,16 +198,15 @@
   (p/chook identity p/<emptiness>))
 
 (def <imprecise-fractional-part>
-  (p/prefix
-    (p/lit \.)
-    (p/+ (->> r/<decimal-digit>
-           (r/hooked-rep
-             (fn [[prev-num multiplier] next-digit]
-               [(+ (* next-digit multiplier) prev-num) (/ multiplier 10)])
-             [0 0.1])
-           (r/hook #(partial + (get % 0))))
-         (p/hook #(partial + (/ % 10.)) <decimal-natural-number>)
-         <empty-number-tail>)))
+  (letfn [(reduce-digit-accumulator [[prev-num multiplier] next-digit]
+            [(+ (* next-digit multiplier) prev-num) (/ multiplier 10)])]
+    (p/prefix
+      (p/lit \.)
+      (p/+ (->> r/<decimal-digit>
+             (r/hooked-rep reduce-digit-accumulator [0 0.1])
+             (r/hook #(partial + (get % 0))))
+           (p/hook #(partial + (/ % 10.)) <decimal-natural-number>)
+           <empty-number-tail>))))
 
 (def <exponential-part>
   (p/prefix
