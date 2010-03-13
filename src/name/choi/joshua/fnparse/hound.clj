@@ -1,4 +1,6 @@
 (ns name.choi.joshua.fnparse.hound
+  "This is FnParse Hound, which can create unambiguous,
+  LL(1) or LL(n) parsers."
   (:require [name.choi.joshua.fnparse.common :as c]
             [clojure.contrib.seq :as seq]
             [clojure.contrib.monads :as m]
@@ -51,48 +53,13 @@
     (update-in (-> merger :result force) [:error]
       c/merge-parse-errors (-> mergee :result force :error))))
 
-(defn rule-doc-summary-header
-  [obj-type-str]
-  (format "\n
-  Summary
-  =======
-  * FnParse Hound %s."
-    obj-type-str))
-
-(def rule-doc-info
-  {:succeeds "Success"
-   :product "Product"
-   :consumes "Consumes"
-   :error "Error"})
-
-(defn rule-doc-str [original-doc obj-type-str meta-opts]
-  (let [doc-opts (select-keys meta-opts (keys rule-doc-info))
-        opt-seq (seq doc-opts)]
-    (if opt-seq
-      (->> doc-opts sort
-        (map #(format "  * %s: %s" (rule-doc-info (key %)) (val %)))
-        (interpose "\n")
-        (apply str original-doc (rule-doc-summary-header obj-type-str) "\n"))
-      original-doc)))
+(def library-name "FnParse Hound")
 
 (defmacro defrule
   ([rule-name form] `(defrule ~rule-name nil ~form))
   ([rule-name doc-string form] `(defrule ~rule-name ~doc-string nil ~form))
   ([rule-name doc-string meta-opts form]
-  `(let [rule-var# (d/defvar ~rule-name ~form ~doc-string)]
-     (alter-meta! rule-var# update-in [:doc] rule-doc-str "rule" ~meta-opts)
-     rule-var#)))
-
-(defmacro general-defmaker [def-form fn-name & forms]
- `(let [maker-var# (~def-form ~fn-name ~@forms)]
-    (alter-var-root maker-var# identity)
-    ; Add extended documentation.
-    (alter-meta! maker-var# update-in [:doc] rule-doc-str
-      "rule maker" (meta maker-var#))
-    ; Memoize unless the :no-memoize meta flag is true.
-    (if-not (:no-memoize? (meta maker-var#))
-      (alter-var-root maker-var# memoize))
-    maker-var#))
+  `(c/general-defrule ~library-name ~rule-name ~doc-string ~meta-opts ~form)))
 
 (defmacro defmaker
   "Creates a rule-making function. Use this instead of
@@ -100,7 +67,7 @@
   function. (It does other stuff like memoization and
   delaying and stuff.)"
   [fn-name & forms]
-  (list* `general-defmaker `defn fn-name forms))
+  (list* `c/general-defmaker library-name `defn fn-name forms))
 
 (defmacro defmaker-
   "Like `defmaker`, but also makes the var private."
@@ -111,7 +78,7 @@
   "Like `defmaker`, but makes a macro rule-maker
   instead of a function rule-maker."
   [fn-name & forms]
-  (list* `general-defmaker `defmacro fn-name forms))
+  (list* `c/general-defmaker library-name `defmacro fn-name forms))
 
 (defmaker prod
   "Creates a rule that always returns the given `product`.
@@ -673,7 +640,11 @@
   this saves memory. Using `rep` and `hook` instead
   forces the entire repetition's product to be in
   memory at the start, which may be prohibitive for
-  potentially large repititions."
+  potentially large repititions.
+  
+  *Warning!* Do not use this with any rules that
+  possibly may succeed without consuming any tokens.
+  An error will be thrown, because it doesn't make sense."
   {:no-memoize true
    :success "If rule succeeds at least once."
    :consumes "As many tokens as rule can consecutively consume."
@@ -684,7 +655,11 @@
 (defmaker rep
   "Creates a one-or-more greedy repetition rule. Tries to
   repeat consecutively the given `rule` as many
-  times as possible."
+  times as possible.
+  
+  *Warning!* Do not use this with any rules that
+  possibly may succeed without consuming any tokens.
+  An error will be thrown, because it doesn't make sense."
   {:success "If rule succeeds at least once."
    :consumes "As many tokens as rule can consecutively consume."
    :product "A *vector* of all of `rule`'s consecutive products."}
@@ -692,7 +667,11 @@
   (->> rule (hooked-rep- conj! #(transient [])) (hook persistent!)))
 
 (defmaker rep*
-  "Creates a zero-or-more greedy repetition rule."
+  "Creates a zero-or-more greedy repetition rule.
+  
+  *Warning!* Do not use this with any rules that
+  possibly may succeed without consuming any tokens.
+  An error will be thrown, because it doesn't make sense."
   {:success "If rule succeeds at least once."
    :consumes "As many tokens as rule can consecutively consume."
    :product "A *vector* of all of `rule`'s consecutive products.
@@ -740,8 +719,7 @@
   concatenate two rules, but you don't care about
   the first rule's product.
   Its product is always the body-rule's product.
-  A shortcut for:
-    (for [_ prefix-rule, content body-rule] content)."
+  A shortcut for `(for [_ prefix-rule, content body-rule] content)`."
   {:no-memoize? true}
   [prefix-rule body-rule]
   (for [_ prefix-rule, content body-rule] content))
@@ -751,8 +729,7 @@
   concatenate two rules, but you don't care about
   the second rule's product.
   Its product is always the body-rule's product.
-  A shortcut for:
-    (for [content body-rule, _ suffix-rule] content)."
+  A shortcut for `(for [content body-rule, _ suffix-rule] content)`."
   {:no-memoize? true}
   (for [content body-rule, _ suffix-rule] content))
 
@@ -761,8 +738,7 @@
   concatenate three rules, but you don't care about
   the first and third rules' products.
   Its product is always the body-rule's product.
-  A shortcut for:
-    (prefix prefix-rule (suffix body-rule suffix-rule))."
+  A shortcut for `(prefix prefix-rule (suffix body-rule suffix-rule))`."
   {:no-memoize? true}
   [prefix-rule body-rule suffix-rule]
   (prefix prefix-rule (suffix body-rule suffix-rule)))
