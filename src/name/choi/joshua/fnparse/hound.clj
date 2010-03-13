@@ -51,33 +51,91 @@
     (update-in (-> merger :result force) [:error]
       c/merge-parse-errors (-> mergee :result force :error))))
 
-(defn prod
-  "Creates a product rule.
-  *   Succeeds? Always.
-      *   Product: The given `product`.
-      *   Consumes: Zero tokens.
-  *   Fails? Never.
+(defn rule-doc-summary-header
+  [obj-type-str]
+  (format "\n
+  Summary
+  =======
+  * FnParse Hound %s."
+    obj-type-str))
+
+(def rule-doc-info
+  {:succeeds "Success"
+   :product "Product"
+   :consumes "Consumes"
+   :error "Error"})
+
+(defn rule-doc-str [original-doc obj-type-str meta-opts]
+  (let [doc-opts (select-keys meta-opts (keys rule-doc-info))
+        opt-seq (seq doc-opts)]
+    (if opt-seq
+      (->> doc-opts sort
+        (map #(format "  * %s: %s" (rule-doc-info (key %)) (val %)))
+        (interpose "\n")
+        (apply str original-doc (rule-doc-summary-header obj-type-str) "\n"))
+      original-doc)))
+
+(defmacro defrule
+  ([rule-name form] `(defrule ~rule-name nil ~form))
+  ([rule-name doc-string form] `(defrule ~rule-name ~doc-string nil ~form))
+  ([rule-name doc-string meta-opts form]
+  `(let [rule-var# (d/defvar ~rule-name ~form ~doc-string)]
+     (alter-meta! rule-var# update-in [:doc] rule-doc-str "rule" ~meta-opts)
+     rule-var#)))
+
+(defmacro general-defmaker [def-form fn-name & forms]
+ `(let [maker-var# (~def-form ~fn-name ~@forms)]
+    (alter-var-root maker-var# identity)
+    ; Add extended documentation.
+    (alter-meta! maker-var# update-in [:doc] rule-doc-str
+      "rule maker" (meta maker-var#))
+    ; Memoize unless the :no-memoize meta flag is true.
+    (if-not (:no-memoize? (meta maker-var#))
+      (alter-var-root maker-var# memoize))
+    maker-var#))
+
+(defmacro defmaker
+  "Creates a rule-making function. Use this instead of
+  `clojure.core/defmaker` whenever you make a rule-making
+  function. (It does other stuff like memoization and
+  delaying and stuff.)"
+  [fn-name & forms]
+  (list* `general-defmaker `defn fn-name forms))
+
+(defmacro defmaker-
+  "Like `defmaker`, but also makes the var private."
+  [fn-name & forms]
+  (list* `defmaker (vary-meta fn-name assoc :private true) forms))
+
+(defmacro defmaker-macro
+  "Like `defmaker`, but makes a macro rule-maker
+  instead of a function rule-maker."
+  [fn-name & forms]
+  (list* `general-defmaker `defmacro fn-name forms))
+
+(defmaker prod
+  "Creates a rule that always returns the given `product`.
   
   Use the `:let` modifier in preference to this function
   when you use this inside rule comprehensions with the
   for macro.
   
   Is the result monadic function of the `parser-m` monad."
+  {:succeeds "Always."
+   :product "The given `product`."
+   :consumes "No tokens."}
   [product]
   (fn prod-rule [state]
     (Reply false
       (c/Success product state
         (c/ParseError (:position state) nil nil)))))
 
-(d/defvar <emptiness> (prod nil)
-  "The general emptiness rule.
-  
-  *   Succeeds? Always.
-      *   Product: `nil`.
-      *   Consumes: Zero tokens.
-  *   Fails? Never.
-  
-  Happens to be equivalent to `(prod nil)`.")
+(defrule <emptiness>
+  "The general emptiness rule. (Actually just `(prod nil)`)."
+  {:succeeds "Always."
+   :product "`nil`."
+   :consumes "No tokens."}
+  (prod nil))
 
 (defn- make-failed-reply
   "Used to create replies containing failures."
@@ -90,115 +148,64 @@
 
 (d/defvar nothing-descriptors
   #{(c/ErrorDescriptor :label "absolutely nothing")}
-  "The error descriptors that `-nothing-` uses.")
+  "The error descriptors that `<nothing>` uses.")
 
-(defn <nothing>
+(defrule <nothing>
   "The general failing rule.
   
-  *   Succeeds? Never.
-  *   Fails? Always.
-      *   Labels: \"absolutely nothing\"
-      *   Message: None.
+  Use `with-error` in preference to `<nothing>`,
+  because `with-error` rules can attach meaningful
+  error messages.
   
-  Use `with-error` in preference to this rule,
-  because 
-  
-  Is the zero monadic value of the parser monad."
-  [state]
-  (make-failed-reply state nothing-descriptors))
+  Is the zero monadic value of the `parser-m` monad."
+  {:succeeds "Never."
+   :error "`\"Expected: absolutely nothing\"`."}
+  (fn nothing-rule [state]
+    (make-failed-reply state nothing-descriptors)))
 
-(defn with-error
+(defmaker with-error
   "Creates an always-failing rule with the given
-  message. Use this in preference to <nothing-.
-  
-  *   Succeeds? Never.
-  *   Fails? Always.
-      *   Labels: None.
-      *   Message: The given `message`."
+  message. Use this in preference to `<nothing>`."
+  {:succeeds "Never."
+   :error "An error with the given `message`."
+   :no-memoize? true}
   [message]
   (fn with-error-rule [state]
     (make-failed-reply state #{(c/ErrorDescriptor :message message)})))
 
-(def rule-doc-summary-header "\n
-  Rule Summary
-  ============")
-
-(def rule-doc-info
-  {:success "Success"
-   :failure "Failure"
-   :product "Product"
-   :consumes "Consumes"})
-
-(defn rule-doc-str [original-doc meta-opts]
-  (let [doc-opts (select-keys meta-opts (keys rule-doc-info))
-        opt-seq (seq doc-opts)]
-    (if opt-seq
-      (->> doc-opts sort
-        (map #(format "  * %s: %s" (rule-doc-info (key %)) (val %)))
-        (interpose "\n")
-        (apply str (str original-doc rule-doc-summary-header "\n")))
-      original-doc)))
-
-(defmacro defrule
-  ([rule-name form] `(defrule ~rule-name nil ~form))
-  ([rule-name doc-string form] `(defrule ~rule-name ~doc-string nil ~form))
-  ([rule-name doc-string meta-opts form]
-  `(let [rule-var# (d/defvar ~rule-name ~form ~doc-string)]
-     (alter-meta! rule-var# update-in [:doc] rule-doc-str ~meta-opts)
-     rule-var#)))
-
-(defmacro defmaker
-  "Creates a rule-making function. Use this instead of
-  `clojure.core/defmaker` whenever you make a rule-making
-  function. (It does other stuff like memoization and
-  delaying and stuff.)"
-  [fn-name & forms]
- `(let [maker-var# (defn ~fn-name ~@forms)]
-    (alter-var-root maker-var# identity)
-    ; Add extended documentation.
-    (alter-meta! maker-var# update-in [:doc] rule-doc-str (meta maker-var#))
-    ; Memoize unless the :no-memoize meta flag is true.
-    (if-not (:no-memoize? (meta maker-var#))
-      (alter-var-root maker-var# memoize))
-    maker-var#))
-
-(defmacro defmaker-
-  "Like `defmaker`, but also makes the var private."
-  [fn-name & forms]
-  (list* `defmaker (vary-meta fn-name assoc :private true) forms))
-
 (defmaker only-when
-  "Creates a maybe-failing rule.
-  
-  *   Succeeds? Only if the given `valid?` is
-      logical true.
-      *   Product: `valid?`.
-      *   Consumes: Zero tokens.
-  *   Fails? Only if not `valid?`.
-      *   Labels: None.
-      *   Messages: The given `message`.
-  It creates an either succeeding or a failing rule,
+  "Creates a maybe-failing rule—
+  an either succeeding or a failing rule—
   depending on if `valid?` is logical true. If
   `valid?`, then the rule always succeeds and acts
   like `(prod valid?)`. If not `valid?`, then the
   rule always fails and acts like `(with-error message)`.
   
+  Examples
+  ========
   This function is very useful for when you want
-  to validate a certain rule. For instance:
-      (for [value <number>
+  to validate a certain rule.
+  
+    (for [value <number>
             _ (only-when (< odd 10)
                 \"number must be less than ten\")]
         value)
-  The example above succeeds only when `-number-`
-  matches and its product is less than 10."
+  
+  The rule given above succeeds only when `<number>`
+  matches and `<number>`'s product is less than 10."
+  {:succeeds "If `valid?` is a true value."
+   :product "The value of `valid?`."
+   :consumes "No tokens."
+   :error-messages "The given `message`."
+   :no-memoize? true}
   [valid? message]
   (if-not valid? (with-error message) (prod valid?)))
 
-(defn combine
+(defmaker combine
   "Creates a rule combining the given `rule` into the
   `product-fn`.
   
-  *Use `cat` or `for` instead* of this function.
+  *Use `cat` or `for`* instead of this function.
   You *shouldn't have to use this function*
   at all, unless you're doing something special.
 
@@ -208,15 +215,14 @@
   
   Below, the rule returned by `(product-fn
   state-after-first-rule)` will be referred to as
-  `second-rule`.
-  
-  *   Succeeds? If both `rule` and `second-rule` succeed.
-      *   Product: The product of `second-rule`.
-      *   Consumes: All the tokens that `rule` and then
-          `second-rule` consume.
-  *   Fails? If either `rule` or `second-rule` fail.
-      *   Labels and messages: Whatever the failed rule
-          gives."
+  `second-rule`."
+  {:success "If both `rule` and `(product-fn state-after-first-rule)` succeed."
+   :product "The product of `(product-fn state-after-first-rule)`."
+   :consumes "All tokens that `rule` and then `(product-fn
+             state-after-first-rule)` consume."
+   :fail "If either `rule` and `(product-fn state-after-first-rule)` fail."
+   :labels "Any labels that the failing rule gives."
+   :messages "Any messages that the failing rule gives."}
   [rule product-fn]
   (letfn [(apply-product-fn [result]
             (c/apply (:state result) (product-fn (:product result))))]
@@ -251,7 +257,7 @@
   Adds the given sub-rules together, forming a new rule.
   The order of the sub-rules matters.
   
-  *This is the FnParse Hound version of +.* It does *not*
+  This is the FnParse *Hound* version of +. It does *not*
   backtrack.
   
   This means that it *first* searches for a successful parse from its
@@ -265,25 +271,20 @@
   Otherwise, if every sub-rule failed, then a failure
   is returned with the proper error descriptors.
   
-  This is the plus monadic operator of the parser monad.
-  
-  *   Success?
-      *   If *either* of the following is true:
-          1. Any sub-rule both consumes tokens and succeeds.
-          2. Any sub-rule succeeds without consuming any
-             tokens, *and* no sub-rule that consumes tokens
-             also succeeds.
-      *   The first sub-rule that fulfills #1, or else #2,
-          above is used.
-      *   Product: The product of that first sub-rule.
-      *   Consumes: Whatever tokens that first sub-rule
-          consumes too.
-  *   Failure?
-      *   If *either* of the following is true:
-          1. Any sub-rule both consumes tokens and fails.
-          2. Not a single sub-rule succeeds.
-      *   Descriptors: The descriptors of all failed rules
-          are combined in an intelligent way."
+  This is the plus monadic operator of the `parser-m` monad."
+  {:success "If *either* of the following is true:
+             1. Any sub-rule both consumes tokens and succeeds.
+             2. Any sub-rule succeeds without consuming any
+                tokens, *and* no sub-rule that consumes tokens
+                also succeeds."
+   :failure "If *either* of the following is true:
+             1. Any sub-rule both consumes tokens and fails.
+             2. Not a single sub-rule succeeds."
+   :product "The product of the succeeding sub-rule."
+   :consumes "Whatever the succeeding sub-rule consumes."
+   :error "An intelligent combination of the errors
+                from all the failed sub-rules."
+   :no-memoize? true}
   [& rules]
   (fn summed-rule [state]
     (let [[consuming-replies empty-replies]
@@ -306,7 +307,7 @@
    m-bind combine
    m-plus +])
 
-(defn label
+(defmaker label
   "Creates a labelled rule.
   
   Labels the given rule with the given string, returning
@@ -314,16 +315,21 @@
   of any parse errors that expected the given rule to
   succeed.
   
-  *   Success? If `rule` succeeds.
-      *   Product: `rule`'s product.
-      *   Consumes: Whatever `rule` consumes.
-  *   Failure? If `rule` fails.
-      *   Labels: All of `rule`'s labels are overrided
-          with `label-str`, but only if `rule` consumed
-          no tokens. (If `rule` did consume tokens, then
-          its labels contain more specific information
-          than `label-str`.)
-      *   Messages: Whatever `rule` returns."
+  Personally, I label rules with articles like \"a\" or \"an\".
+  For instance, I'd label a rule representing Clojure
+  vectors \"a vector\".
+  
+  You don't have to understand the details, but...
+  If `rule` consumed *no* tokens, then all error labels
+  from `rule`'s result are overrided with the
+  given `label-str`. Otherwise, the old labels are
+  untouched, as they contain information from
+  further down the input."
+  {:success "If `rule` succeeds."
+   :product "`rule`'s product."
+   :consumes "Whatever `rule` consumes."
+   :error "Smartly determines the appropriate error message."
+   :no-memoize true}
   [label-str rule]
   (letfn [(assoc-label [result]
             (-> result force
@@ -336,18 +342,23 @@
           (update-in reply [:result] assoc-label)
           reply)))))
 
-(defmacro for
+(defmaker-macro for
   "Creates a rule comprehension, very much like
-  `clojure.core/for`.
+  `clojure.core/for`. If it succeeds or fails and
+  also how many tokens it consumes is similar to `cat`.
+  How the final product is calculated is similar to `hook`.
+  
+  If you want to know, this macro is equivalent to the
+  `clojure.contrib.monads/domonad` form of the `parser-m` monad.
   
   Arguments
   =========
-  *   label-str: An optional label string. See the
-      label function for more info.
-  *   steps: A binding vector containing binding-form/
-      rule pairs followed by optional modifiers.
-      The given rules in each pair are conca>
-      tenated together in sequence to create
+  *   `label-str`: An optional label string. See the
+      `label` function for more info.
+  *   `steps`: A binding vector containing *binding-form/
+      rule pairs* optionally followed by *modifiers*.
+      The given rules in each pair are concatenated
+      together one after another to create
       the new rule. Each binding-form is bound
       to the product of its corresponding rule.
       The rule expressions can refer to any
@@ -355,59 +366,36 @@
       The only current recommended modifier
       is `:let`, which works like how it does it
       `clojure.core/for`.
-  *   product-expr: The final product of the new rule.
+  *   `product-expr`: The final product of the new rule.
       Only is reached after every sub-rule
       succeeds. The expression can refer
-      to any symbol bound to in the `steps`.
-  
-  Rule behaviour
-  ==============
-  If it succeeds or fails and also how many tokens
-  it consumes is similar to `cat`. How the final
-  product is calculated is similar to `hook`.
-  *   Success: All sub-rules in the `steps`
-      succeed, in order.
-      *   Product: Whatever is calculated by
-          `product-expr`.
-      *   Consumes: All tokens that each step
-          consumes.
-  *   Failure: Any sub-rule in the `steps` fails.
-      *   Labels and messages: Whatever is
-          returned by the failed rule.
-  
-  Miscellaneous info
-  ==================
-  For examples of for rules, check the example
-  libraries like `fnparse.clojure`.
-  
-  This macro is equivalent to the `domonad` form of
-  the parser monad."
+      to any symbol bound to in the `steps`."
+  {:success "All sub-rules in the given `steps` succeed, in order."
+   :product "Whatever is calculated by `product-expr`."
+   :consumes "All tokens that each step consecutively consumes."
+   :error "Whatever error the failed rule returns."}
   ([label-str steps product-expr]
    `(->> (for ~steps ~product-expr) (label ~label-str)))
   ([steps product-expr]
   `(m/domonad parser-m ~steps ~product-expr)))
 
-(defn validate
+(defmaker validate
   "Creates a validating rule.
   
   A convenience function. Returns a new rule that
   acts like the given `rule`, but also validates
   `rule`'s products with the given predicate.
-  Basically just a shortcut for `for` and `only-when`.
-  
-  *   Success: When `rule` succeeds and its product
-      fulfills `(pred product)`.
-      *   Product: `rule`'s product.
-      *   Consumes: What `rule` consumes.
-  *   Failure: When `rule` fails or `(pred product)`
-      is false."
+  Basically just a shortcut for `for` and `only-when`."
+  {:success "When `rule` succeeds and its product fulfills `(pred product)`."
+   :product "`rule`'s product."
+   :consumes "What `rule` consumes."}
   [pred message rule]
   (for [product rule, _ (only-when (pred product) message)]
     product))
 
 (defn antivalidate
-  "Exactly like the validate function, except that
-  it uses the complement of pred instead."
+  "Exactly like the `validate` function, except that
+  it uses the complement of `pred` instead."
   [pred message rule]
   (validate (complement pred) message rule))
 
@@ -430,26 +418,16 @@
               (make-failed-reply state first-token nil)))
           (make-failed-reply state ::c/end-of-input nil))))))
 
-(defn term
+(defmaker term
   "Creates a terminal rule.
   
   The new rule either consumes one token or fails.
   It must have a `label-str` that describes it
-  and a `pred`icate to test if the token it consumes is
+  and a `predicate` to test if the token it consumes is
   valid.
   
-  *   Success: When there are still tokens left in
-      the input, and the next such token fulfills
-      `(pred token)`.
-      *   Product: The consumed token.
-      *   Consumes: One and only one token.
-  *   Failure: When there are no tokens left, or
-      `(pred next-token)` is false.
-      *   Labels: The given `label-str`.
-      *   Messages: None.
-  
-  Notes
-  =====
+  Do you really need to use `term`?
+  =================================
   * If you just want to make sure that the consumed
     token equals something, use `lit` instead.
   * If you just want to make sure that the consumed
@@ -463,134 +441,122 @@
   * If you want a terminal rule, but you want the result
     of the predicate to be the rule's product instead of
     the token itself, use `term*`."
+  {:success "When there's a next token, and it fulfills `(pred token)`."
+   :product "The consumed token itself."
+   :consumes "One token, any type that fulfills `pred`."
+   :error "When `(term \"number\" num?)` fails,
+           its error is \"Expected number.\""
+   :no-memoize? true}
   [label-str predicate]
   (term- false label-str predicate))
 
-(defn term*
-  "Exactly like term, only its product is the result of
+(defmaker term*
+  "Exactly like `term`, only its product is the result of
   `(f token)` rather than `token`."
+  {:no-memoize? true}
   [label-str f]
   (term- true label-str f))
 
-(defn antiterm
+(defmaker antiterm
   "Exactly like term, only uses the complement of the
   given predicate instead."
+  {:no-memoize? true}
   [label-str pred]
   (term label-str (complement pred)))
 
 (defrule <anything>
   "The generic terminal rule that matches any one token."
-  {:success "If there are any tokens left."
-   :failure "If it's at the end of input."
+  {:succeeds "If there are any tokens left, i.e.
+   not at the end of input."
    :product "The token it consumes."
-   :consumes "One token, any type."}
+   :consumes "One token, any type."
+   :error "\"Expected anything.\""}
   (term "anything" (constantly true)))
 
-(defn hook
+(defmaker hook
   "Creates a rule with a semantic hook.
-  A shortcut for the `for` macro.
-  
-  *   Success: If `rule` succeeds.
-      *   Product: `(semantic-hook rule-product)`.
-      *   Consumes: Whatever `rule` consumes.
-  *   Failure: If `rule` fails."
+  A shortcut for the `for` macro."
+  {:no-memoize? true
+   :success "If `rule` succeeds."
+   :product "`(semantic-hook product-from-rule)`."
+   :consumes "Whatever `rule` consumes."}
   [semantic-hook rule]
   (for [product rule] (semantic-hook product)))
 
 (defn chook
   "Creates a rule with a constant semantic hook.
-  A shortcut for the for macro. The name
+  A shortcut for the `for` macro. The name
   stands for 'constant-hook'. It's exactly like
-  hook, only the product is a constant; its
-  product is always the given object.
-  
-  *   Success: If `rule` succeeds.
-      *   Product: Always is `product`.
-      *   Consumes: Whatever `rule` consumes.
-  *   Failure: If `rule` fails."
+  `hook`, only the product is a constant; its
+  product is always the given `product` object."
+  {:no-memoize? true
+   :success "If `rule` succeeds."
+   :product "Always the given `product`."
+   :consumes "Whatever `rule` consumes."}
   [product subrule]
   (for [_ subrule] product))
 
-(defn lit
+(defmaker lit
   "Creates a rule of a literal. A shortcut for
-  the term function. It automatically adds an
-  appropriate label.
-  
-  *   Success? If there are tokens left, and
-      the first remaining token is equal to
-      the given `token`.
-      *   Product: The consumed token.
-      *   Consumes: One token.
-  *   Failure? If it's at the end of input, or
-      the next token is not equal to the given
-      `token`.
-      *   Labels: The given `token` in single>
-          quotes. For instance, (lit \\$) has
-          the label `\"'$'\"`."
+  `term`. It automatically adds an
+  appropriate label."
+  {:success "If there is a next token and it is equal to the given `token`."
+   :product "Always the given `token`."
+   :consumes "One token, equal to the given `token`."
+   :error "When `(lit \\a) fails, its error says, \"Expected 'a'.\""}
   [token]
   (term (format "'%s'" token) #(= token %)))
 
-(defn antilit
+(defmaker antilit
   "Creates a rule of an antiliteral.
-  A shortcut for the term function. It consumes
-  one token, and succeeds only if it *does not
-  Its product is the consumed token.
-  equal* the given token. It fails otherwise.
-  It automatically adds an appropriate label
-  (e.g. `(antilit \\$)` is labelled
-  `\"anything except '$'\")."
+  A shortcut for `term`.
+  It automatically adds an appropriate label."
+  {:success "If there is a next token and it is *unequal* to the given `token`."
+   :product "The consumed token."
+   :consumes "One token, any type (so long as it doesn't equal `token`)."
+   :error "When `(antilit \\a) fails, its error
+           says, \"Expected anything except 'a'.\""}
   [token]
   (term (format "anything except '%s'" token) #(not= token %)))
 
-(defn set-term
+(defmaker set-term
   "Creates a terminal rule with a set.
   A shortcut for `(term label-str (set tokens))`."
+  {:no-memoize? true}
   [label-str tokens]
   (term label-str (set tokens)))
 
-(defn antiset-lit
+(defmaker antiset-lit
   "Creates a terminal rule with an antiset.
   A shortcut for `(antiterm label-str (set tokens))`."
+  {:no-memoize? true}
   [label-str tokens]
   (antiterm label-str (tokens set)))
 
-(defn cat
-  "Creates a concatenated rule out of many given `rules`.
-  
-  *   Success: All given `rules` succeed, one after another.
-      *   Product: The sequence of all the `rules`'
-          respective products.
-      *   Consumes: All tokens that each rule in `rules`
-          consecutively consumes.
-  *   Failure: Any rule in the `rule` fails at its
-      respective position.
-      *   Labels and messages: Whatever is
-          returned by the failed rule."
+(defmaker cat
+  "Creates a concatenated rule out of many given `rules`."
+  {:success "All given `rules` succeed, one after another."
+   :product "The sequence (not lazy) of all the `rules`'s respective products."
+   :consumes "All tokens that the `rules` sequentially consume."
+   :error "The error of whatever sub-rule failed."}
   [& rules]
   (m/with-monad parser-m
     (m/m-seq rules)))
 
-(defn vcat
-  "Exactly like cat, only applies vec to its product."
+(defmaker vcat
+  "Exactly like cat, only applies `vec` to its product."
   [& subrules]
   (hook vec (apply cat subrules)))
 
-(defn opt
-  "Creates an optional rule. The new rule
-  always succeeds. It is equivalent to the
-  sum of the given rule and `-emptiness-`.
-  
-  *   Success: Always.
-      *   Product: If `rule` succeeds, whatever
-          product `rule` gives. Otherwise, `nil`.
-      *   Consumes: If `rule` succeeds, whatever
-          `rule` consumed. Otherwise, nothing is
-          consumed.
-  *   Failure: Never."
+(defmaker opt
+  "Creates an optional rule. It is equivalent to `(+ rule emptiness)`."
+  {:success "Always."
+   :product "Either `rule`'s product (if it succeeds) or `nil` if it fails."
+   :consumes "Either whatever `rule` consumes (if it succeeds) or no tokens."}
   [rule]
   (+ rule <emptiness>))
 
-(defn lex
+(defmaker lex
   "Creates a lexical rule.
   You use this whenever you want the lexer to
   *backtrack* when it fails, *even* if it consumes
@@ -614,10 +580,12 @@
     (def <expr> (r/+ <let-expr> <identifier>))
     (parse <let-expr> \"number\" nil) ; Line one
     (parse <let-expr> \"letter\" nil) ; Line two
+  
   In the code above, line one will give a successful
   parse, because the input \"number\" matches
-  <indentifier-.
-      But line two will give a failure. This is because
+  <indentifier>.
+  
+  But line two will give a failure. This is because
   (r/phrase \"let\") will match, but the <ws> after it
   will not match. Thus, <let-expr> fails. Also, because
   <let-expr> consumed the first three tokens of \"letter\",
@@ -634,15 +602,12 @@
     (-> state subrule
       (assoc :tokens-consumed? false))))
 
-(defn peek
+(defmaker peek
   "Creates a lookahead rule. Checks if the given
   `rule` succeeds, but doesn't actually consume
-  any tokens.
-  
-  *   Success? If `rule` succeeds.
-      *   Product: `rule`'s product.
-      *   Consumes: Zero tokens.
-  *   Failure? If `rule` fails."
+  any tokens."
+  {:success "If `rule` succeeds."
+   :consumes "No tokens."}
   [rule]
   (fn [state]
     (let [result (-> state (c/apply rule) :result force)]
@@ -650,17 +615,13 @@
         (Reply false result)
         ((prod (:product result)) state)))))
 
-(defn antipeek
+(defmaker antipeek
   "Creates a negative lookahead rule. Checks if
   the given `rule` fails, but doesn't actually
   consume any tokens. You must provide a `label-str`
-  describing this rule.
-  
-  *   Success? If `rule` fails.
-      *   Product: `true`.
-      *   Consumes: Zero tokens.
-  *   Failure? If `rule` succeeds.
-      *   Labels: Uses the given `label-str`."
+  describing this rule."
+  {:success "If `rule` succeeds."
+   :product "Always `true`."}
   [label-str rule]
   (label label-str
     (fn antipeek-rule [state]
@@ -698,82 +659,127 @@
             (except/throwf "empty rules cannot be greedily repeated")
             first-reply))))))
 
-(defn hooked-rep [f initial-product rule]
+(defmaker hooked-rep
+  "A `reduce`-like version of `rep`. See `rep` for more info.
+  
+  `f` should be a function of two arguments. The
+  product is the result of applying `f` first to
+  `initial-product` and the product of `rule`'s
+  first match, then applying `f` to that result and
+  the product of `rule`'s second match, and so on.
+  
+  Why would you use this instead of `(->> rule rep
+  (hook #(reduce f initial-product %)))`? Because
+  this saves memory. Using `rep` and `hook` instead
+  forces the entire repetition's product to be in
+  memory at the start, which may be prohibitive for
+  potentially large repititions."
+  {:no-memoize true
+   :success "If rule succeeds at least once."
+   :consumes "As many tokens as rule can consecutively consume."
+   :product "`(reduce f initial-product seq-of-consecutive-rule-products)`."}
+  [f initial-product rule]
   (hooked-rep- f (constantly initial-product) rule))
 
-(defn rep [rule]
+(defmaker rep
+  "Creates a one-or-more greedy repetition rule. Tries to
+  repeat consecutively the given `rule` as many
+  times as possible."
+  {:success "If rule succeeds at least once."
+   :consumes "As many tokens as rule can consecutively consume."
+   :product "A *vector* of all of `rule`'s consecutive products."}
+  [rule]
   (->> rule (hooked-rep- conj! #(transient [])) (hook persistent!)))
 
-(defn rep* [rule]
-  (opt (rep rule)))
+(defmaker rep*
+  "Creates a zero-or-more greedy repetition rule."
+  {:success "If rule succeeds at least once."
+   :consumes "As many tokens as rule can consecutively consume."
+   :product "A *vector* of all of `rule`'s consecutive products.
+             If `rule` fails immediately, then this is `[]`."}
+  [rule]
+  (+ (rep rule) (prod [])))
 
-(defn mapcat
-  "Returns the result of applying `cat` to the
-  result of applying map to `f` and `colls`.
+(defmaker mapcat
+  "Creates a rule that is the result of
+  applying `cat` to the result of applying map
+  to `f` and `colls`.
   Use the `phrase` function instead of this
   function when `f` is just `lit`."
+  {:no-memoize? true}
   [f & token-colls]
   (->> token-colls (apply map f) (apply cat)))
 
-(defn mapsum
-  "Returns the result of applying `+` to the
+(defmaker mapsum
+  "Creates a rule that is the result of applying `+` to the
   result of applying map to `f` and `colls`.
   Use the `set-term` function instead of this
   function when `f` is just `lit`."
+  {:no-memoize? true}
   [f & token-colls]
   (->> token-colls (apply map f) (apply +)))
 
-(defn phrase
-  "Returns a phrase rule, which succeeds
+(defmaker phrase
+  "Creates a phrase rule, which succeeds
   only when the next few tokens all
   consecutively match the given tokens.
-  Actually, it's just `(mapcat lit tokens)`."
+  (Actually, it's just `(mapcat lit tokens)`.)"
+  {:no-memoize? true}
   [tokens]
   (mapcat lit tokens))
 
 (defrule <end-of-input>
   "The standard end-of-input rule."
-  {:success "If there are no tokens left."
-   :failure "If there are any tokens left."
+  {:succeeds "If there are no tokens left."
    :product "`true`."
    :consumes "No tokens."}
   (antipeek "the end of input" <anything>))
 
-(defn prefix
+(defmaker prefix
   "Creates a prefixed rule. Use when you want to
   concatenate two rules, but you don't care about
   the first rule's product.
   Its product is always the body-rule's product.
   A shortcut for:
     (for [_ prefix-rule, content body-rule] content)."
+  {:no-memoize? true}
   [prefix-rule body-rule]
   (for [_ prefix-rule, content body-rule] content))
 
-(defn suffix [body-rule suffix-rule]
+(defmaker suffix [body-rule suffix-rule]
   "Creates a suffixed rule. Use when you want to
   concatenate two rules, but you don't care about
   the second rule's product.
   Its product is always the body-rule's product.
   A shortcut for:
     (for [content body-rule, _ suffix-rule] content)."
+  {:no-memoize? true}
   (for [content body-rule, _ suffix-rule] content))
 
-(defn circumfix
+(defmaker circumfix
   "Creates a circumfixed rule. Use when you want to
   concatenate three rules, but you don't care about
   the first and third rules' products.
   Its product is always the body-rule's product.
   A shortcut for:
     (prefix prefix-rule (suffix body-rule suffix-rule))."
+  {:no-memoize? true}
   [prefix-rule body-rule suffix-rule]
   (prefix prefix-rule (suffix body-rule suffix-rule)))
 
-(defn separated-rep [separator element]
+(defmaker separated-rep
+  "Creates a greedy repetition rule with a separator.
+  The `separator` is a rule that must succeed between
+  each `element` success."
+  {:no-memoize? true
+   :success "If `element` succeeds at least once."
+   :product "The vector of `element`'s successes."}
+  [separator element]
   (for [first-element element
         rest-elements (rep* (prefix separator element))]
-    (cons first-element rest-elements)))
+    (into [first-element] rest-elements)))
 
-(defmacro template-sum
+(defmaker-macro template-sum
   "Creates a summed rule using a template.
   Acts very similarly to `clojure.template/do-template`,
   but instead sums each rule together."
@@ -782,46 +788,36 @@
    `(+ ~@(map (fn [a] (t/apply-template argv expr a))
            (partition c values)))))
 
-(defn case-insensitive-lit
+(defmaker case-insensitive-lit
   "Creates a case-insensitive rule using Java's
   `Character/toLowerCase` and `Character/toUpperCase`
-  methods. Only works with `Character`-type tokens.
-  
-  *   Succeeds? If there is a next token and it's
-      equal to either the lower> or upper-case of
-      the given `token`.
-      *   Product: The consumed token.
-      *   Consumes: One token.
-  *   Failure? If there are no more tokens or if
-      the next token doesn't equal the upper> or
-      lower-case of the given `token`."
+  methods. Only works with `Character`-type tokens."
+  {:succeeds "If there is a next token and it's equal to either
+              the upper or lowercase of the given `token`."
+   :consumes "One character."}
   [#^Character token]
   (+ (lit (Character/toLowerCase token))
      (lit (Character/toUpperCase token))))
 
-(defn effects
+(defmaker effects
   "Creates a side-effect rule. Applies the given
-  arguments to the given function.
-  
-  *   Succeeds? Always.
-      *   Product: The result of `(apply f args)`.
-      *   Consumes: No tokens.
-  *   Failure? Never."
+  arguments to the given function. You may prefer `prod`."
+  {:succeeds "Always."
+   :product "The result of `(apply f args)`."
+   :consumes "No tokens."}
   [f & args]
   (fn effects-rule [state]
     (c/apply state (prod (apply f args)))))
 
-(defn except
+(defmaker except
   "Creates a subtracted rule. Matches using
   the given minuend rule, but only when the
-  subtrahend rule does not also match.
-  
-  *   Succeeds? `minuend` succeeds and
-      `subtrahend` fails.
-      *   Product: `minuend`'s product.
-      *   Consumes: Whatever `minuend` consumes.
-  *   Fails? `minuend` fails or `subtrahend`
-      succeeds."
+  subtrahend rule does not also match. You
+  must provide a custom `label-str`."
+  {:success "If `minuend` succeeds and `subtrahend` fails."
+   :product "`minuend`'s product."
+   :consumes "Whatever `minuend` consumes."
+   :error "Uses the `label-str` you provide."}
   ([label-str minuend subtrahend]
    (for [_ (antipeek label-str subtrahend)
          product (label label-str minuend)]
@@ -830,15 +826,18 @@
    (except label-str minuend
      (apply + (cons first-subtrahend rest-subtrahends)))))
 
-(defn annotate-error
+(defmaker annotate-error
   "Creates an error-annotating rule. Whenever
   the given `rule` fails, the error is passed
   into the `message-fn` function. This can be
   useful to add a message with more info to an
   error when certain conditions are met.
   
-  The result that `message-fn` receives is of the
-  type `::name.choi.joshua.fnparse.common/ParseError`.
+  `message-fn` must return a string when given
+  the original `ParseError`, which will be added
+  to the `ParseError`.
+  `ParseError`s are maps of type
+  `::name.choi.joshua.fnparse.common/ParseError`.
   See its documentation for more information."
   [message-fn rule]
   (letfn [(annotate [result]
@@ -852,29 +851,26 @@
       (let [reply (c/apply state rule)]
         (update-in reply [:result] annotate)))))
 
-(defn factor=
+(defmaker factor=
   "Creates a non-greedy repetition rule.
   Concatenates the given `rule` to itself `n` times."
   [n rule]
   (->> rule (replicate n) (apply cat)))
 
-(defn <fetch-context>
-  "A rule that fetches the current context.
-  
-  *   Success? Always.
-      *   Product: The current context.
-      *   Consumes: Zero tokens.
-  *   Failure? Never."
-  [state]
-  (c/apply state (prod (:context state))))
+(defrule <fetch-context>
+  "A rule that fetches the current context."
+  {:success "Always."
+   :product "The current context."
+   :consumes "Zero tokens."}
+  (fn fetch-context-rule [state]
+    (c/apply state (prod (:context state)))))
 
 (defn alter-context
-  "A rule that alters the curent context.
-  
-  *   Success? Always.
-      *   Product: The new context.
-      *   Consumes: Zero tokens.
-  *   Failure? Never."
+  "A rule that alters the curent context."
+  {:success "Always."
+   :product "The current context."
+   :consumes "Zero tokens."
+   :no-memoize? true}
   [f & args]
   (fn context-altering-rule [state]
     (let [altered-state (apply update-in state [:context] f args)]
@@ -914,13 +910,13 @@
   36 are accepted, but there's no way to use
   digits beyond \\Z (which corresponds to 36).
   
-  The rules `-decimal-digit-` and
-  `-hexadecimal-digit-` are already provided."
-  {:success "If the next token is a digit
+  The rules `<decimal-digit>` and
+  `<hexadecimal-digit>` are already provided."
+  {:succeeds "If the next token is a digit
     character in the given `base`'s number
     system."
    :product "The digit's corresponding integer."
-   :consumes "One Character."}
+   :consumes "One character."}
   [base]
   {:pre #{(integer? base) (> base 0)}}
   (->> base-36-digit-map (filter #(< (val %) base)) (into {})
@@ -943,19 +939,19 @@
 (defrule <uppercase-ascii-letter>
   "A rule matching a single uppercase ASCII letter."
   {:product "The matching character itself."
-   :consumes "One Character."}
+   :consumes "One character."}
   (set-term "an uppercase ASCII letter" uppercase-ascii-alphabet))
 
 (defrule <lowercase-ascii-letter>
   "A rule matching a single lowercase ASCII letter."
   {:product "The matching character itself."
-   :consumes "One Character."}
+   :consumes "One character."}
   (set-term "a lowercase ASCII letter" lowercase-ascii-alphabet))
 
 (defrule <ascii-letter>
   "A rule matching a single uppercase or lowercase ASCII letter."
   {:product "The matching character itself."
-   :consumes "One Character."}
+   :consumes "One character."}
   (label "an ASCII letter"
     (+ <uppercase-ascii-letter> <lowercase-ascii-letter>)))
 
@@ -964,12 +960,12 @@
   want to use instead `decimal-digit`, which automatically
   converts digits to Integer objects."
   {:product "The matching character itself."
-   :consumes "One Character."}
+   :consumes "One character."}
   (set-term "an ASCII digit" ascii-digits))
 
 (defrule <ascii-alphanumeric>
   "A rule matching a single alphanumeric ASCII letter."
   {:product "The matching character itself."
-   :consumes "One Character."}
+   :consumes "One character."}
   (label "an alphanumeric ASCII character"
     (+ <ascii-letter> <ascii-digit>)))
