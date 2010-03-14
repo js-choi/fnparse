@@ -93,9 +93,7 @@
    :consumes "No tokens."
    :no-memoize? true}
   [product]
-  (prn "Creating a product rule prod>" product)
   (fn prod-rule [state]
-    (prn "A product rule state/prod>" state product)
     (Reply false
       (c/Success product state
         (c/ParseError (:position state) nil nil)))))
@@ -205,7 +203,6 @@
                 (if (c/success? first-result)
                   (let [{next-error :error, :as next-result}
                          (-> first-result apply-product-fn :result force)]
-                    (prn "combine next result CONSUMED>" next-result)
                     (assoc next-result :error
                       (c/merge-parse-errors first-error next-error)))
                   first-result))))
@@ -213,12 +210,10 @@
             (if (c/success? first-result)
               (let [first-error (:error first-result)
                     next-reply (apply-product-fn first-result)]
-                (prn "combine next REPLY EMPTY>" next-reply)
                 (assoc next-reply :result
                   (delay
                     (let [next-result (-> next-reply :result force)
                           next-error (:error next-result)]
-                      (prn "combine next result EMPTY>" next-result)
                       (assoc next-result :error
                         (c/merge-parse-errors first-error next-error))))))
               (Reply false first-result))))))))
@@ -624,7 +619,6 @@
                       (partition 2 1)
                       (take-while #(-> % first :result force c/success?))
                       last)]
-                (prn "last-success>" last-success)
                 (-> last-success :result force
                   (assoc :error (-> first-failure :result force :error))))))
           (if (-> first-reply :result force c/success?)

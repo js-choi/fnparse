@@ -299,8 +299,8 @@
     (p/for [_ (p/lit start-token)
             contents <form-series>
             _ (p/lit end-token)]
-      (product-fn (seq (to-array (into [] contents))))))
-  <list> \( \) #(let [x (apply list %)] (prn x) x)
+      (product-fn contents)))
+  <list> \( \) #(apply list %)
   <vector> \[ \] identity
   <map> \{ \} #(apply hash-map %)
   <set-inner> \{ \} set)
