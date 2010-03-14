@@ -1,7 +1,7 @@
 (ns edu.arizona.fnparse.hound
-  "This is FnParse Hound, which can create unambiguous,
+  "This is *FnParse Hound*, which can create unambiguous,
   LL(1) or LL(n) parsers."
-  (:require [edu.arizona.fnparse.common :as c]
+  (:require [edu.arizona.fnparse :as c]
             [clojure.contrib.seq :as seq]
             [clojure.contrib.monads :as m]
             [clojure.template :as t]
@@ -36,7 +36,9 @@
       the input. `(success-fn final-product final-position)`
       is called.
   *   `failure-fn`: A function called when the rule does not
-      match the input. `(failure-fn final-error)` is called.
+      match the input. `(failure-fn final-error)` is called,
+      where `final-error` is an object of type
+      `:edu.arizona.fnparse/ParseError`.
   
   If `success-fn` and `failure-fn` aren't included, then
   parse will print out a report of the parsing result."
@@ -115,7 +117,7 @@
   rule when given `[1 2 3]` versus `'(1 2 3)`, then you should
   give `{:no-memoize? true}` in your metadata."
   [fn-name & forms]
-  (list* `c/general-defmaker library-name `defn fn-name forms))
+  (list* `c/general-defmaker library-name "rule maker" `defn fn-name forms))
 
 (defmacro defmaker-
   "Like `defmaker`, but also makes the var private."
@@ -126,14 +128,15 @@
   "Like `defmaker`, but makes a macro rule-maker
   instead of a function rule-maker."
   [fn-name & forms]
-  (list* `c/general-defmaker library-name `defmacro fn-name forms))
+  (list* `c/general-defmaker library-name "rule maker (macro)" `defmacro fn-name
+    forms))
 
 (defmaker prod
   "Creates a rule that always returns the given `product`.
   
   Use the `:let` modifier in preference to this function
-  when you use this inside rule comprehensions with the
-  for macro.
+  when you use this inside rule comprehensions from the
+  `for` macro.
   
   Is the result monadic function of the `parser-m` monad."
   {:succeeds "Always."
@@ -855,7 +858,7 @@
   the original `ParseError`, which will be added
   to the `ParseError`.
   `ParseError`s are maps of type
-  `:edu.arizona.fnparse.common/ParseError`.
+  `:edu.arizona.fnparse/ParseError`.
   See its documentation for more information."
   [message-fn rule]
   (letfn [(annotate [result]

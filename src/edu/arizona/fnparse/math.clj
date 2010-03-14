@@ -74,8 +74,6 @@
 
 (def <expr> <addition-level>)
 
-(require '[edu.arizona.fnparse.common :as c])
-
 (deftest various-tests
   (is (match? <expr> "3 + 1 * cos(-(-5) + sin(2))"
         :product? #(= % [3 \+ [1 \* ["cos" [[\- [\- 5]] \+ ["sin" 2]]]]])))

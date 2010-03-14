@@ -1,6 +1,6 @@
 (ns edu.arizona.fnparse.cat
   (:require [clojure.contrib.monads :as m] [clojure.template :as template]
-            [edu.arizona.fnparse.common :as c] [clojure.contrib.def :as d]
+            [edu.arizona.fnparse :as c] [clojure.contrib.def :as d]
             [clojure.contrib.seq :as seq])
   (:refer-clojure :rename {defn define-fn, defn- define-fn-, peek vec-peek}
                   :exclude #{for + mapcat})
