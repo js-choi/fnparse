@@ -1,9 +1,9 @@
-(ns name.choi.joshua.fnparse.clojure
-  (:require [name.choi.joshua.fnparse.hound :as p]
+(ns edu.arizona.fnparse.clojure
+  (:require [edu.arizona.fnparse.hound :as p]
             [clojure.template :as t] [clojure.set :as set]
             [clojure.contrib.seq :as seq]
             [clojure.contrib.except :as except]
-            name.choi.joshua.fnparse.hound.test)
+            edu.arizona.fnparse.hound.test)
   (:use [clojure.test :only #{set-test is run-tests}])
   (:refer-clojure :exclude #{read-string})
   (:import [clojure.lang IPersistentMap]))

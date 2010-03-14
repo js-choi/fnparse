@@ -1,7 +1,7 @@
-(ns name.choi.joshua.fnparse.hound
+(ns edu.arizona.fnparse.hound
   "This is FnParse Hound, which can create unambiguous,
   LL(1) or LL(n) parsers."
-  (:require [name.choi.joshua.fnparse.common :as c]
+  (:require [edu.arizona.fnparse.common :as c]
             [clojure.contrib.seq :as seq]
             [clojure.contrib.monads :as m]
             [clojure.template :as t]
@@ -56,6 +56,25 @@
 (def library-name "FnParse Hound")
 
 (defmacro defrule
+  "Defines a rule var. You should use this instead of `def`,
+  if only because it gives you cool shortcuts to write documentation.
+  
+  Metadata documentation options
+  ==============================
+  The `meta-opts` parameter expects a map argument,
+  and makes it the new var's metadata. Giving certain
+  options in the metadata also does appends certain
+  things to the rule's `doc-string`.
+  
+  *  `:succeeds` expects a short description on when
+     the rule succeeds.
+  *  `:product` expects a short description on what
+     products the rule gives when it succeeds.
+  *  `:consumes` expects a short description on how
+     many and what kinds of tokens the rule consumes
+     when it succeeds.
+  *  `:error` expects a short description on the
+     error that the rule gives when it fails."
   ([rule-name form] `(defrule ~rule-name nil ~form))
   ([rule-name doc-string form] `(defrule ~rule-name ~doc-string nil ~form))
   ([rule-name doc-string meta-opts form]
@@ -63,9 +82,38 @@
 
 (defmacro defmaker
   "Creates a rule-making function. Use this instead of
-  `clojure.core/defmaker` whenever you make a rule-making
+  `clojure.core/defn` whenever you make a rule-making
   function. (It does other stuff like memoization and
-  delaying and stuff.)"
+  and stuff.) Also see `defmaker-` and `defmaker-macro`.
+  
+  Arguments
+  =========
+  `defmaker` requires exactly the same arguments as
+  `clojure.core/defn`. Particularly important is being
+  able to give metadata easily.
+  
+  Metadata options
+  ================
+  `defmaker` accepts all metadata options that `defrule`
+  does too. There is also a special `:no-memoize?` option
+  that does something special, detailed below.
+  
+  Memoization
+  ===========
+  `defmaker` rule-makers *memoize by default*. This means
+  that they save the arguments they receive and their
+  corresponding results in a cache, and search the cache
+  every time they are called for equal arguments. See
+  `clojure.core/memoize` for more information.
+  
+  95% of the time, you won't have to worry about the warning below.
+  
+  A warning: memoization uses Clojure equality. This
+  means that *giving vector arguments must always return the
+  same rule as giving list arguments*, because vectors can
+  be equal to lists. If your function must return a different
+  rule when given `[1 2 3]` versus `'(1 2 3)`, then you should
+  give `{:no-memoize? true}` in your metadata."
   [fn-name & forms]
   (list* `c/general-defmaker library-name `defn fn-name forms))
 
@@ -538,7 +586,7 @@
   
   Why you would need to use it
   ============================
-    (require '[name.choi.joshua.fnparse.hound :as r])
+    (require '[edu.arizona.fnparse.hound :as r])
     (def <ws> (r/lit \\space))
     (def <claim> (r/phrase \"x = 1\"))
     (def <let-expr> (r/cat (r/phrase \"let\") <ws> <let-expr>))
@@ -807,7 +855,7 @@
   the original `ParseError`, which will be added
   to the `ParseError`.
   `ParseError`s are maps of type
-  `::name.choi.joshua.fnparse.common/ParseError`.
+  `:edu.arizona.fnparse.common/ParseError`.
   See its documentation for more information."
   [message-fn rule]
   (letfn [(annotate [result]

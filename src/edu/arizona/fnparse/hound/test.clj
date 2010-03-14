@@ -1,6 +1,6 @@
-(ns name.choi.joshua.fnparse.cat.test
-  (:require [name.choi.joshua.fnparse.common :as c]
-            [name.choi.joshua.fnparse.cat :as p]
+(ns edu.arizona.fnparse.hound.test
+  (:require [edu.arizona.fnparse.common :as c]
+            [edu.arizona.fnparse.hound :as p]
             [clojure.test :as test]))
 
 (defmethod test/assert-expr 'match?

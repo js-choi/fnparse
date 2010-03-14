@@ -1,7 +1,7 @@
-(ns name.choi.joshua.fnparse.math
-  (:require [name.choi.joshua.fnparse.cat :as r]
+(ns edu.arizona.fnparse.math
+  (:require [edu.arizona.fnparse.cat :as r]
             [clojure.template :as template]
-            name.choi.joshua.fnparse.cat.test)
+            edu.arizona.fnparse.cat.test)
   (:use [clojure.test :only #{deftest is run-tests}]))
 
 (set! *warn-on-reflection* true)
@@ -74,7 +74,7 @@
 
 (def <expr> <addition-level>)
 
-(require '[name.choi.joshua.fnparse.common :as c])
+(require '[edu.arizona.fnparse.common :as c])
 
 (deftest various-tests
   (is (match? <expr> "3 + 1 * cos(-(-5) + sin(2))"

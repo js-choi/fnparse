@@ -1,4 +1,4 @@
-(ns name.choi.joshua.fnparse.common
+(ns edu.arizona.fnparse.common
   "This is the namespace containing stuff that both
   FnParse Cat and FnParse Hound use. The actual user of either
   library is recommended to *not use any of these functions*.
