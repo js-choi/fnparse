@@ -299,9 +299,9 @@
     (p/for [_ (p/lit start-token)
             contents <form-series>
             _ (p/lit end-token)]
-      (product-fn contents)))
-  <list> \( \) #(apply list %)
-  <vector> \[ \] vec
+      (product-fn (seq (to-array (into [] contents))))))
+  <list> \( \) #(let [x (apply list %)] (prn x) x)
+  <vector> \[ \] identity
   <map> \{ \} #(apply hash-map %)
   <set-inner> \{ \} set)
 
@@ -458,6 +458,7 @@
   (is (match? <form> "true" :product? true?))
   (is (= (with-out-str (p/parse <form> "^()" {} list list))
          "WARNING: The ^ indicator is deprecated (since Clojure 1.1).\n"))
+  (is (match? <form> "(+ 33 22)" :product? list?))
   (is (match? <form> "[()]" :product? #(= % [()])))
   (is (match? <form> "\"\\na\\u3333\"" :product? #(= % "\na\u3333")))
   (is (non-match? <form> "([1 32]"
@@ -486,7 +487,7 @@
         :context (ClojureContext "user" nil nil nil)
         :product? #(= ((eval (second %)) 3 2 8 1) 16)))
   (is (match? <form> "#=(+ 3 2)" :context (ClojureContext nil nil nil true)
-                                :product? #(= % 5)))
+                                 :product? #(= % 5)))
   (is (match? <form> "#\"\\w+\""
         :product? #(re-matches % "abc")))
   (is (non-match? <form> "17rAZ"

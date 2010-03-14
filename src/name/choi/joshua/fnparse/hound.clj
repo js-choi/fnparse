@@ -90,9 +90,12 @@
   Is the result monadic function of the `parser-m` monad."
   {:succeeds "Always."
    :product "The given `product`."
-   :consumes "No tokens."}
+   :consumes "No tokens."
+   :no-memoize? true}
   [product]
+  (prn "Creating a product rule prod>" product)
   (fn prod-rule [state]
+    (prn "A product rule state/prod>" state product)
     (Reply false
       (c/Success product state
         (c/ParseError (:position state) nil nil)))))
@@ -134,8 +137,7 @@
   "Creates an always-failing rule with the given
   message. Use this in preference to `<nothing>`."
   {:succeeds "Never."
-   :error "An error with the given `message`."
-   :no-memoize? true}
+   :error "An error with the given `message`."}
   [message]
   (fn with-error-rule [state]
     (make-failed-reply state #{(c/ErrorDescriptor :message message)})))
@@ -203,6 +205,7 @@
                 (if (c/success? first-result)
                   (let [{next-error :error, :as next-result}
                          (-> first-result apply-product-fn :result force)]
+                    (prn "combine next result CONSUMED>" next-result)
                     (assoc next-result :error
                       (c/merge-parse-errors first-error next-error)))
                   first-result))))
@@ -210,10 +213,12 @@
             (if (c/success? first-result)
               (let [first-error (:error first-result)
                     next-reply (apply-product-fn first-result)]
+                (prn "combine next REPLY EMPTY>" next-reply)
                 (assoc next-reply :result
                   (delay
                     (let [next-result (-> next-reply :result force)
                           next-error (:error next-result)]
+                      (prn "combine next result EMPTY>" next-result)
                       (assoc next-result :error
                         (c/merge-parse-errors first-error next-error))))))
               (Reply false first-result))))))))
@@ -250,8 +255,7 @@
    :product "The product of the succeeding sub-rule."
    :consumes "Whatever the succeeding sub-rule consumes."
    :error "An intelligent combination of the errors
-                from all the failed sub-rules."
-   :no-memoize? true}
+                from all the failed sub-rules."}
   [& rules]
   (fn summed-rule [state]
     (let [[consuming-replies empty-replies]
@@ -295,8 +299,7 @@
   {:success "If `rule` succeeds."
    :product "`rule`'s product."
    :consumes "Whatever `rule` consumes."
-   :error "Smartly determines the appropriate error message."
-   :no-memoize true}
+   :error "Smartly determines the appropriate error message."}
   [label-str rule]
   (letfn [(assoc-label [result]
             (-> result force
@@ -340,7 +343,8 @@
   {:success "All sub-rules in the given `steps` succeed, in order."
    :product "Whatever is calculated by `product-expr`."
    :consumes "All tokens that each step consecutively consumes."
-   :error "Whatever error the failed rule returns."}
+   :error "Whatever error the failed rule returns."
+   :no-memoize? true}
   ([label-str steps product-expr]
    `(->> (for ~steps ~product-expr) (label ~label-str)))
   ([steps product-expr]
@@ -355,14 +359,16 @@
   Basically just a shortcut for `for` and `only-when`."
   {:success "When `rule` succeeds and its product fulfills `(pred product)`."
    :product "`rule`'s product."
-   :consumes "What `rule` consumes."}
+   :consumes "What `rule` consumes."
+   :no-memoize? true}
   [pred message rule]
   (for [product rule, _ (only-when (pred product) message)]
     product))
 
-(defn antivalidate
+(defmaker antivalidate
   "Exactly like the `validate` function, except that
   it uses the complement of `pred` instead."
+  {:no-memoize? true}
   [pred message rule]
   (validate (complement pred) message rule))
 
@@ -465,14 +471,14 @@
 
 (defmaker lit
   "Creates a rule of a literal. A shortcut for
-  `term`. It automatically adds an
+  `(term (partial = token))`. It automatically adds an
   appropriate label."
   {:success "If there is a next token and it is equal to the given `token`."
-   :product "Always the given `token`."
+   :product "Always the consumed `token`."
    :consumes "One token, equal to the given `token`."
    :error "When `(lit \\a) fails, its error says, \"Expected 'a'.\""}
   [token]
-  (term (format "'%s'" token) #(= token %)))
+  (term (format "'%s'" token) (partial = token)))
 
 (defmaker antilit
   "Creates a rule of an antiliteral.
@@ -489,16 +495,14 @@
 (defmaker set-term
   "Creates a terminal rule with a set.
   A shortcut for `(term label-str (set tokens))`."
-  {:no-memoize? true}
   [label-str tokens]
   (term label-str (set tokens)))
 
 (defmaker antiset-lit
   "Creates a terminal rule with an antiset.
   A shortcut for `(antiterm label-str (set tokens))`."
-  {:no-memoize? true}
   [label-str tokens]
-  (antiterm label-str (tokens set)))
+  (antiterm label-str (set tokens)))
 
 (defmaker cat
   "Creates a concatenated rule out of many given `rules`."
@@ -620,6 +624,7 @@
                       (partition 2 1)
                       (take-while #(-> % first :result force c/success?))
                       last)]
+                (prn "last-success>" last-success)
                 (-> last-success :result force
                   (assoc :error (-> first-failure :result force :error))))))
           (if (-> first-reply :result force c/success?)
@@ -645,7 +650,7 @@
   *Warning!* Do not use this with any rules that
   possibly may succeed without consuming any tokens.
   An error will be thrown, because it doesn't make sense."
-  {:no-memoize true
+  {:no-memoize? true
    :success "If rule succeeds at least once."
    :consumes "As many tokens as rule can consecutively consume."
    :product "`(reduce f initial-product seq-of-consecutive-rule-products)`."}
@@ -685,7 +690,6 @@
   to `f` and `colls`.
   Use the `phrase` function instead of this
   function when `f` is just `lit`."
-  {:no-memoize? true}
   [f & token-colls]
   (->> token-colls (apply map f) (apply cat)))
 
@@ -694,7 +698,6 @@
   result of applying map to `f` and `colls`.
   Use the `set-term` function instead of this
   function when `f` is just `lit`."
-  {:no-memoize? true}
   [f & token-colls]
   (->> token-colls (apply map f) (apply +)))
 
@@ -703,7 +706,6 @@
   only when the next few tokens all
   consecutively match the given tokens.
   (Actually, it's just `(mapcat lit tokens)`.)"
-  {:no-memoize? true}
   [tokens]
   (mapcat lit tokens))
 
@@ -720,7 +722,6 @@
   the first rule's product.
   Its product is always the body-rule's product.
   A shortcut for `(for [_ prefix-rule, content body-rule] content)`."
-  {:no-memoize? true}
   [prefix-rule body-rule]
   (for [_ prefix-rule, content body-rule] content))
 
@@ -730,7 +731,6 @@
   the second rule's product.
   Its product is always the body-rule's product.
   A shortcut for `(for [content body-rule, _ suffix-rule] content)`."
-  {:no-memoize? true}
   (for [content body-rule, _ suffix-rule] content))
 
 (defmaker circumfix
@@ -739,7 +739,6 @@
   the first and third rules' products.
   Its product is always the body-rule's product.
   A shortcut for `(prefix prefix-rule (suffix body-rule suffix-rule))`."
-  {:no-memoize? true}
   [prefix-rule body-rule suffix-rule]
   (prefix prefix-rule (suffix body-rule suffix-rule)))
 
@@ -779,6 +778,7 @@
   "Creates a side-effect rule. Applies the given
   arguments to the given function. You may prefer `prod`."
   {:succeeds "Always."
+   :no-memoize? true
    :product "The result of `(apply f args)`."
    :consumes "No tokens."}
   [f & args]

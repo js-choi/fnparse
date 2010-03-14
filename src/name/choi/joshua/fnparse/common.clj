@@ -6,7 +6,8 @@
   {:author "Joshua Choi"}
   (:require [clojure.contrib.string :as str] [clojure.template :as temp]
             [clojure.set :as set] [clojure.test :as test]
-            [clojure.contrib.seq :as seq] [clojure.contrib.monads :as m])
+            [clojure.contrib.seq :as seq] [clojure.contrib.monads :as m]
+            [clojure.contrib.def :as d])
   (:refer-clojure :rename {apply apply-seq})
   (:import [clojure.lang IPersistentMap]))
 
@@ -165,7 +166,7 @@
 * Initial context: %s
 * Error: %s
 "
-    (pr-str input) (pr-str context) error))
+    (pr-str input) (pr-str context) (format-parse-error error)))
 
 (defn parse
   "Parses the given input using the given rule.
@@ -178,9 +179,8 @@
   input: The sequence of tokens to parse.
   context: The initial context for the rule.
   success-fn: A function called when the rule matches
-              the input.
-              (success-fn final-product final-position) is
-              called.
+              the input. `(success-fn final-product
+              final-position)` is called.
   failure-fn: A function called when the rule does not
               match the input.
               (failure-fn final-error) is called."
