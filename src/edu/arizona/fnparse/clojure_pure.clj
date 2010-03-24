@@ -1,4 +1,4 @@
-(ns edu.arizona.fnparse.clojure
+(ns edu.arizona.fnparse.clojure-pure
   (:require [edu.arizona.fnparse.hound :as p] [edu.arizona.fnparse :as c]
             [clojure [template :as t] [set :as set]]
             [clojure.contrib.seq :as seq]
