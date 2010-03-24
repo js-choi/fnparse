@@ -791,8 +791,7 @@
   "Creates a greedy repetition rule with a separator.
   The `separator` is a rule that must succeed between
   each `element` success."
-  {:no-memoize? true
-   :success "If `element` succeeds at least once."
+  {:success "If `element` succeeds at least once."
    :product "The vector of `element`'s successes."}
   [separator element]
   (for [first-element element

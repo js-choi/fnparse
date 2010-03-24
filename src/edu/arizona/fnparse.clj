@@ -251,7 +251,8 @@
    :error "Error"})
 
 (defn rule-doc-str [doc-str library-name obj-type-str meta-opts]
-  (let [doc-str (str (rule-doc-first-header library-name obj-type-str) doc-str)
+  (let [doc-str (or doc-str "No description available.")
+        doc-str (str (rule-doc-first-header library-name obj-type-str) doc-str)
         doc-opts (select-keys meta-opts (keys rule-doc-info))
         opt-seq (seq doc-opts)]
     (if opt-seq
@@ -288,7 +289,7 @@
                                 list))
         message-text (->> expectation-text (concat messages)
                           (str/join "; "))]
-    (format "parse error at position %s: %s" position message-text)))
+    (format "at position %s, %s" position message-text)))
 
 (defn group-descriptors
   "From the given set of descriptors, returns a map with
