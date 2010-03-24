@@ -77,8 +77,7 @@
 
 (def ascii-digits "0123456789")
 (def lowercase-ascii-alphabet "abcdefghijklmnopqrstuvwxyz")
-(def uppercase-ascii-alphabet
-  (map #(Character/toUpperCase (char %)) lowercase-ascii-alphabet))
+(def uppercase-ascii-alphabet "ABCEDFGHIJKLMNOPQRSTUVWXYZ")
 (def base-36-digits (concat ascii-digits lowercase-ascii-alphabet))
 (def base-36-digit-map
   (letfn [(digit-entries [[index digit-char]]

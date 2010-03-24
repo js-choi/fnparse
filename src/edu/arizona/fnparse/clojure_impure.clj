@@ -209,9 +209,7 @@
 
 (def <exponential-part>
   (p/prefix
-    (p/set-term "exponent indicator" "eE")
-      ; If I wasn't worrying about pure Clojure,
-      ; use (p/case-insensitive-lit \e) above instead.
+    (p/case-insensitive-lit \e)
     (p/hook #(partial * (expt-int 10 %)) <decimal-natural-number>)))
 
 (def <fractional-exponential-part>
@@ -235,9 +233,7 @@
 (p/defmaker radix-coefficient-tail [base]
   (p/hook constantly
     (p/prefix
-      (p/set-term "radix indicator" "rR")
-        ; If I wasn't worrying about pure Clojure,
-        ; use (case-insensitive-p/lit \r) above instead.
+      (case-insensitive-p/lit \r)
       (radix-natural-number base))))
 
 (p/defmaker number-tail [base]

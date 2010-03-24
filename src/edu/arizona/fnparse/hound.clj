@@ -943,13 +943,6 @@
 (def lowercase-ascii-alphabet "abcdefghijklmnopqrstuvwxyz")
 (def uppercase-ascii-alphabet
   (map #(Character/toUpperCase (char %)) lowercase-ascii-alphabet))
-(def base-36-digits (concat ascii-digits lowercase-ascii-alphabet))
-(def base-36-digit-map
-  (letfn [(digit-entries [[index digit-char]]
-            (let [digit-char (char digit-char)]
-              [[(Character/toUpperCase digit-char) index]
-               [(Character/toLowerCase digit-char) index]]))]
-    (->> base-36-digits seq/indexed (seq-mapcat digit-entries) (into {}))))
 
 (defn radix-label
   "The function used by radix-digit to smartly
