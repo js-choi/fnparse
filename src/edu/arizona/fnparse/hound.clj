@@ -248,9 +248,7 @@
    :messages "Any messages that the failing rule gives."}
   [rule product-fn]
   (letfn [(apply-product-fn [result]
-            (let [a (product-fn (:product result))] (prn ">>>" result a)
-            (println "Calling next rule")
-            (c/apply (:state result) a)))]
+            (c/apply (:state result) (product-fn (:product result))))]
     (fn [state]
       (let [first-reply (c/apply state rule)]
         (if (:tokens-consumed? first-reply)
@@ -259,10 +257,8 @@
               (let [{first-error :error, :as first-result}
                       (-> first-reply :result force)]
                 (if (c/success? first-result)
-                  (let [a
-                         (-> first-result apply-product-fn)
-                         {next-error :error, :as next-result} (-> a :result force)]
-                    (prn ">>" first-result a)
+                  (let [{next-error :error, :as next-result}
+                          (-> first-result apply-product-fn :result force)]
                     (assoc next-result :error
                       (c/merge-parse-errors first-error next-error)))
                   first-result))))
@@ -363,7 +359,6 @@
               delay))]
     (fn labelled-rule [state]
       (let [reply (c/apply state rule)]
-        (prn "label>" label-str reply rule)
         (if-not (:tokens-consumed? reply)
           (update-in reply [:result] assoc-label)
           reply)))))
@@ -682,7 +677,6 @@
                         (partition 2 1)
                         (take-while #(-> % first :result force c/success?))
                         last)]
-                  (prn "hooked-rep>" [last-success first-failure] first-reply)
                   (-> last-success :result force
                     (assoc :error (-> first-failure :result force :error)))))))
           (if (-> first-reply :result force c/success?)
