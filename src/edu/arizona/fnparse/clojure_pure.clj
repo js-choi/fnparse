@@ -1,4 +1,8 @@
 (ns edu.arizona.fnparse.clojure-pure
+  "This is a proof-of-concept Clojure parser implemented in *pure Clojure*.
+  It, and all functions it uses in its referred libraries, except
+  `clojure.core`, use *no* direct Java calls (with the exception
+  of the Exception thrown in the final read-string function.)"
   (:require [edu.arizona.fnparse.hound :as p] [edu.arizona.fnparse :as c]
             [clojure [template :as t] [set :as set]]
             [clojure.contrib.seq :as seq]
@@ -66,6 +70,105 @@
       (update-in context [:anonymous-fn-context]
         assoc :slurping-parameter parameter-symbol)))
 
+;;; HELPER RULES AND RULE-MAKERS
+; These are reimplementations of rules and rule-makers that are already
+; in `edu.arizona.fnparse.hound`, but have been rewritten to
+; use pure Clojure only.
+
+(def ascii-digits "0123456789")
+(def lowercase-ascii-alphabet "abcdefghijklmnopqrstuvwxyz")
+(def uppercase-ascii-alphabet
+  (map #(Character/toUpperCase (char %)) lowercase-ascii-alphabet))
+(def base-36-digits (concat ascii-digits lowercase-ascii-alphabet))
+(def base-36-digit-map
+  (letfn [(digit-entries [[index digit-char]]
+            (let [digit-char (char digit-char)]
+              [[(Character/toUpperCase digit-char) index]
+               [(Character/toLowerCase digit-char) index]]))]
+    (->> base-36-digits seq/indexed (mapcat digit-entries) (into {}))))
+
+(defn radix-label
+  "The function used by radix-digit to smartly
+  create digit labels for the given `base`."
+  [base]
+  (case base
+    10 "a decimal digit"
+    16 "a hexadecimal digit"
+    8 "an octal digit"
+    2 "a binary digit"
+    (format "a base-%s digit" base)))
+
+(p/defmaker radix-digit
+  "Returns a rule that accepts one digit character
+  token in the number system with the given `base`.
+  For instance, `(radix-digit 12)` is a rule
+  of a single duodecimal digit.
+  
+  Digits past 9 are case-insensitive letters:
+  11, for instance, is \\b or \\B. Bases above
+  36 are accepted, but there's no way to use
+  digits beyond \\Z (which corresponds to 36).
+  
+  The rules `<decimal-digit>` and
+  `<hexadecimal-digit>` are already provided."
+  {:succeeds "If the next token is a digit
+    character in the given `base`'s number
+    system."
+   :product "The digit's corresponding integer."
+   :consumes "One character."}
+  [base]
+  {:pre #{(integer? base) (> base 0)}}
+  (->> base-36-digit-map (filter #(< (val %) base)) (into {})
+    (p/term* (radix-label base))))
+
+(p/defrule <decimal-digit>
+  "A rule matching a single base-10 digit
+  character token (i.e. \\0 through \\9)."
+  {:product "The matching digit's corresponding Integer object, 0 through 9."
+   :consumes "One character."}
+  (radix-digit 10))
+
+(p/defrule <hexadecimal-digit>
+  "A rule matching a single base-16 digit
+  character token (i.e. \\0 through \\F)."
+  {:product "The matching digit's corresponding Integer object, 0 through 15."
+   :consumes "One character."}
+  (radix-digit 16))
+
+(p/defrule <uppercase-ascii-letter>
+  "A rule matching a single uppercase ASCII letter."
+  {:product "The matching character itself."
+   :consumes "One character."}
+  (p/set-term "an uppercase ASCII letter" uppercase-ascii-alphabet))
+
+(p/defrule <lowercase-ascii-letter>
+  "A rule matching a single lowercase ASCII letter."
+  {:product "The matching character itself."
+   :consumes "One character."}
+  (p/set-term "a lowercase ASCII letter" lowercase-ascii-alphabet))
+
+(p/defrule <ascii-letter>
+  "A rule matching a single uppercase or lowercase ASCII letter."
+  {:product "The matching character itself."
+   :consumes "One character."}
+  (p/label "an ASCII letter"
+    (p/+ <uppercase-ascii-letter> <lowercase-ascii-letter>)))
+
+(p/defrule <ascii-digit>
+  "A rule matching a single ASCII numeric digit. You may
+  want to use instead `decimal-digit`, which automatically
+  converts digits to Integer objects."
+  {:product "The matching character itself."
+   :consumes "One character."}
+  (p/set-term "an ASCII digit" ascii-digits))
+
+(p/defrule <ascii-alphanumeric>
+  "A rule matching a single alphanumeric ASCII letter."
+  {:product "The matching character itself."
+   :consumes "One character."}
+  (p/label "an alphanumeric ASCII character"
+    (p/+ <ascii-letter> <ascii-digit>)))
+
 ;;; RULES START HERE.
 
 (declare <form>)
@@ -105,11 +208,11 @@
   (p/set-term "a non-alphanumeric symbol character" "*+!---?."))
 
 (def <symbol-first-char>
-  (p/+ p/<ascii-letter> <non-alphanumeric-symbol-char>))
+  (p/+ <ascii-letter> <non-alphanumeric-symbol-char>))
 
 (def <symbol-char>
   (p/label "a symbol character"
-    (p/+ <symbol-first-char> p/<decimal-digit>)))
+    (p/+ <symbol-first-char> <decimal-digit>)))
 
 (def <symbol-char-series>
   (p/hook str* (p/rep <symbol-char>)))
@@ -201,7 +304,7 @@
             [(+ (* next-digit multiplier) prev-num) (/ multiplier 10)])]
     (p/prefix
       (p/lit \.)
-      (p/+ (->> p/<decimal-digit>
+      (p/+ (->> <decimal-digit>
              (p/hooked-rep reduce-digit-accumulator [0 0.1])
              (p/hook #(partial + (get % 0))))
            (p/hook #(partial + (/ % 10.)) <decimal-natural-number>)
@@ -257,7 +360,7 @@
 (def <unicode-escape-sequence>
   (p/prefix (p/lit \u)
     (p/hook (comp char reduce-hexadecimal-digits)
-      (p/factor= 4 p/<hexadecimal-digit>))))
+      (p/factor= 4 <hexadecimal-digit>))))
 
 ;; Characters.
 

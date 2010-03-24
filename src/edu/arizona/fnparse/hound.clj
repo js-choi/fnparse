@@ -981,9 +981,11 @@
    :product "The digit's corresponding integer."
    :consumes "One character."}
   [base]
-  {:pre #{(integer? base) (> base 0)}}
-  (->> base-36-digit-map (filter #(< (val %) base)) (into {})
-    (term* (radix-label base))))
+  {:pre #{(integer? base) (pos? base)}}
+  (term* (radix-label base)
+   #(let [product (Character/digit (char %) (int base))]
+      (when (not= product -1)
+        product))))
 
 (defrule <decimal-digit>
   "A rule matching a single base-10 digit

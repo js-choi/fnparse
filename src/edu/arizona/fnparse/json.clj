@@ -82,7 +82,8 @@
       (p/factor= 4 p/<hexadecimal-digit>))))
 
 (p/defrule <escaped-str-char>
-  "An escaped character in a string, preceded by a backslash."
+  "An escaped character in a string: a backslash
+  followed by an escape sequence."
   {:product "A character."}
   (p/prefix <escape-char-start>
     (p/+ (p/term* "escape sequence" normal-escape-sequences)
