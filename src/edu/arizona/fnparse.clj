@@ -361,6 +361,7 @@
   is at a further position than the other, than that first error
   is returned instead."
   [error-a error-b]
+  (prn ">" error-a error-b)
   (let [{position-a :position, descriptors-a :descriptors} error-a
         {position-b :position, descriptors-b :descriptors} error-b]
     (cond
