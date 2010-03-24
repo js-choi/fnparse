@@ -81,9 +81,26 @@
   "A sequence of JSON values separated by commas, with optional
   whitespace padding on the front."
   {:product "A vector."}
-  (p/hook vec (p/opt (p/separated-rep <value-separator> <value>))))
+  (p/separated-rep* <value-separator> <value>))
 
 (p/defrule <array>
   "A JSON array. Optionally padded on the front with whitespace."
   {:product "A vector."}
   (p/circumfix <array-start> <array-content> <array-end>))
+
+(p/defrule <object-entry>
+  "A string-value pair with a colon. They appear in objects.
+  Optionally padded on the front with whitespace."
+  {:product "A vector pair."}
+  (p/for [name <str>, _ <name-separator>, val <value>]
+    [name val]))
+
+(p/defrule <object-content>
+  "A sequence of object entries separated by commas. Optionally
+  padded with whitepace on the front."
+  (p/hook #(into {} %) (p/separated-rep* <value-separator> <object-entry>)))
+
+(p/defrule <object>
+  "A JSON object. Optionally padded on the front with whitespace."
+  {:product "A map."}
+  (p/circumfix <object-start> <object-content> <object-end>))

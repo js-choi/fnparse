@@ -82,6 +82,11 @@
   ([rule-name doc-string meta-opts form]
   `(c/general-defrule ~library-name ~rule-name ~doc-string ~meta-opts ~form)))
 
+(defmacro defrule-
+  "Like `defrule`, but also makes the var private."
+  [fn-name & forms]
+  (list* `defrule (vary-meta fn-name assoc :private true) forms))
+
 (defmacro defmaker
   "Creates a rule-making function. Use this instead of
   `clojure.core/defn` whenever you make a rule-making
@@ -716,6 +721,8 @@
   [rule]
   (->> rule (hooked-rep- conj! #(transient [])) (hook persistent!)))
 
+(defrule- <vector-emptiness> (prod []))
+
 (defmaker rep*
   "Creates a zero-or-more greedy repetition rule.
   
@@ -727,7 +734,7 @@
    :product "A *vector* of all of `rule`'s consecutive products.
              If `rule` fails immediately, then this is `[]`."}
   [rule]
-  (+ (rep rule) (prod [])))
+  (+ (rep rule) <vector-emptiness>))
 
 (defmaker mapcat
   "Creates a rule that is the result of
@@ -752,7 +759,7 @@
   consecutively match the given tokens.
   (Actually, it's just `(mapcat lit tokens)`.)"
   [tokens]
-  (mapcat lit tokens))
+  (->> tokens (mapcat lit) (label (format "'%s'" tokens))))
 
 (defrule <end-of-input>
   "The standard end-of-input rule."
@@ -797,6 +804,12 @@
   (for [first-element element
         rest-elements (rep* (prefix separator element))]
     (into [first-element] rest-elements)))
+
+(defmaker separated-rep*
+  "Like `separated-rep`, but also calls `opt` afterwards."
+  {:success "Always.", :product "A vector."}
+  [separator element]
+  (+ (separated-rep separator element) <vector-emptiness>))
 
 (defmaker-macro template-sum
   "Creates a summed rule using a template.
