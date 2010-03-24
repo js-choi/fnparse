@@ -279,17 +279,28 @@
       (alter-var-root maker-var# memoize))
     maker-var#))
 
+(defn- format-unexpected-token [input position]
+  (let [input-size (count input)
+        remainder-size (- input-size position)
+        subinput (drop position input)
+        subinput (cond (= remainder-size 0) "the end of input"
+                       (> remainder-size 7) (concat (take 7 subinput) ["..."])
+                       true subinput)]
+    (if (string? input) (apply-seq str subinput) subinput)))
+
 (defn format-parse-error-data
   "Returns a formatted string with the given error data.
   The descriptor map should be returned from group-descriptors."
-  [position descriptor-map]
-  (let [{labels :label, messages :message} descriptor-map
+  [input position descriptor-map]
+  (let [unexpected-token (format-unexpected-token input position)
+        {labels :label, messages :message} descriptor-map
         expectation-text (when (seq labels)
                            (->> labels (str/join ", or ") (str "expected ")
                                 list))
         message-text (->> expectation-text (concat messages)
                           (str/join "; "))]
-    (format "at position %s, %s" position message-text)))
+    (format "At position %s, '%s': %s"
+      position unexpected-token message-text)))
 
 (defn group-descriptors
   "From the given set of descriptors, returns a map with
@@ -304,14 +315,14 @@
 
 (defn format-parse-error
   "Returns a formatted string from the given error."
-  [error]
-  (let [{:keys #{position descriptors}} error]
-    (format-parse-error-data position (group-descriptors descriptors))))
+  [error input]
+  (let [{:keys #{position descriptors unexpected-token}} error]
+    (format-parse-error-data input position (group-descriptors descriptors))))
 
 (defn print-success [input context product position]
   (printf
-    "PARSE SUCCESS
-=============
+    "PARSE SUCCESSFUL MATCH
+======================
 * Input: %s
 * Initial context: %s
 * Final product: %s
@@ -322,13 +333,13 @@
 
 (defn print-failure [input context error]
   (printf
-    "PARSE FAILURE
-=============
+    "PARSE FAILED MATCH
+==================
 * Input: %s
 * Initial context: %s
 * Error: %s
 "
-    (pr-str input) (pr-str context) (format-parse-error error)))
+    (pr-str input) (pr-str context) (format-parse-error error input)))
 
 (defn parse
   "Parses the given input using the given rule.
