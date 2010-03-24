@@ -1,8 +1,6 @@
 (ns edu.arizona.fnparse.math
   (:require [edu.arizona.fnparse.cat :as r]
-            [clojure.template :as template]
-            edu.arizona.fnparse.cat.test)
-  (:use [clojure.test :only #{deftest is run-tests}]))
+            [clojure.template :as template]))
 
 (set! *warn-on-reflection* true)
 
@@ -73,12 +71,3 @@
        <multiplication-level>))
 
 (def <expr> <addition-level>)
-
-(deftest various-tests
-  (is (match? <expr> "3 + 1 * cos(-(-5) + sin(2))"
-        :product? #(= % [3 \+ [1 \* ["cos" [[\- [\- 5]] \+ ["sin" 2]]]]])))
-  (is (non-match? <expr> "*3+1*cos(-(-5)+sin(2))"
-        :labels #{"a number" "a symbol" "'-'" "'+'" "'('" "whitespace"}
-        :position 0)))
-
-(run-tests)

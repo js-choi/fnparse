@@ -2,20 +2,21 @@
   (:require [clojure.contrib.monads :as m] [clojure.template :as template]
             [edu.arizona.fnparse :as c] [clojure.contrib.def :as d]
             [clojure.contrib.seq :as seq])
-  (:refer-clojure :rename {defn define-fn, defn- define-fn-, peek vec-peek}
-                  :exclude #{for + mapcat})
+  (:refer-clojure :rename {peek vec-peek}
+                  :exclude #{for + mapcat find})
   (:import [clojure.lang IPersistentMap]))
 
 (defprotocol ABankable
   (get-bank [o])
   (set-bank [o new-bank]))
 
-(define-fn- vary-bank [bankable f & args]
+(defn- vary-bank [bankable f & args]
   (set-bank bankable (apply f (get-bank bankable) args)))
 
 (deftype State [tokens position context] :as this
   c/AState
     (position [] position)
+    (remainder [] (drop position tokens))
   ABankable
     (get-bank [] (meta this))
     (set-bank [new-bank] (with-meta this new-bank))
@@ -49,31 +50,60 @@
   {:get-bank meta
    :set-bank with-meta})
 
-(define-fn make-state [input context]
+(defn make-state [input context]
   (State input 0 context (Bank {} [] {}) nil))
 
-(define-fn match
-  "The general matching function of FnParse Cat.
-  Tries to match the given `rule` to the *entire* given `input`.
+(defn match
+  "The general matching function of FnParse Cat. Attempt to
+  match the given rule to at least the beginning of the given input.
   
   *   `rule`: The rule. It must accept whatever state that
       make-state returns.
-  *   `input`: The sequence of tokens to match.
   *   `context`: The initial context for the rule.
-  *   `success-fn`: A function called when the rule matches
-      the input. `(success-fn final-product final-position)`
-      is called.
+  *   `success-fn`: A function called when the rule
+      matches the input.
+      `(complete-fn final-product final-remainder)` is called.
   *   `failure-fn`: A function called when the rule does not
-      match the input. `(failure-fn final-error)` is called.
+      match the input. `(failure-fn final-error)` is called,
+      where `final-error` is an object of type
+      `:edu.arizona.fnparse/ParseError`.
+  *   `input`: The sequence of tokens to match.
   
   If `success-fn` and `failure-fn` aren't included, then
   `match` will print out a report of the parsing result."
-  ([rule input context success-fn failure-fn]
-   (c/match make-state rule input context success-fn failure-fn))
-  ([rule input context]
-   (match rule input context nil nil)))
+  ([rule context success-fn failure-fn input]
+   (c/match make-state rule context success-fn failure-fn input))
+  ([rule context input]
+   (match rule context nil nil input)))
 
-(define-fn prod
+(defn find
+  "Finds all occurrences of a rule in a sequence of tokens.
+  Returns a lazy sequence of the rule's products at each
+  occurence. The occurences do not overlap."
+  [<rule> context input]
+  (c/find match <rule> context input))
+
+(defn substitute
+  "Substitutes all occurences of a rule in a sequence of tokens
+  with their respective products. Returns a lazy sequence of
+  tokens and products.
+  
+  `flatten?` is a boolean. If it is true, then the substituting
+  products will be flattened into the input sequence; in that
+  case the products must always be Seqables."
+  [<rule> context flatten? input]
+  (c/substitute match <rule> context flatten? input))
+
+(defn substitute-1
+  "Substitutes the first occurence of a rule in a sequence of
+  tokens with its respective product. Returns a lazy sequence
+  of tokens and products.
+  
+  See `substitute`'s docs for information on `flatten?`."
+  [<rule> context flatten? input]
+  (c/substitute-1 match <rule> context flatten? input))
+
+(defn prod
   "Creates a product rule.
   *   Succeeds? Always.
       *   Product: The given `product`.
@@ -106,13 +136,13 @@
   
   Happens to be equivalent to `(prod nil)`.")
 
-(define-fn- make-failure [state unexpected-token descriptors]
+(defn- make-failure [state unexpected-token descriptors]
   (set-bank
     (c/Failure
       (c/ParseError (:position state) unexpected-token descriptors))
     (get-bank state)))
 
-(define-fn <nothing>
+(defn <nothing>
   "The general failing rule.
   
   *   Succeeds? Never.
@@ -127,14 +157,14 @@
   [state]
   (make-failure state nil #{}))
 
-(define-fn with-error [message]
+(defn with-error [message]
   (fn with-error-rule [state]
     (make-failure state nil #{(c/ErrorDescriptor :message message)})))
 
-(define-fn only-when [valid? message]
+(defn only-when [valid? message]
   (if-not valid? (with-error message) (prod valid?)))
 
-(define-fn combine [rule product-fn]
+(defn combine [rule product-fn]
   (fn [state]
     (let [{first-error :error, :as first-result} (c/apply state rule)]
       ;(prn ">" first-result)
@@ -148,19 +178,19 @@
             (c/merge-parse-errors first-error next-error)))
         first-result))))
 
-(define-fn- get-memory [bank subrule state-position]
+(defn- get-memory [bank subrule state-position]
   (-> bank :memory (get-in [subrule state-position])))
 
-(define-fn- store-memory [bank subrule state-position result]
+(defn- store-memory [bank subrule state-position result]
   (assoc-in bank [:memory subrule state-position] result))
 
-(define-fn- clear-bank [bankable]
+(defn- clear-bank [bankable]
   (set-bank bankable nil))
 
-(define-fn- get-lr-node [bank index]
+(defn- get-lr-node [bank index]
   (-> bank :lr-stack (get index)))
 
-(define-fn- grow-lr [subrule state node-index]
+(defn- grow-lr [subrule state node-index]
   (let [state-0 state
         position-0 (:position state-0)
         bank-0 (assoc-in (get-bank state-0) [:position-heads position-0]
@@ -182,11 +212,11 @@
                            position-0 (clear-bank cur-result))]
             (recur new-bank)))))))
 
-(define-fn- add-head-if-not-already-there [head involved-rules]
+(defn- add-head-if-not-already-there [head involved-rules]
   (update-in (or head (Head #{} #{})) [:involved-rules]
     into involved-rules))
 
-(define-fn- setup-lr [lr-stack stack-index]
+(defn- setup-lr [lr-stack stack-index]
   (let [indexes (range (inc stack-index) (count lr-stack))
         involved-rules (map :rule (subvec lr-stack (inc stack-index)))
         lr-stack (update-in lr-stack [stack-index :head]
@@ -195,7 +225,7 @@
                    lr-stack indexes)]
     lr-stack))
 
-(define-fn- lr-answer [subrule state node-index seed-result]
+(defn- lr-answer [subrule state node-index seed-result]
   (let [bank (get-bank state)
         bank (assoc-in bank [:lr-stack node-index :seed] seed-result)
         lr-node (get-lr-node bank node-index)
@@ -207,7 +237,7 @@
           (set-bank node-seed bank)
           (grow-lr subrule (set-bank state bank) node-index))))))
 
-(define-fn- recall [bank subrule state]
+(defn- recall [bank subrule state]
   (let [position (:position state)
         memory (get-memory bank subrule position)
         node-index (-> bank :position-heads (get position))
@@ -226,7 +256,7 @@
               (vary-bank result store-memory subrule position result))
             memory))))))
 
-(define-fn- remember [subrule]
+(defn- remember [subrule]
   (fn remembering-rule [state]
     (let [bank (get-bank state)
           state-position (:position state)
@@ -257,7 +287,7 @@
               result (vary-bank result update-in [:lr-stack] pop)]
           result)))))
 
-(define-fn + [& rules]
+(defn + [& rules]
   (letfn [(merge-result-errors [prev-result next-error]
             (c/merge-parse-errors (:error prev-result) next-error))
           (apply-next-rule [state prev-result next-rule]
@@ -281,7 +311,7 @@
    m-bind combine
    m-plus +])
 
-(define-fn label [label-str rule]
+(defn label [label-str rule]
   {:pre #{(string? label-str)}}
   (fn labelled-rule [state]
     (let [result (c/apply state rule), initial-position (:position state)]
@@ -318,7 +348,7 @@
   ([steps product-expr]
   `(m/domonad parser-m ~steps ~product-expr)))
 
-(define-fn term
+(defn term
   "(term validator) is equivalent
   to (validate anything validator).
   Creates a rule that is a terminal rule of the given validator--that is, it
@@ -338,7 +368,7 @@
             (make-failure state token nil))
           (make-failure state ::c/end-of-input nil))))))
 
-(define-fn antiterm [label-str pred]
+(defn antiterm [label-str pred]
   (term label-str (complement pred)))
 
 (d/defvar <anything>
@@ -348,7 +378,7 @@
   This rule's product is the first token it receives.
   It fails if there are no tokens left.")
 
-(define-fn hook
+(defn hook
   "Creates a rule with a semantic hook,
   basically a simple version of a complex
   rule. The semantic hook is a function
@@ -357,14 +387,14 @@
   [f rule]
   (for [product rule] (f product)))
 
-(define-fn chook
+(defn chook
   "Creates a rule with a constant semantic
   hook. Its product is always the given
   constant."
   [product rule]
   (for [_ rule] product))
 
-(define-fn lit
+(defn lit
   "Equivalent to (comp term (partial partial =)).
   Creates a rule that is the terminal
   rule of the given literal token--that is,
@@ -377,16 +407,16 @@
   [token]
   (term (format "'%s'" token) (partial = token)))
 
-(define-fn antilit [token]
+(defn antilit [token]
   (term (str "anything except " token) #(not= token %)))
 
-(define-fn set-lit [label-str tokens]
+(defn set-lit [label-str tokens]
   (term label-str (set tokens)))
 
-(define-fn antiset-lit [label-str tokens]
+(defn antiset-lit [label-str tokens]
   (antiterm label-str (tokens set)))
 
-(define-fn cat
+(defn cat
   "Creates a rule that is the concatenation
   of the given subrules. Basically a simple
   version of complex, each subrule consumes
@@ -403,10 +433,10 @@
   (m/with-monad parser-m
     (m/m-seq subrules)))
 
-(define-fn vcat [& subrules]
+(defn vcat [& subrules]
   (hook vec (apply cat subrules)))
 
-(define-fn opt
+(defn opt
   "Creates a rule that is the optional form
   of the subrule. It always succeeds. Its result
   is either the subrule's (if the subrule
@@ -417,14 +447,14 @@
   [rule]
   (+ rule <emptiness>))
 
-(define-fn peek [rule]
+(defn peek [rule]
   (fn [state]
     (let [result (c/apply state rule)]
       (if (c/success? result)
         ((prod (:product result)) state)
         result))))
 
-(define-fn antipeek
+(defn antipeek
   "Creates a rule that does not consume
   any tokens, but fails when the given
   subrule succeeds. On success, the new
@@ -437,13 +467,13 @@
           (c/Success true state (:error result))
           (c/apply state <nothing>))))))
 
-(define-fn mapcat [f tokens]
+(defn mapcat [f tokens]
   (->> tokens (map f) (apply cat)))
 
-(define-fn mapsum [f tokens]
+(defn mapsum [f tokens]
   (->> tokens (map f) (apply +)))
 
-(define-fn phrase
+(defn phrase
   "A convenience function: it creates a rule
   that is the concatenation of the literals
   formed from the given sequence of literal tokens.
@@ -465,13 +495,13 @@
   rep*/rep+/etc.-type rule will result in an
   infinite loop.")
 
-(define-fn prefix [prefix-rule body-rule]
+(defn prefix [prefix-rule body-rule]
   (for [_ prefix-rule, content body-rule] content))
 
-(define-fn suffix [body-rule suffix-rule]
+(defn suffix [body-rule suffix-rule]
   (for [content body-rule, _ suffix-rule] content))
 
-(define-fn circumfix [prefix-rule body-rule suffix-rule]
+(defn circumfix [prefix-rule body-rule suffix-rule]
   (prefix prefix-rule (suffix body-rule suffix-rule)))
 
 (defmacro template-sum [argv expr & values]
@@ -479,16 +509,16 @@
    `(+ ~@(map (fn [a] (template/apply-template argv expr a)) 
              (partition c values)))))
 
-(define-fn case-insensitive-lit [#^Character token]
+(defn case-insensitive-lit [#^Character token]
   (+ (lit (Character/toLowerCase token))
        (lit (Character/toUpperCase token))))
 
-(define-fn effects [f & args]
+(defn effects [f & args]
   (fn effects-rule [state]
     (apply f args)
     (c/apply state <emptiness>)))
 
-(define-fn except
+(defn except
   "Creates a rule that is the exception from
   the first given subrules with the second given
   subrule--that is, it accepts only tokens that
@@ -506,7 +536,7 @@
    (except label-str minuend
      (apply + (cons first-subtrahend rest-subtrahends)))))
 
-(define-fn annotate-error [message-fn rule]
+(defn annotate-error [message-fn rule]
   (letfn [(annotate [error]
             (let [new-message (message-fn error)]
               (if new-message

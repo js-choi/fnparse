@@ -8,13 +8,14 @@
             [clojure.contrib.def :as d]
             [clojure.contrib.except :as except])
   (:refer-clojure :rename {mapcat seq-mapcat}
-                  :exclude #{for + peek})
+                  :exclude #{for + peek find})
   (:import [clojure.lang IPersistentMap]))
 
 (deftype State [remainder position context] :as this
   IPersistentMap
   c/AState
-    (position [] (:position this)))
+    (position [] (:position this))
+    (remainder [] (:remainder this)))
 
 (deftype Reply [tokens-consumed? result] :as this
   IPersistentMap
@@ -26,30 +27,54 @@
   (State remainder 0 context))
 
 (defn match
-  "The general parsing function of FnParse Hound.
-  Tries to match the given `rule` to the *entire* given `input`.
+  "The general matching function of FnParse Hound. Attempt to
+  match the given rule to at least the beginning of the given input.
   
   *   `rule`: The rule. It must accept whatever state that
       make-state returns.
-  *   `input`: The sequence of tokens to match.
   *   `context`: The initial context for the rule.
-  *   `success-fn`: A function called when the rule matches
-      the input. `(success-fn final-product final-position)`
-      is called.
+  *   `success-fn`: A function called when the rule
+      matches the input.
+      `(complete-fn final-product final-remainder)` is called.
   *   `failure-fn`: A function called when the rule does not
       match the input. `(failure-fn final-error)` is called,
       where `final-error` is an object of type
       `:edu.arizona.fnparse/ParseError`.
+  *   `input`: The sequence of tokens to match.
   
   If `success-fn` and `failure-fn` aren't included, then
   `match` will print out a report of the parsing result."
-  ([rule input context success-fn failure-fn]
-   (c/match make-state rule input context success-fn failure-fn))
-  ([rule input context]
-   (match rule input context nil nil)))
+  ([rule context success-fn failure-fn input]
+   (c/match make-state rule context success-fn failure-fn input))
+  ([rule context input]
+   (match rule context nil nil input)))
 
-(defn format-parse-error [error]
-  (c/format-parse-error error))
+(defn find
+  "Finds all occurrences of a rule in a sequence of tokens.
+  Returns a lazy sequence of the rule's products at each
+  occurence. The occurences do not overlap."
+  [<rule> context input]
+  (c/find match <rule> context input))
+
+(defn substitute
+  "Substitutes all occurences of a rule in a sequence of tokens
+  with their respective products. Returns a lazy sequence of
+  tokens and products.
+  
+  `flatten?` is a boolean. If it is true, then the substituting
+  products will be flattened into the input sequence; in that
+  case the products must always be Seqables."
+  [<rule> context flatten? input]
+  (c/substitute match <rule> context flatten? input))
+
+(defn substitute-1
+  "Substitutes the first occurence of a rule in a sequence of
+  tokens with its respective product. Returns a lazy sequence
+  of tokens and products.
+  
+  See `substitute`'s docs for information on `flatten?`."
+  [<rule> context flatten? input]
+  (c/substitute-1 match <rule> context flatten? input))
 
 (defn merge-replies [mergee merger]
   (assoc merger :result

@@ -169,12 +169,13 @@
             [clojure.set :as set] [clojure.test :as test]
             [clojure.contrib.seq :as seq] [clojure.contrib.monads :as m]
             [clojure.contrib.def :as d])
-  (:refer-clojure :rename {apply apply-seq})
+  (:refer-clojure :rename {apply apply-seq}, :exclude #{find})
   (:import [clojure.lang IPersistentMap]))
 
 (defprotocol AState
   "The protocol of FnParse states, which must
   be able to return a position."
+  (remainder [state])
   (position [state]))
 
 (deftype
@@ -291,6 +292,16 @@
       (->> subinput (apply-seq str) (format "'%s'"))
       subinput)))
 
+(defn- format-remainder [string-input? subinput]
+  (let [remainder-size (count subinput)
+        subinput (cond (= remainder-size 0) "the end of input"
+                       (> remainder-size 7) (concat (take 7 subinput) ["..."])
+                       true subinput)
+        subinput (seq subinput)]
+    (if string-input?
+      (->> subinput (apply-seq str) (format "'%s'"))
+      subinput)))
+
 (defn format-parse-error-data
   "Returns a formatted string with the given error data.
   The descriptor map should be returned from group-descriptors."
@@ -322,40 +333,32 @@
   (let [{:keys #{position descriptors unexpected-token}} error]
     (format-parse-error-data input position (group-descriptors descriptors))))
 
-(defn- print-complete [input context product position]
+(defn- print-complete [product]
   (printf
     "COMPLETE MATCH
 ==============
-* Input: %s
-* Initial context: %s
 * Final product: %s
 * Final product type: %s
-* Final position: %s
-* Input size: %s
 "
-    (pr-str input) (pr-str context) (pr-str product)
-    (type product) position (count input))
+    (pr-str product) (type product))
   true)
 
-(defn- print-incomplete [input context product position]
+(defn- print-incomplete [string-input? product final-remainder]
   (printf
     "INCOMPLETE MATCH
 ================
-* Input: %s
-* Initial context: %s
 * Final product: %s
 * Final product type: %s
-* Final position: %s
-* Input size: %s
 * Unmatched remainder: %s
 "
-    (pr-str input) (pr-str context) (pr-str product)
-    (type product) position (count input) (format-tokens input position))
+    (pr-str product) (type product)
+    (format-remainder string-input? final-remainder))
   false)
 
-(defn print-success [input context product position]
-  ((if (= position (count input)) print-complete print-incomplete)
-   input context product position))
+(defn print-success [string-input? product final-remainder]
+  (if (empty? final-remainder)
+    (print-complete product)
+    (print-incomplete string-input? product final-remainder)))
 
 (defn print-failure [input context error]
   (printf
@@ -370,31 +373,55 @@
 
 (defn match
   "Parses the given input using the given rule.
-  *Use the match function in fnparse.cat or fnparse.hound
-  in preference to this function.*
-  make-state: A function to create a state for the rule
-              from the given input and context.
-  rule: The rule. It must accept whatever state that
-        make-state returns.
-  input: The sequence of tokens to match.
-  context: The initial context for the rule.
-  success-fn: A function called when the rule matches
-              the input. `(success-fn final-product
-              final-position)` is called.
-  failure-fn: A function called when the rule does not
-              match the input.
-              (failure-fn final-error) is called."
-  [make-state rule input context success-fn failure-fn]
-  (let [success-fn (or success-fn (partial print-success input context))
+  *Use the match or find functions in fnparse.cat or fnparse.hound
+  in preference to this function.*"
+  [make-state rule context success-fn failure-fn input]
+  (let [string-input? (string? input)
+        success-fn (or success-fn (partial print-success string-input?))
         failure-fn (or failure-fn (partial print-failure input context))
         state (make-state input context)
         result (-> state (apply rule) answer-result)]
     (if (failure? result)
       (failure-fn (:error result))
-      (success-fn (:product result) (-> result :state position)))))
+      (success-fn (:product result) (-> result :state remainder)))))
+
+(defn find [match-fn <rule> context input]
+  (when-let [input (seq input)]
+    (lazy-seq
+      (match-fn <rule> context
+        (fn find-success [product remainder]
+          (cons product (find match-fn <rule> context remainder)))
+        (fn find-failure [e]
+          (find match-fn <rule> context (rest input)))
+        input))))
+
+(defn substitute [match-fn <rule> context flatten? input]
+  (let [combining-fn (if flatten? concat cons)]
+    (when-let [input (seq input)]
+      (lazy-seq
+        (match-fn <rule> context
+          (fn substitute-success [product remainder]
+            (combining-fn product
+              (substitute match-fn <rule> context flatten? remainder)))
+          (fn substitute-failure [_]
+            (cons (first input)
+              (substitute match-fn <rule> context flatten? (rest input))))
+          input)))))
+
+(defn substitute-1 [match-fn <rule> context flatten? input]
+  (let [combining-fn (if flatten? concat cons)]
+    (when-let [input (seq input)]
+      (lazy-seq
+        (match-fn <rule> context
+          (fn substitute-1-success [product remainder]
+            (combining-fn product remainder))
+          (fn substitute-1-failure [_]
+            (cons (first input)
+              (substitute-1 match-fn <rule> context flatten? (rest input))))
+          input)))))
 
 (defn merge-parse-errors
-  "Merges two Errors together. If the two errors are at the same
+  "Merges two ParseErrors together. If the two errors are at the same
   position, their descriptors are combined. If one of the errors
   is at a further position than the other, than that first error
   is returned instead."

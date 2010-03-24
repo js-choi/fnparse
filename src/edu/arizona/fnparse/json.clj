@@ -41,7 +41,9 @@
 ; Define special value rules: true, false, and null.
 ; Again, I use `clojure.template/do-template` to reduce repetition.
 (do-template [rule-name tokens product]
-  (p/defrule rule-name (p/chook product (p/phrase tokens)))
+  (p/defrule rule-name
+    "Padded on the front with optional whitespace."
+    (p/prefix <ws?> (p/chook product (p/phrase tokens))))
   <true>  "true"  true
   <false> "false" false
   <null>  "null"  nil)
@@ -106,3 +108,8 @@
   "A general JSON value, optionally padded with whitespace on the front."
   {:product "A vector, map, number, true, false, or nil."}
   (p/prefix <ws?> (p/+ <object> <array> <str> <true> <false> <null>)))
+
+(p/defrule <document>
+  "A general JSON document, optionally padded with whitespace on both sides.
+  The root rule of the JSON grammar."
+  (p/suffix <value> <ws?>))
