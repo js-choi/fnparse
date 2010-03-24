@@ -30,6 +30,7 @@
   (p/defrule rule-name
     "Padded on the front with optional whitespace."
     (p/prefix <ws?> (p/lit token)))
+  <escape-char-start> \\
   <str-delimiter>   \"
   <value-separator> \,
   <name-separator>  \:
@@ -48,17 +49,50 @@
   <false> "false" false
   <null>  "null"  nil)
 
+(defn- control-char? [character]
+  (<= 0 (int character) 16r1F))
+
+(p/defrule <control-char>
+  "A Unicode control character, which is not allowed in strings."
+  (p/term "a Unicode control character" control-char?))
+
 (p/defrule <normal-str-char>
-  "Define normal, non-espaced string characters."
+  "A normal, non-espaced string character. No control characters allowed."
   {:product "A character."}
-  (p/except "a normal string character" p/<anything> <str-delimiter>))
+  (p/annotate-error
+   (fn [error]
+     (when (-> error :unexpected-token (not= \"))
+       "Unicode control characters are not allowed in strings"))
+    (p/except "a normal string character" p/<anything>
+      (p/+ <str-delimiter> <control-char>))))
   ; The `except` rule-maker requires a label argument.
+
+(def normal-escape-sequences
+  {\" \", \\ \\, \/ \/, \b \backspace, \f \formfeed, \n \newline,
+   \r \return, \t \tab})
+
+(defn combine-hexadecimal-digits [digits]
+  (reduce #(+ (* 16 %1) %2) digits))
+
+(p/defrule <unicode-sequence>
+  "The lowercase u followed by hexadecimal digits."
+  {:product "The character with the given digits' Unicode code."}
+  (p/prefix (p/lit \u)
+    (p/hook (comp char combine-hexadecimal-digits)
+      (p/factor= 4 p/<hexadecimal-digit>))))
+
+(p/defrule <escaped-str-char>
+  "An escaped character in a string, preceded by a backslash."
+  {:product "A character."}
+  (p/prefix <escape-char-start>
+    (p/+ (p/term* "escape sequence" normal-escape-sequences)
+         <unicode-sequence>)))
 
 (p/defrule <str-char>
   "A general string character."
   {:product "A character or a sequence of characters."
    :consumes "One character."}
-  (p/+ <normal-str-char>))
+  (p/+ <escaped-str-char> <normal-str-char>))
 
 (p/defrule <str-content>
   "A sequence of string characters."

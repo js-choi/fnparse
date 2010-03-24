@@ -490,7 +490,9 @@
     just as long as a token is consumed, use `-anything-`.
   * If you want a terminal rule, but you want the result
     of the predicate to be the rule's product instead of
-    the token itself, use `term*`."
+    the token itself, use `term*`. This is useful if
+    you have a map of tokens and their products (e.g.
+    string escape sequences)."
   {:success "When there's a next token, and it fulfills `(pred token)`."
    :product "The consumed token itself."
    :consumes "One token, any type that fulfills `pred`."
@@ -896,10 +898,10 @@
   
   `message-fn` must return a string when given
   the original `ParseError`, which will be added
-  to the `ParseError`.
-  `ParseError`s are maps of type
+  to the `ParseError`, or `nil` for no message.
+  (`ParseError`s are maps of type
   `:edu.arizona.fnparse/ParseError`.
-  See its documentation for more information."
+  See its documentation for more information.)"
   [message-fn rule]
   (letfn [(annotate [result]
             (delay (let [{error :error, :as forced-result} (force result)

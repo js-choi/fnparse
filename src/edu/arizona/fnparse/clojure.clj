@@ -1,10 +1,9 @@
 (ns edu.arizona.fnparse.clojure
-  (:require [edu.arizona.fnparse.hound :as p]
-            [clojure.template :as t] [clojure.set :as set]
+  (:require [edu.arizona.fnparse.hound :as p] [edu.arizona.fnparse :as c]
+            [clojure [template :as t] [set :as set]]
             [clojure.contrib.seq :as seq]
             [clojure.contrib.except :as except]
             edu.arizona.fnparse.hound.test)
-  (:use [clojure.test :only #{set-test is run-tests}])
   (:refer-clojure :exclude #{read-string})
   (:import [clojure.lang IPersistentMap]))
 
@@ -42,7 +41,7 @@
 (def indicator-set (set ";()[]{}\\\"'@^`#"))
 
 (defn annotate-symbol-end [error]
-  (if (= (:unexpected-token error) \/)
+  (when (= (:unexpected-token error) \/)
     "multiple slashes aren't allowed in symbols"))
 
 (defn make-parameter-vector [{:keys #{normal-parameters slurping-parameter}}]
@@ -445,67 +444,4 @@
       (fn [product position] product)
       (fn [error]
         (except/throwf "FnParse parsing error: %s"
-          (p/format-parse-error error))))))
-
-;;; TESTS.
-
-(set-test <form>
-  (is (match? <form> "123" :product? #(== % 123)))
-  (is (match? <form> "55.23" :product? #(== % 55.23)))
-  (is (match? <form> "55.2e2" :product? #(== % 5520.)))
-  (is (match? <form> "16r3AF" :product? #(== % 943)))
-  (is (match? <form> "16." :product? #(== % 16.)))
-  (is (match? <form> "true" :product? true?))
-  (is (= (with-out-str (p/parse <form> "^()" {} list list))
-         "WARNING: The ^ indicator is deprecated (since Clojure 1.1).\n"))
-  (is (match? <form> "(+ 33 22)" :product? list?))
-  (is (match? <form> "[()]" :product? #(= % [()])))
-  (is (match? <form> "\"\\na\\u3333\"" :product? #(= % "\na\u3333")))
-  (is (non-match? <form> "([1 32]"
-        :position 7
-        :labels #{"a form" "')'" "whitespace"}))
-  (is (non-match? <form> "a/b/c"
-        :position 3
-        :messages #{"multiple slashes aren't allowed in symbols"}
-        :labels #{"an indicator" "the end of input"
-                  "a symbol character" "whitespace"}))
-  (is (match? <form> ":a/b" :product? #(= % :a/b)))
-  (is (match? <form> "::b"
-        :context (ClojureContext "user" nil nil nil)
-        :product? #(= % :user/b)))
-  (is (non-match? <form> "::z/abc"
-        :position 3
-        :messages #{"no namespace with alias 'z'"}
-        :labels #{"the end of input" "a symbol character" "an indicator"
-                  "whitespace"}))
-  (is (match? <form> "+" :product? #(= % '+)))
-  (is (match? <form> "clojure.core//" :product? #(= % 'clojure.core//)))
-  (is (match? <form> "#!/usp/bin/clojure\n\"a\\n\"" :product? #(= % "a\n")))
-  (is (match? <form> "[~@a ()]"
-        :product? #(= % [(list 'clojure.core/unquote-splicing 'a) ()])))
-  (is (match? <form> "[#(%) #(apply + % %2 %2 %&)]"
-        :context (ClojureContext "user" nil nil nil)
-        :product? #(= ((eval (second %)) 3 2 8 1) 16)))
-  (is (match? <form> "#=(+ 3 2)" :context (ClojureContext nil nil nil true)
-                                 :product? #(= % 5)))
-  (is (match? <form> "#\"\\w+\""
-        :product? #(re-matches % "abc")))
-  (is (non-match? <form> "17rAZ"
-        :position 4
-        :labels #{"a base-17 digit" "an indicator" "whitespace"
-                  "the end of input"}))
-  (is (non-match? <form> "#(% #(%))"
-        :position 6
-        :context (ClojureContext "user" nil nil nil)
-        :messages #{"nested anonymous functions are not allowed"}))
-  (is (non-match? <form> "3/0 3"
-        :position 3
-        :labels #{"a decimal digit"}
-        :messages #{"a fraction's denominator cannot be zero"}))
-  (is (non-match? <form> "#<java.lang.String@35235>"
-        :position 25
-        :labels #{}
-        :messages #{"the data in #<java.lang.String@35235> is unrecoverable"})))
-
-(set-test read-string
-  (is (= (read-string "[3 2 5]") [3 2 5])))
+          (c/format-parse-error error))))))
