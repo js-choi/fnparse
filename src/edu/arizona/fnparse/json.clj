@@ -1,3 +1,58 @@
+(ns edu.arizona.fnparse.json
+  "Contains a parser for [the JSON language][JSON], or
+  JavaScript Object Notation. It is a simple language for
+  storing simple data structures: numbers, strings,
+  \"arrays\" (i.e. vectors), and \"objects\" (i.e. maps).
+  
+  The formal grammar can be seen in pictoral format
+  at [JSON's homepage][JSON] or in textual format in
+  [RFC 4627][RFC].
+  
+  [JSON]: http://json.org
+  [RFC]: http://www.ietf.org/rfc/rfc4627"
+  (:require [edu.arizona.fnparse.hound :as p] [clojure.set :as set]
+            [clojure.contrib [seq :as seq] [except :as except]]
+            edu.arizona.fnparse.hound.test)
+  (:use [clojure.template :only #{do-template}]
+        [clojure.test :only #{set-test is run-tests}])
+  (:refer-clojure :exclude #{read-string}))
+
+(defn str* [objects]
+  (apply str objects))
+
+; Define single-character indicator rules.
+(do-template [rule-name token]
+  (def rule-name (p/lit token))
+  <str-delimiter>     \"
+  <value-separator>      \,
+  <name-value-separator> \:
+  <array-start>          \[
+  <array-end>            \]
+  <object-start>         \{
+  <object-end>           \})
+
+; Define multi-character indicator rules.
+(do-template [rule-name tokens product]
+  (def rule-name (->> tokens p/phrase (p/chook product)))
+  <true>  "true"  true
+  <false> "false" false
+  <null>  "null"  nil)
+
+(def <normal-str-char>
+  (p/except "string character" p/<anything> <str-delimiter>))
+
+(def <str-chars> (p/rep* (p/+ <normal-str-char>)))
+
+(def <str>
+  (->>
+    (p/circumfix <str-delimiter> <str-chars> <str-delimiter>)
+    (p/hook str*)))
+
+#_(def <array>
+  (p/circumfix <array-start> <values> <array-end>))
+
+(comment
+
 (ns name.choi.joshua.fnparse.json
   (:use name.choi.joshua.fnparse clojure.contrib.error-kit
         clojure.contrib.test-is
@@ -74,7 +129,7 @@
   
   ;; And here are where this parser's rules are defined.
   
-  (def string-delimiter
+  (def str-delimiter
     (nb-char-lit \"))
   
   (def escape-indicator
@@ -301,3 +356,5 @@
   (is (= (load-stream "{\"a\": 1, \"b\\n\": 2, \"\\u1234\": 3}")
          {"a" 1, "b\n" 2, "\u1234" 3})
       "loading a flat object containing strings and integers"))
+
+)
