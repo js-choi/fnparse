@@ -52,12 +52,13 @@
 (define-fn make-state [input context]
   (State input 0 context (Bank {} [] {}) nil))
 
-(define-fn parse
-  "The general parsing function of FnParse Hound.
+(define-fn match
+  "The general matching function of FnParse Cat.
+  Tries to match the given `rule` to the *entire* given `input`.
   
   *   `rule`: The rule. It must accept whatever state that
       make-state returns.
-  *   `input`: The sequence of tokens to parse.
+  *   `input`: The sequence of tokens to match.
   *   `context`: The initial context for the rule.
   *   `success-fn`: A function called when the rule matches
       the input. `(success-fn final-product final-position)`
@@ -66,11 +67,11 @@
       match the input. `(failure-fn final-error)` is called.
   
   If `success-fn` and `failure-fn` aren't included, then
-  parse will print out a report of the parsing result."
+  `match` will print out a report of the parsing result."
   ([rule input context success-fn failure-fn]
-   (c/parse make-state rule input context success-fn failure-fn))
+   (c/match make-state rule input context success-fn failure-fn))
   ([rule input context]
-   (parse rule input context nil nil)))
+   (match rule input context nil nil)))
 
 (define-fn prod
   "Creates a product rule.

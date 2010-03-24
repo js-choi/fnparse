@@ -441,7 +441,7 @@
                 Defaults to *read-eval*."
   [input & opts]
   (let [{:keys #{ns-name ns-aliases reader-eval?}} (apply hash-map opts)]
-    (p/parse <form> input (ClojureContext ns-name ns-aliases nil reader-eval?)
+    (p/match <form> input (ClojureContext ns-name ns-aliases nil reader-eval?)
       (fn [product position] product)
       (fn [error]
         (except/throwf "FnParse parsing error: %s"

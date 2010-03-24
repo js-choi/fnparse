@@ -279,28 +279,31 @@
       (alter-var-root maker-var# memoize))
     maker-var#))
 
-(defn- format-unexpected-token [input position]
+(defn- format-tokens [input position]
   (let [input-size (count input)
         remainder-size (- input-size position)
         subinput (drop position input)
         subinput (cond (= remainder-size 0) "the end of input"
                        (> remainder-size 7) (concat (take 7 subinput) ["..."])
-                       true subinput)]
-    (if (string? input) (apply-seq str subinput) subinput)))
+                       true subinput)
+        subinput (seq subinput)]
+    (if (string? input)
+      (->> subinput (apply-seq str) (format "'%s'"))
+      subinput)))
 
 (defn format-parse-error-data
   "Returns a formatted string with the given error data.
   The descriptor map should be returned from group-descriptors."
   [input position descriptor-map]
-  (let [unexpected-token (format-unexpected-token input position)
+  (let [unexpected-tokens (format-tokens input position)
         {labels :label, messages :message} descriptor-map
         expectation-text (when (seq labels)
                            (->> labels (str/join ", or ") (str "expected ")
                                 list))
         message-text (->> expectation-text (concat messages)
                           (str/join "; "))]
-    (format "At position %s, '%s': %s"
-      position unexpected-token message-text)))
+    (format "At position %s, %s: %s"
+      position unexpected-tokens message-text)))
 
 (defn group-descriptors
   "From the given set of descriptors, returns a map with
@@ -319,37 +322,61 @@
   (let [{:keys #{position descriptors unexpected-token}} error]
     (format-parse-error-data input position (group-descriptors descriptors))))
 
-(defn print-success [input context product position]
+(defn- print-complete [input context product position]
   (printf
-    "PARSE SUCCESSFUL MATCH
-======================
+    "COMPLETE MATCH
+==============
 * Input: %s
 * Initial context: %s
 * Final product: %s
 * Final product type: %s
 * Final position: %s
+* Input size: %s
 "
-    (pr-str input) (pr-str context) (pr-str product) (type product) position))
+    (pr-str input) (pr-str context) (pr-str product)
+    (type product) position (count input))
+  true)
+
+(defn- print-incomplete [input context product position]
+  (printf
+    "INCOMPLETE MATCH
+================
+* Input: %s
+* Initial context: %s
+* Final product: %s
+* Final product type: %s
+* Final position: %s
+* Input size: %s
+* Unmatched remainder: %s
+"
+    (pr-str input) (pr-str context) (pr-str product)
+    (type product) position (count input) (format-tokens input position))
+  false)
+
+(defn print-success [input context product position]
+  ((if (= position (count input)) print-complete print-incomplete)
+   input context product position))
 
 (defn print-failure [input context error]
   (printf
-    "PARSE FAILED MATCH
-==================
+    "FAILED MATCH
+===========
 * Input: %s
 * Initial context: %s
 * Error: %s
 "
-    (pr-str input) (pr-str context) (format-parse-error error input)))
+    (pr-str input) (pr-str context) (format-parse-error error input))
+  false)
 
-(defn parse
+(defn match
   "Parses the given input using the given rule.
-  *Use the parse function in fnparse.cat or fnparse.hound
+  *Use the match function in fnparse.cat or fnparse.hound
   in preference to this function.*
   make-state: A function to create a state for the rule
               from the given input and context.
   rule: The rule. It must accept whatever state that
         make-state returns.
-  input: The sequence of tokens to parse.
+  input: The sequence of tokens to match.
   context: The initial context for the rule.
   success-fn: A function called when the rule matches
               the input. `(success-fn final-product
@@ -383,7 +410,7 @@
 (defn match-assert-expr
   "The function that's used for (is (match? ...)) forms in
   fnparse.hound.test and fnparse.cat.test."
-  [parse-fn msg rule input opts]
+  [match-fn msg rule input opts]
   (let [{:keys #{position context product?}
          :or {product? (list constantly true), position (count input),
               context {}}}
@@ -394,7 +421,7 @@
                              :expected expected-arg#, :actual actual-arg#}))
               ([kind#]
                (test/report {:type kind#, :message ~msg})))]
-      (~parse-fn ~rule ~input ~context
+      (~match-fn ~rule ~input ~context
         (fn success-match [actual-product# actual-position#]
           (if (not= actual-position# ~position)
             (report-this# :fail
@@ -407,7 +434,7 @@
               (report-this# :pass))))
         (fn failure-match [error#]
           (report-this# :fail
-            (format "a successful parse by the rule '%s' from the input '%s'"
+            (format "a successful match by the rule '%s' from the input '%s'"
               '~rule '~input)
             (format-parse-error error#)))))))
 
@@ -419,7 +446,7 @@
 (defn non-match-assert-expr
   "The function that's used for (is (non-match? ...)) forms in
   fnparse.hound.test and fnparse.cat.test."
-  [parse-fn msg rule input opts]
+  [match-fn msg rule input opts]
   (let [{:keys #{labels messages position context}} (apply-seq hash-map opts)
         descriptor-map {:label labels, :message messages}]
    `(letfn [(report-this#
@@ -428,12 +455,12 @@
                              :expected expected-arg#, :actual actual-arg#}))
               ([kind#]
                (test/report {:type kind#, :message ~msg})))]
-      (let [expected-error-str# (format-parse-error-data 
+      (let [expected-error-str# (format-match-error-data 
                                   (or ~position "any") ~descriptor-map)]
-        (~parse-fn ~rule ~input ~context
+        (~match-fn ~rule ~input ~context
           (fn success-nonmatch [actual-product# actual-position#]
             (report-this# :fail expected-error-str#
-              (format "successful parse up to %s with a product of %s"
+              (format "successful match up to %s with a product of %s"
                 actual-position# actual-product#)))
           (fn failure-nonmatch
             [{actual-position# :position, actual-descriptors# :descriptors}]

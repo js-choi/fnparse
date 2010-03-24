@@ -25,12 +25,13 @@
   [remainder context]
   (State remainder 0 context))
 
-(defn parse
+(defn match
   "The general parsing function of FnParse Hound.
+  Tries to match the given `rule` to the *entire* given `input`.
   
   *   `rule`: The rule. It must accept whatever state that
       make-state returns.
-  *   `input`: The sequence of tokens to parse.
+  *   `input`: The sequence of tokens to match.
   *   `context`: The initial context for the rule.
   *   `success-fn`: A function called when the rule matches
       the input. `(success-fn final-product final-position)`
@@ -41,11 +42,11 @@
       `:edu.arizona.fnparse/ParseError`.
   
   If `success-fn` and `failure-fn` aren't included, then
-  parse will print out a report of the parsing result."
+  `match` will print out a report of the parsing result."
   ([rule input context success-fn failure-fn]
-   (c/parse make-state rule input context success-fn failure-fn))
+   (c/match make-state rule input context success-fn failure-fn))
   ([rule input context]
-   (parse rule input context nil nil)))
+   (match rule input context nil nil)))
 
 (defn format-parse-error [error]
   (c/format-parse-error error))

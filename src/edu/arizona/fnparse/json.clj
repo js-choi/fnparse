@@ -72,16 +72,13 @@
 #_(def <nonzero-integer>
   (p/rep ))
 
-(p/defrule <value>
-  "A general JSON value, optionally padded with whitespace on the front."
-  {:product "A vector, map, number, true, false, or nil."}
-  (p/prefix <ws?> (p/+ <str> <true> <false> <null>)))
+(declare <value>)
 
 (p/defrule <array-content>
   "A sequence of JSON values separated by commas, with optional
   whitespace padding on the front."
   {:product "A vector."}
-  (p/separated-rep* <value-separator> <value>))
+  (p/separated-rep* <value-separator> #'<value>))
 
 (p/defrule <array>
   "A JSON array. Optionally padded on the front with whitespace."
@@ -92,7 +89,7 @@
   "A string-value pair with a colon. They appear in objects.
   Optionally padded on the front with whitespace."
   {:product "A vector pair."}
-  (p/for [name <str>, _ <name-separator>, val <value>]
+  (p/for [name <str>, _ <name-separator>, val #'<value>]
     [name val]))
 
 (p/defrule <object-content>
@@ -104,3 +101,8 @@
   "A JSON object. Optionally padded on the front with whitespace."
   {:product "A map."}
   (p/circumfix <object-start> <object-content> <object-end>))
+
+(p/defrule <value>
+  "A general JSON value, optionally padded with whitespace on the front."
+  {:product "A vector, map, number, true, false, or nil."}
+  (p/prefix <ws?> (p/+ <object> <array> <str> <true> <false> <null>)))
