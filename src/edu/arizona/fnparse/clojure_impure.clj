@@ -233,7 +233,7 @@
 (p/defmaker radix-coefficient-tail [base]
   (p/hook constantly
     (p/prefix
-      (case-insensitive-p/lit \r)
+      (p/case-insensitive-lit \r)
       (radix-natural-number base))))
 
 (p/defmaker number-tail [base]

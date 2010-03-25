@@ -53,18 +53,18 @@
   (<= 0 (int character) 16r1F))
 
 (p/defrule <control-char>
-  "A Unicode control character, which is not allowed in strings."
-  (p/term "a Unicode control character" control-char?))
+  "An ASCII control character, which is not allowed in strings."
+  (p/chook ::control-char p/<ascii-control>))
 
 (p/defrule <normal-str-char>
   "A normal, non-espaced string character. No control characters allowed."
   {:product "A character."}
-  (p/annotate-error
-   (fn [error]
-     (when (-> error :unexpected-token (not= \"))
-       "Unicode control characters are not allowed in strings"))
-    (p/except "a normal string character" p/<anything>
-      (p/+ <str-delimiter> <control-char>))))
+  (p/except "a normal string character"
+    (fn [subtrahend-prod]
+      (when (= subtrahend-prod ::control-char)
+        "an illegal, invisible ASCII control character was found in a string"))
+    p/<anything>
+    (p/+ <str-delimiter> <control-char>)))
   ; The `except` rule-maker requires a label argument.
 
 (def normal-escape-sequences
@@ -77,7 +77,8 @@
 (p/defrule <unicode-sequence>
   "The lowercase u followed by hexadecimal digits."
   {:product "The character with the given digits' Unicode code."}
-  (p/prefix (p/lit \u)
+  (p/prefix
+    (p/lit \u)
     (p/hook (comp char combine-hexadecimal-digits)
       (p/factor= 4 p/<hexadecimal-digit>))))
 
@@ -85,7 +86,8 @@
   "An escaped character in a string: a backslash
   followed by an escape sequence."
   {:product "A character."}
-  (p/prefix <escape-char-start>
+  (p/prefix
+    <escape-char-start>
     (p/+ (p/term* "escape sequence" normal-escape-sequences)
          <unicode-sequence>)))
 

@@ -2,11 +2,9 @@
   "This is *FnParse Hound*, which can create unambiguous,
   LL(1) or LL(n) parsers."
   (:require [edu.arizona.fnparse :as c]
-            [clojure.contrib.seq :as seq]
-            [clojure.contrib.monads :as m]
-            [clojure.template :as t]
-            [clojure.contrib.def :as d]
-            [clojure.contrib.except :as except])
+            [clojure.contrib [seq :as seq] [monads :as m] [def :as d]
+                             [except :as except]]
+            [clojure [template :as t] [set :as set]])
   (:refer-clojure :rename {mapcat seq-mapcat}
                   :exclude #{for + peek find})
   (:import [clojure.lang IPersistentMap]))
@@ -203,8 +201,8 @@
 (defrule <nothing>
   "The general failing rule.
   
-  Use `with-error` in preference to `<nothing>`,
-  because `with-error` rules can attach meaningful
+  Use `with-error` or `only-when` in preference to `<nothing>`,
+  because the first two rule-makers can attach meaningful
   error messages.
   
   Is the zero monadic value of the `parser-m` monad."
@@ -355,6 +353,20 @@
    m-bind combine
    m-plus +])
 
+(defn- assoc-label-in-descriptors
+  "Removes all labels from the given `descriptors` set, then adds the
+  given `label-str`."
+  [descriptors label-str]
+  (let [descriptors (set/select #(not= (:kind %) :label) descriptors)
+        descriptors (conj descriptors (c/ErrorDescriptor :label label-str))]
+    descriptors))
+
+(defn- assoc-label-in-result [result label-str]
+  (-> result
+    force
+    (update-in [:error :descriptors] assoc-label-in-descriptors label-str)
+    delay))
+
 (defmaker label
   "Creates a labelled rule.
   
@@ -378,16 +390,11 @@
    :consumes "Whatever `rule` consumes."
    :error "Smartly determines the appropriate error message."}
   [label-str rule]
-  (letfn [(assoc-label [result]
-            (-> result force
-              (assoc-in [:error :descriptors]
-                #{(c/ErrorDescriptor :label label-str)})
-              delay))]
-    (fn labelled-rule [state]
-      (let [reply (c/apply state rule)]
-        (if-not (:tokens-consumed? reply)
-          (update-in reply [:result] assoc-label)
-          reply)))))
+  (fn labelled-rule [state]
+    (let [reply (c/apply state rule)]
+      (if-not (:tokens-consumed? reply)
+        (update-in reply [:result] assoc-label-in-result label-str)
+        reply))))
 
 (defmaker-macro for
   "Creates a rule comprehension, very much like
@@ -465,8 +472,8 @@
                     (assoc state :remainder (next remainder)
                                  :position (inc position))
                     (c/ParseError position nil nil))))
-              (make-failed-reply state first-token nil)))
-          (make-failed-reply state ::c/end-of-input nil))))))
+              (make-failed-reply state first-token #{})))
+          (make-failed-reply state ::c/end-of-input #{}))))))
 
 (defmaker term
   "Creates a terminal rule.
@@ -669,16 +676,30 @@
   "Creates a negative lookahead rule. Checks if
   the given `rule` fails, but doesn't actually
   consume any tokens. You must provide a `label-str`
-  describing this rule."
+  describing this rule.
+  
+  `message-fn`, if given, creates a detailed error
+  message when the sub-rule succeeds. `message-fn`
+  should be a function that takes one argument: `rule`'s
+  product, and returns a string."
   {:success "If `rule` succeeds."
    :product "Always `true`."}
-  [label-str rule]
-  (label label-str
-    (fn antipeek-rule [state]
-      (let [result (-> state (c/apply rule) :result force)]
-        (if (c/failure? result)
-          (Reply false (c/Success true state (:error result)))
-          (-> state (c/apply <nothing>)))))))
+  ([label-str rule]
+   (label label-str
+     (fn antipeek-rule [state]
+       (let [result (-> state (c/apply rule) :result force)]
+         (if (c/failure? result)
+           (Reply false (c/Success true state (:error result)))
+           (c/apply state <nothing>))))))
+  ([label-str message-fn rule]
+   (label label-str
+     (fn antipeek-rule [state]
+       (let [result (-> state (c/apply rule) :result force)]
+         (if (c/failure? result)
+           (Reply false (c/Success true state (:error result)))
+           (let [message (message-fn (:product result))
+                 error-rule (if message (with-error message) <nothing>)]
+             (c/apply state error-rule))))))))
 
 (defn- apply-reply-and-rule [f prev-reply next-rule]
   (c/apply nil
@@ -876,7 +897,12 @@
   "Creates a subtracted rule. Matches using
   the given minuend rule, but only when the
   subtrahend rule does not also match. You
-  must provide a custom `label-str`."
+  must provide a custom `label-str`.
+
+  `message-fn`, if given, creates a detailed error
+  message when the `subtrahend` succeeds. `message-fn`
+  should be a function that takes one argument: `subtrahend`'s
+  product, and returns a string."
   {:success "If `minuend` succeeds and `subtrahend` fails."
    :product "`minuend`'s product."
    :consumes "Whatever `minuend` consumes."
@@ -885,9 +911,10 @@
    (for [_ (antipeek label-str subtrahend)
          product (label label-str minuend)]
      product))
-  ([label-str minuend first-subtrahend & rest-subtrahends]
-   (except label-str minuend
-     (apply + (cons first-subtrahend rest-subtrahends)))))
+  ([label-str message-fn minuend subtrahend]
+   (for [_ (antipeek label-str message-fn subtrahend)
+         product (label label-str minuend)]
+     product)))
 
 (defmaker annotate-error
   "Creates an error-annotating rule. Whenever
@@ -941,8 +968,7 @@
 
 (def ascii-digits "0123456789")
 (def lowercase-ascii-alphabet "abcdefghijklmnopqrstuvwxyz")
-(def uppercase-ascii-alphabet
-  (map #(Character/toUpperCase (char %)) lowercase-ascii-alphabet))
+(def uppercase-ascii-alphabet "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
 (defn radix-label
   "The function used by radix-digit to smartly
@@ -1027,3 +1053,10 @@
    :consumes "One character."}
   (label "an alphanumeric ASCII character"
     (+ <ascii-letter> <ascii-digit>)))
+
+(defrule <ascii-control>
+  "A rule matching a single ASCII control character,
+  i.e. a character within Unicode points 0000 and 001F."
+  {:product "The matching character itself."
+   :consumes "One character."}
+  (term "an ASCII control character" #(Character/isISOControl (char %))))
