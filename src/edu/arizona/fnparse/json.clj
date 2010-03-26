@@ -65,7 +65,6 @@
         "an illegal, invisible ASCII control character was found in a string"))
     p/<anything>
     (p/+ <str-delimiter> <control-char>)))
-  ; The `except` rule-maker requires a label argument.
 
 (def normal-escape-sequences
   {\" \", \\ \\, \/ \/, \b \backspace, \f \formfeed, \n \newline,

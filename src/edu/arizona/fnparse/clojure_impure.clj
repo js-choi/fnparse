@@ -1,5 +1,5 @@
 (ns edu.arizona.fnparse.clojure-impure
-  (:require [edu.arizona.fnparse.hound :as p] [edu.arizona.fnparse :as c]
+  (:require [edu.arizona.fnparse.hound :as p] [edu.arizona.fnparse :as fnp]
             [clojure [template :as t] [set :as set]]
             [clojure.contrib.seq :as seq]
             [clojure.contrib.except :as except]
@@ -440,4 +440,4 @@
       (fn [product position] product)
       (fn [error]
         (except/throwf "FnParse parsing error: %s"
-          (c/format-parse-error error))))))
+          (fnp/format-parse-error error))))))

@@ -1,6 +1,7 @@
 (ns edu.arizona.fnparse.cat
-  (:require [clojure.contrib.monads :as m] [clojure.template :as template]
-            [edu.arizona.fnparse :as c] [clojure.contrib.def :as d]
+  (:require [edu.arizona.fnparse :as fnp]
+            [clojure.contrib.monads :as m] [clojure.template :as template]
+            [edu.arizona.fnparse.common :as c] [clojure.contrib.def :as d]
             [clojure.contrib.seq :as seq])
   (:refer-clojure :rename {peek vec-peek}
                   :exclude #{for + mapcat find})
@@ -13,13 +14,16 @@
 (defn- vary-bank [bankable f & args]
   (set-bank bankable (apply f (get-bank bankable) args)))
 
+(declare make-state)
+
 (deftype State [tokens position context] :as this
-  c/AState
-    (position [] position)
-    (remainder [] (drop position tokens))
+  fnp/AState
+    (get-position [] position)
+    (get-remainder [] (drop position tokens))
   ABankable
     (get-bank [] (meta this))
     (set-bank [new-bank] (with-meta this new-bank))
+    (make-another-state [input context] (make-state input context))
   IPersistentMap)
 
 (deftype Bank [memory lr-stack position-heads] IPersistentMap)
@@ -42,66 +46,18 @@
 
 (deftype Head [involved-rules rules-to-be-evaluated] IPersistentMap)
 
-(extend ::c/Success ABankable
+(extend ::fnp/Success ABankable
   {:get-bank (comp get-bank :state)
    :set-bank #(update-in %1 [:state] set-bank %2)})
 
-(extend ::c/Failure ABankable
+(extend ::fnp/Failure ABankable
   {:get-bank meta
    :set-bank with-meta})
 
 (defn make-state [input context]
   (State input 0 context (Bank {} [] {}) nil))
 
-(defn match
-  "The general matching function of FnParse Cat. Attempt to
-  match the given rule to at least the beginning of the given input.
-  
-  *   `rule`: The rule. It must accept whatever state that
-      make-state returns.
-  *   `context`: The initial context for the rule.
-  *   `success-fn`: A function called when the rule
-      matches the input.
-      `(complete-fn final-product final-remainder)` is called.
-  *   `failure-fn`: A function called when the rule does not
-      match the input. `(failure-fn final-error)` is called,
-      where `final-error` is an object of type
-      `:edu.arizona.fnparse/ParseError`.
-  *   `input`: The sequence of tokens to match.
-  
-  If `success-fn` and `failure-fn` aren't included, then
-  `match` will print out a report of the parsing result."
-  ([rule context success-fn failure-fn input]
-   (c/match make-state rule context success-fn failure-fn input))
-  ([rule context input]
-   (match rule context nil nil input)))
-
-(defn find
-  "Finds all occurrences of a rule in a sequence of tokens.
-  Returns a lazy sequence of the rule's products at each
-  occurence. The occurences do not overlap."
-  [<rule> context input]
-  (c/find match <rule> context input))
-
-(defn substitute
-  "Substitutes all occurences of a rule in a sequence of tokens
-  with their respective products. Returns a lazy sequence of
-  tokens and products.
-  
-  `flatten?` is a boolean. If it is true, then the substituting
-  products will be flattened into the input sequence; in that
-  case the products must always be Seqables."
-  [<rule> context flatten? input]
-  (c/substitute match <rule> context flatten? input))
-
-(defn substitute-1
-  "Substitutes the first occurence of a rule in a sequence of
-  tokens with its respective product. Returns a lazy sequence
-  of tokens and products.
-  
-  See `substitute`'s docs for information on `flatten?`."
-  [<rule> context flatten? input]
-  (c/substitute-1 match <rule> context flatten? input))
+(d/defalias match c/match)
 
 (defn prod
   "Creates a product rule.
@@ -117,8 +73,8 @@
   Is the result monadic function of the `parser-m` monad."
   [product]
   (fn product-rule [state]
-    (c/Success product state
-      (c/ParseError (:position state) nil nil))))
+    (fnp/Success product state
+      (fnp/ParseError (:position state) nil nil))))
 
 (defmacro defrm [& forms]
   `(d/defn-memo ~@forms))
@@ -138,8 +94,8 @@
 
 (defn- make-failure [state unexpected-token descriptors]
   (set-bank
-    (c/Failure
-      (c/ParseError (:position state) unexpected-token descriptors))
+    (fnp/Failure
+      (fnp/ParseError (:position state) unexpected-token descriptors))
     (get-bank state)))
 
 (defn <nothing>
@@ -159,18 +115,18 @@
 
 (defn with-error [message]
   (fn with-error-rule [state]
-    (make-failure state nil #{(c/ErrorDescriptor :message message)})))
+    (make-failure state nil #{(fnp/ErrorDescriptor :message message)})))
 
 (defn only-when [valid? message]
   (if-not valid? (with-error message) (prod valid?)))
 
 (defn combine [rule product-fn]
   (fn [state]
-    (let [{first-error :error, :as first-result} (c/apply state rule)]
+    (let [{first-error :error, :as first-result} (fnp/apply state rule)]
       ;(prn ">" first-result)
-      (if (c/success? first-result)
+      (if (fnp/success? first-result)
         (let [next-rule (-> first-result :product product-fn)
-              next-result (-> first-result :state (c/apply next-rule))
+              next-result (-> first-result :state (fnp/apply next-rule))
               next-error (:error next-result)]
           ;(prn ">>" next-result)
           ;(prn ">>>" (c/merge-parse-errors first-error next-error))
@@ -199,10 +155,10 @@
       (let [cur-bank (update-in cur-bank [:lr-stack node-index]
                        #(assoc % :rules-to-be-evaluated
                           (:involved-rules %)))
-            cur-result (c/apply (set-bank state-0 cur-bank) subrule)
+            cur-result (fnp/apply (set-bank state-0 cur-bank) subrule)
             cur-result-bank (get-bank cur-result)
             cur-memory-val (get-memory cur-result-bank subrule position-0)]
-        (if (or (c/failure? cur-result)
+        (if (or (fnp/failure? cur-result)
                 (<= (-> cur-result :state :position)
                     (-> cur-memory-val :state :position)))
           (let [cur-result-bank (update-in cur-result-bank [:position-heads]
@@ -233,7 +189,7 @@
     (if (-> lr-node :rule (not= subrule))
       node-seed
       (let [bank (store-memory bank subrule (:position state) node-seed)]
-        (if (c/failure? node-seed)
+        (if (fnp/failure? node-seed)
           (set-bank node-seed bank)
           (grow-lr subrule (set-bank state bank) node-index))))))
 
@@ -252,7 +208,7 @@
           (if (-> head :rules-to-be-evaluated (contains? subrule))
             (let [bank (update-in [:lr-stack node-index :rules-to-be-evalated]
                          disj subrule)
-                  result (-> state (set-bank bank) (c/apply subrule))]
+                  result (-> state (set-bank bank) (fnp/apply subrule))]
               (vary-bank result store-memory subrule position result))
             memory))))))
 
@@ -273,7 +229,7 @@
               bank (update-in bank [:lr-stack] conj
                      (LRNode nil subrule nil))
               state-0b (set-bank state bank)
-              subresult (c/apply  state-0b subrule)
+              subresult (fnp/apply  state-0b subrule)
               bank (get-bank subresult)
               submemory (get-memory bank subrule state-position)
               current-lr-node (-> bank :lr-stack vec-peek)
@@ -293,7 +249,7 @@
           (apply-next-rule [state prev-result next-rule]
             (-> state
               (set-bank (get-bank prev-result))
-              (c/apply next-rule)
+              (fnp/apply next-rule)
               (update-in [:error] (partial merge-result-errors prev-result))))]
     (remember
       (fn summed-rule [state]
@@ -302,7 +258,7 @@
               results (rest (seq/reductions apply-next-rule
                               initial-result rules))]
           #_ (str results) #_ (prn "results" results)
-          (or (seq/find-first c/success? results) (last results)))))))
+          (or (seq/find-first fnp/success? results) (last results)))))))
 
 (m/defmonad parser-m
   "The monad that FnParse uses."
@@ -314,10 +270,10 @@
 (defn label [label-str rule]
   {:pre #{(string? label-str)}}
   (fn labelled-rule [state]
-    (let [result (c/apply state rule), initial-position (:position state)]
+    (let [result (fnp/apply state rule), initial-position (:position state)]
       (if (-> result :error :position (<= initial-position))
         (assoc-in result [:error :descriptors]
-          #{(c/ErrorDescriptor :label label-str)})
+          #{(fnp/ErrorDescriptor :label label-str)})
         result))))
 
 (defmacro for
@@ -363,10 +319,10 @@
       (let [token (nth tokens position ::nothing)]
         (if (not= token ::nothing)
           (if (validator token)
-            (c/Success token (assoc state :position (inc position))
-              (c/ParseError position token nil))
+            (fnp/Success token (assoc state :position (inc position))
+              (fnp/ParseError position token nil))
             (make-failure state token #{}))
-          (make-failure state ::c/end-of-input #{}))))))
+          (make-failure state ::fnp/end-of-input #{}))))))
 
 (defn antiterm [label-str pred]
   (term label-str (complement pred)))
@@ -449,8 +405,8 @@
 
 (defn peek [rule]
   (fn [state]
-    (let [result (c/apply state rule)]
-      (if (c/success? result)
+    (let [result (fnp/apply state rule)]
+      (if (fnp/success? result)
         ((prod (:product result)) state)
         result))))
 
@@ -462,10 +418,10 @@
   [rule]
   (label "<not followed by something>"
     (fn antipeek-rule [state]
-      (let [result (c/apply state rule)]
-        (if (c/failure? result)
-          (c/Success true state (:error result))
-          (c/apply state <nothing>))))))
+      (let [result (fnp/apply state rule)]
+        (if (fnp/failure? result)
+          (fnp/Success true state (:error result))
+          (fnp/apply state <nothing>))))))
 
 (defn mapcat [f tokens]
   (->> tokens (map f) (apply cat)))
@@ -516,7 +472,7 @@
 (defn effects [f & args]
   (fn effects-rule [state]
     (apply f args)
-    (c/apply state <emptiness>)))
+    (fnp/apply state <emptiness>)))
 
 (defn except
   "Creates a rule that is the exception from
@@ -541,10 +497,10 @@
             (let [new-message (message-fn error)]
               (if new-message
                 (update-in error [:descriptors]
-                  conj (c/ErrorDescriptor :message new-message))
+                  conj (fnp/ErrorDescriptor :message new-message))
                 error)))]
     (fn error-annotation-rule [state]
-      (let [reply (c/apply state rule)]
+      (let [reply (fnp/apply state rule)]
         (update-in reply [:error] annotate)))))
 
 (def ascii-digits "0123456789")
