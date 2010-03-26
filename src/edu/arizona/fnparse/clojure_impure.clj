@@ -1,9 +1,7 @@
 (ns edu.arizona.fnparse.clojure-impure
-  (:require [edu.arizona.fnparse.hound :as p] [edu.arizona.fnparse :as fnp]
+  (:require [edu.arizona.fnparse [hound :as p] [base :as pbase]]
             [clojure [template :as t] [set :as set]]
-            [clojure.contrib.seq :as seq]
-            [clojure.contrib.except :as except]
-            edu.arizona.fnparse.hound.test)
+            [clojure.contrib [seq :as seq] [except :as except]])
   (:refer-clojure :exclude #{read-string})
   (:import [clojure.lang IPersistentMap]))
 
@@ -440,4 +438,4 @@
       (fn [product position] product)
       (fn [error]
         (except/throwf "FnParse parsing error: %s"
-          (fnp/format-parse-error error))))))
+          (pbase/format-parse-error error))))))

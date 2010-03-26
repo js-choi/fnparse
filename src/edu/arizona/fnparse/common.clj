@@ -1,11 +1,8 @@
 (ns edu.arizona.fnparse.common
   {:author "Joshua Choi"}
-  (:require [edu.arizona.fnparse :as fnp]
-            [clojure.contrib.string :as str] [clojure.template :as temp]
-            [clojure.set :as set] [clojure.test :as test]
-            [clojure.contrib.seq :as seq] [clojure.contrib.monads :as m]
-            [clojure.contrib.def :as d])
-  (:refer-clojure :rename {apply apply-seq}, :exclude #{find})
+  (:require [edu.arizona.fnparse.base :as base] [clojure.contrib.def :as d]
+            [clojure.set :as set])
+  (:refer-clojure :exclude #{find})
   (:import [clojure.lang IPersistentMap]))
 
 (defn rule-doc-summary-header [obj-type-str]
@@ -14,7 +11,7 @@
   ======="
     obj-type-str))
 
-(defn rule-doc-first-header [library-name obj-type-str]
+(defn- rule-doc-first-header [library-name obj-type-str]
   (format "%s %s.\n\n  " library-name obj-type-str))
 
 (def rule-doc-info
@@ -32,7 +29,7 @@
       (->> doc-opts sort
         (map #(format "  * %s: %s" (rule-doc-info (key %)) (val %)))
         (interpose "\n")
-        (apply-seq str doc-str (rule-doc-summary-header obj-type-str) "\n"))
+        (apply str doc-str (rule-doc-summary-header obj-type-str) "\n"))
       doc-str)))
 
 (defmacro general-defrule [library-name rule-name doc-string meta-opts form]
@@ -71,7 +68,7 @@
 * Unmatched remainder: %s
 "
     (pr-str product) (type product)
-    (format-remainder string-input? final-remainder))
+    (base/format-remainder string-input? final-remainder))
   false)
 
 (defn print-success [string-input? product final-remainder]
@@ -85,7 +82,7 @@
 =============
 %s
 "
-    (fnp/format-parse-error error))
+    (base/format-parse-error error))
   false)
 
 (defn match
@@ -105,12 +102,12 @@
   If `success-fn` and `failure-fn` aren't included, then
   `match` will print out a report of the parsing result."
   ([rule state success-fn failure-fn]
-   (let [result (-> state (fnp/apply rule) fnp/answer-result)]
-     (if (fnp/failure? result)
+   (let [result (-> state (base/apply rule) base/answer-result)]
+     (if (base/failure? result)
        (failure-fn (:error result))
-       (success-fn (:product result) (-> result :state fnp/get-remainder)))))
+       (success-fn (:product result) (-> result :state base/get-remainder)))))
   ([rule state]
-   (let [string-input? (string? (fnp/get-remainder state))]
+   (let [string-input? (string? (base/get-remainder state))]
      (match rule state
        (partial print-success string-input?)
        print-failure))))
@@ -119,7 +116,7 @@
   [rule input context state-0]
   (when-let [input (seq input)]
     (lazy-seq
-      (match rule (fnp/make-another-state state-0 input context)
+      (match rule (base/make-another-state state-0 input context)
         (fn find-success [product remainder]
           (cons product (find* rule remainder context state-0)))
         (fn find-failure [_]
@@ -130,7 +127,7 @@
   Returns a lazy sequence of the rule's products at each
   occurence. The occurences do not overlap."
   [rule state]
-  (find* rule (fnp/get-remainder state) (:context state) state))
+  (find* rule (base/get-remainder state) (:context state) state))
 
 #_(defn substitute
   "Substitutes all occurences of a rule in a sequence of tokens

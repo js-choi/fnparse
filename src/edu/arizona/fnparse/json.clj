@@ -11,8 +11,7 @@
   [JSON]: http://json.org
   [RFC]: http://www.ietf.org/rfc/rfc4627"
   (:require [edu.arizona.fnparse.hound :as p] [clojure.set :as set]
-            [clojure.contrib [seq :as seq] [except :as except]]
-            edu.arizona.fnparse.hound.test)
+            [clojure.contrib [seq :as seq] [except :as except]])
   (:use [clojure.template :only #{do-template}]
         [clojure.test :only #{set-test is run-tests}])
   (:refer-clojure :exclude #{read-string}))
@@ -48,9 +47,6 @@
   <true>  "true"  true
   <false> "false" false
   <null>  "null"  nil)
-
-(defn- control-char? [character]
-  (<= 0 (int character) 16r1F))
 
 (p/defrule <control-char>
   "An ASCII control character, which is not allowed in strings."

@@ -1,10 +1,9 @@
 (ns edu.arizona.fnparse.hound
   "This is *FnParse Hound*, which can create unambiguous,
   LL(1) or LL(n) parsers."
-  (:require [edu.arizona.fnparse :as fnp]
-            [edu.arizona.fnparse.common :as c]
+  (:require [edu.arizona.fnparse [base :as base] [common :as c]]
             [clojure.contrib [seq :as seq] [monads :as m] [def :as d]
-                             [except :as except]]
+                             [except :as except] [core :as cc]]
             [clojure [template :as t] [set :as set]])
   (:refer-clojure :rename {mapcat seq-mapcat}
                   :exclude #{for + peek find})
@@ -14,14 +13,14 @@
 
 (deftype State [remainder position context] :as this
   IPersistentMap
-  fnp/AState
+  base/AState
     (get-position [] (:position this))
     (get-remainder [] (:remainder this))
     (make-another-state [input context] (make-state input context)))
 
 (deftype Reply [tokens-consumed? result] :as this
   IPersistentMap
-  fnp/AParseAnswer (answer-result [] (-> this :result force)))
+  base/AParseAnswer (answer-result [] (-> this :result force)))
 
 (defn make-state
   "Creates a state with the given remainder and context."
@@ -29,6 +28,12 @@
    (make-state remainder nil))
   ([remainder context]
    (State remainder 0 context)))
+
+(defn- state? [obj]
+  (isa? (type obj) ::State))
+
+(defn- rule? [obj]
+  (or (isa? (type obj) ::Rule) (var? obj)))
 
 (d/defalias match c/match)
 (d/defalias find c/find)
@@ -119,6 +124,16 @@
   (list* `c/general-defmaker library-name "rule maker (macro)" `defmacro fn-name
     forms))
 
+(defmacro make-rule [rule-symbol [state-symbol :as args] & body]
+  {:pre #{(symbol? rule-symbol) (symbol? state-symbol) (empty? (rest args))}}
+ `(with-meta
+    (fn [~state-symbol]
+      ~@body)
+    {:type ::Rule}))
+
+(defmethod base/parse ::Rule [rule context input]
+  (base/apply (make-state input context) rule))
+
 (defmaker prod
   "Creates a rule that always returns the given `product`.
   
@@ -132,10 +147,10 @@
    :consumes "No tokens."
    :no-memoize? true}
   [product]
-  (fn prod-rule [state]
+  (make-rule prod-rule [state]
     (Reply false
-      (fnp/Success product state
-        (fnp/ParseError (:position state) nil nil)))))
+      (base/Success product state
+        (base/ParseError (:position state) nil nil)))))
 
 (defrule <emptiness>
   "The general emptiness rule. (Actually just `(prod nil)`)."
@@ -149,12 +164,13 @@
   ([state descriptors]
    (make-failed-reply state (first (:remainder state)) descriptors))
   ([state unexpected-token descriptors]
+   {:pre #{(state? state) (set? descriptors)}}
    (Reply false
-     (fnp/Failure
-       (fnp/ParseError (:position state) unexpected-token descriptors)))))
+     (base/Failure
+       (base/ParseError (:position state) unexpected-token descriptors)))))
 
 (d/defvar nothing-descriptors
-  #{(fnp/ErrorDescriptor :label "absolutely nothing")}
+  #{(base/ErrorDescriptor :label "absolutely nothing")}
   "The error descriptors that `<nothing>` uses.")
 
 (defrule <nothing>
@@ -167,7 +183,7 @@
   Is the zero monadic value of the `parser-m` monad."
   {:succeeds "Never."
    :error "`\"Expected: absolutely nothing\"`."}
-  (fn nothing-rule [state]
+  (make-rule nothing-rule [state]
     (make-failed-reply state nothing-descriptors)))
 
 (defmaker with-error
@@ -176,8 +192,9 @@
   {:succeeds "Never."
    :error "An error with the given `message`."}
   [message]
-  (fn with-error-rule [state]
-    (make-failed-reply state #{(fnp/ErrorDescriptor :message message)})))
+  {:pre #{(string? message)}}
+  (make-rule with-error-rule [state]
+    (make-failed-reply state #{(base/ErrorDescriptor :message message)})))
 
 (defmaker only-when
   "Creates a maybe-failing rule—
@@ -205,6 +222,7 @@
    :error-messages "The given `message`."
    :no-memoize? true}
   [valid? message]
+  {:pre #{(string? message)}}
   (if-not valid? (with-error message) (prod valid?)))
 
 (defmaker combine
@@ -230,23 +248,24 @@
    :labels "Any labels that the failing rule gives."
    :messages "Any messages that the failing rule gives."}
   [rule product-fn]
+  {:pre #{(rule? rule) (fn? product-fn)}}
   (letfn [(apply-product-fn [result]
-            (fnp/apply (:state result) (product-fn (:product result))))]
-    (fn [state]
-      (let [first-reply (fnp/apply state rule)]
+            (base/apply (:state result) (product-fn (:product result))))]
+    (make-rule combined-rule [state]
+      (let [first-reply (base/apply state rule)]
         (if (:tokens-consumed? first-reply)
           (assoc first-reply :result
             (delay
               (let [{first-error :error, :as first-result}
                       (-> first-reply :result force)]
-                (if (fnp/success? first-result)
+                (if (base/success? first-result)
                   (let [{next-error :error, :as next-result}
                           (-> first-result apply-product-fn :result force)]
                     (assoc next-result :error
                       (c/merge-parse-errors first-error next-error)))
                   first-result))))
           (let [first-result (-> first-reply :result force)]
-            (if (fnp/success? first-result)
+            (if (base/success? first-result)
               (let [first-error (:error first-result)
                     next-reply (apply-product-fn first-result)]
                 (assoc next-reply :result
@@ -291,16 +310,17 @@
    :error "An intelligent combination of the errors
                 from all the failed sub-rules."}
   [& rules]
-  (fn summed-rule [state]
+  {:pre #{(every? rule? rules)}}
+  (make-rule summed-rule [state]
     (let [[consuming-replies empty-replies]
             (->> rules
-              (map #(fnp/apply state %))
+              (map #(base/apply state %))
               (seq/separate :tokens-consumed?))]
       (if (empty? consuming-replies)
         (if (empty? empty-replies)
-          (fnp/apply <nothing> state)
+          (base/apply <nothing> state)
           (let [empty-replies (seq/reductions merge-replies empty-replies)]
-            (or (first (drop-while #(-> % :result force fnp/failure?)
+            (or (first (drop-while #(-> % :result force base/failure?)
                          empty-replies))
                 (last empty-replies))))
         (first consuming-replies)))))
@@ -316,8 +336,9 @@
   "Removes all labels from the given `descriptors` set, then adds the
   given `label-str`."
   [descriptors label-str]
+  {:pre #{(set? descriptors) (string? label-str)}}
   (let [descriptors (set/select #(not= (:kind %) :label) descriptors)
-        descriptors (conj descriptors (fnp/ErrorDescriptor :label label-str))]
+        descriptors (conj descriptors (base/ErrorDescriptor :label label-str))]
     descriptors))
 
 (defn- assoc-label-in-result [result label-str]
@@ -349,8 +370,9 @@
    :consumes "Whatever `rule` consumes."
    :error "Smartly determines the appropriate error message."}
   [label-str rule]
-  (fn labelled-rule [state]
-    (let [reply (fnp/apply state rule)]
+  {:pre #{(string? label-str) (rule? rule)}}
+  (make-rule labelled-rule [state]
+    (let [reply (base/apply state rule)]
       (if-not (:tokens-consumed? reply)
         (update-in reply [:result] assoc-label-in-result label-str)
         reply))))
@@ -391,6 +413,7 @@
   ([label-str steps product-expr]
    `(->> (for ~steps ~product-expr) (label ~label-str)))
   ([steps product-expr]
+   {:pre #{(vector? steps) (even? (count steps))}}
   `(m/domonad parser-m ~steps ~product-expr)))
 
 (defmaker validate
@@ -405,6 +428,7 @@
    :consumes "What `rule` consumes."
    :no-memoize? true}
   [pred message rule]
+  {:pre #{(ifn? pred) (string? message) (rule? rule)}}
   (for [product rule, _ (only-when (pred product) message)]
     product))
 
@@ -413,26 +437,28 @@
   it uses the complement of `pred` instead."
   {:no-memoize? true}
   [pred message rule]
+  {:pre #{(ifn? pred)}}
   (validate (complement pred) message rule))
 
 (defn- term-
   "All terminal rules, including `term` and
   `term*`, are based on this function."
   [pred-product? label-str f]
+  {:pre #{(string? label-str) (ifn? f)}}
   (label label-str
-    (fn terminal-rule [state]
+    (make-rule terminal-rule [state]
       (let [position (:position state)]
         (if-let [remainder (-> state :remainder seq)]
           (let [first-token (first remainder), f-result (f first-token)]
             (if f-result
               (Reply true
                 (delay
-                  (fnp/Success (if pred-product? f-result first-token)
+                  (base/Success (if pred-product? f-result first-token)
                     (assoc state :remainder (next remainder)
                                  :position (inc position))
-                    (fnp/ParseError position nil nil))))
+                    (base/ParseError position nil nil))))
               (make-failed-reply state first-token #{})))
-          (make-failed-reply state ::fnp/end-of-input #{}))))))
+          (make-failed-reply state ::base/end-of-input #{}))))))
 
 (defmaker term
   "Creates a terminal rule.
@@ -480,6 +506,7 @@
   given predicate instead."
   {:no-memoize? true}
   [label-str pred]
+  {:pre #{(ifn? pred)}}
   (term label-str (complement pred)))
 
 (defrule <anything>
@@ -499,6 +526,7 @@
    :product "`(semantic-hook product-from-rule)`."
    :consumes "Whatever `rule` consumes."}
   [semantic-hook rule]
+  {:pre #{(ifn? semantic-hook) (rule? rule)}}
   (for [product rule] (semantic-hook product)))
 
 (defn chook
@@ -511,8 +539,9 @@
    :success "If `rule` succeeds."
    :product "Always the given `product`."
    :consumes "Whatever `rule` consumes."}
-  [product subrule]
-  (for [_ subrule] product))
+  [product rule]
+  {:pre #{(rule? rule)}}
+  (for [_ rule] product))
 
 (defmaker lit
   "Creates a rule of a literal. A shortcut for
@@ -541,6 +570,7 @@
   "Creates a terminal rule with a set.
   A shortcut for `(term label-str (set tokens))`."
   [label-str tokens]
+  {:pre #{(cc/seqable? tokens)}}
   (term label-str (set tokens)))
 
 (defmaker antiset-lit
@@ -556,6 +586,7 @@
    :consumes "All tokens that the `rules` sequentially consume."
    :error "The error of whatever sub-rule failed."}
   [& rules]
+  {:pre #{(every? rule? rules)}}
   (m/with-monad parser-m
     (m/m-seq rules)))
 
@@ -570,6 +601,7 @@
    :product "Either `rule`'s product (if it succeeds) or `nil` if it fails."
    :consumes "Either whatever `rule` consumes (if it succeeds) or no tokens."}
   [rule]
+  {:pre #{(rule? rule)}}
   (+ rule <emptiness>))
 
 (defmaker lex
@@ -614,7 +646,8 @@
     (r/cat (r/lex (r/phrase \"let\")) <ws> <let-expr>)
   Now both line one and two will be successful."
   [subrule]
-  (fn [state]
+  {:pre #{(rule? subrule)}}
+  (make-rule lexed-rule [state]
     (-> state subrule
       (assoc :tokens-consumed? false))))
 
@@ -625,9 +658,10 @@
   {:success "If `rule` succeeds."
    :consumes "No tokens."}
   [rule]
-  (fn [state]
-    (let [result (-> state (fnp/apply rule) :result force)]
-      (if (fnp/failure? result)
+  {:pre #{(rule? rule)}}
+  (make-rule peeking-rule [state]
+    (let [result (-> state (base/apply rule) :result force)]
+      (if (base/failure? result)
         (Reply false result)
         ((prod (:product result)) state)))))
 
@@ -644,38 +678,41 @@
   {:success "If `rule` succeeds."
    :product "Always `true`."}
   ([label-str rule]
+   {:pre #{(rule? rule)}}
    (label label-str
-     (fn antipeek-rule [state]
-       (let [result (-> state (fnp/apply rule) :result force)]
-         (if (fnp/failure? result)
-           (Reply false (fnp/Success true state (:error result)))
-           (fnp/apply state <nothing>))))))
+     (make-rule antipeek-rule [state]
+       (let [result (-> state (base/apply rule) :result force)]
+         (if (base/failure? result)
+           (Reply false (base/Success true state (:error result)))
+           (base/apply state <nothing>))))))
   ([label-str message-fn rule]
+   {:pre #{(rule? rule)}}
    (label label-str
-     (fn antipeek-rule [state]
-       (let [result (-> state (fnp/apply rule) :result force)]
-         (if (fnp/failure? result)
-           (Reply false (fnp/Success true state (:error result)))
+     (make-rule antipeek-rule [state]
+       (let [result (-> state (base/apply rule) :result force)]
+         (if (base/failure? result)
+           (Reply false (base/Success true state (:error result)))
            (let [message (message-fn (:product result))
                  error-rule (if message (with-error message) <nothing>)]
-             (fnp/apply state error-rule))))))))
+             (base/apply state error-rule))))))))
 
 (defn- apply-reply-and-rule [f prev-reply next-rule]
-  (fnp/apply nil
-    (combine (constantly prev-reply)
+  (base/apply nil
+    (combine (make-rule constantly [_] prev-reply)
       (fn [prev-product]
         (combine next-rule
           (fn [next-product]
             (prod (f prev-product next-product))))))))
 
 (defn- hooked-rep- [reduced-fn initial-product-fn rule]
+  {:pre #{(ifn? reduced-fn) (ifn? initial-product-fn) (rule? rule)}}
   (let [apply-reduced-fn (partial apply-reply-and-rule reduced-fn)]
-    (fn hooked-repeating-rule [state]
+    (make-rule hooked-repeating-rule [state]
       (let [initial-product (initial-product-fn)
             first-fn (partial reduced-fn initial-product)
-            first-reply (fnp/apply state (hook first-fn rule))]
+            first-reply (base/apply state (hook first-fn rule))]
         (if (:tokens-consumed? first-reply)
-          (if (-> first-reply :result force fnp/failure?)
+          (if (-> first-reply :result force base/failure?)
             first-reply
             (assoc first-reply :result
               (delay
@@ -683,11 +720,11 @@
                       (->> rule repeat
                         (seq/reductions apply-reduced-fn first-reply)
                         (partition 2 1)
-                        (take-while #(-> % first :result force fnp/success?))
+                        (take-while #(-> % first :result force base/success?))
                         last)]
                   (-> last-success :result force
                     (assoc :error (-> first-failure :result force :error)))))))
-          (if (-> first-reply :result force fnp/success?)
+          (if (-> first-reply :result force base/success?)
             (except/throwf "empty rules cannot be greedily repeated")
             first-reply))))))
 
@@ -749,18 +786,20 @@
 (defmaker mapcat
   "Creates a rule that is the result of
   applying `cat` to the result of applying map
-  to `f` and `colls`.
+  to `f` and `token-colls`.
   Use the `phrase` function instead of this
   function when `f` is just `lit`."
   [f & token-colls]
+  #{:pre #{(ifn? f) (every? cc/seqable? token-colls)}}
   (->> token-colls (apply map f) (apply cat)))
 
 (defmaker mapsum
   "Creates a rule that is the result of applying `+` to the
-  result of applying map to `f` and `colls`.
+  result of applying map to `f` and `token-colls`.
   Use the `set-term` function instead of this
   function when `f` is just `lit`."
   [f & token-colls]
+  #{:pre #{(ifn? f) (every? cc/seqable? token-colls)}}
   (->> token-colls (apply map f) (apply +)))
 
 (defmaker phrase
@@ -769,6 +808,7 @@
   consecutively match the given tokens.
   (Actually, it's just `(mapcat lit tokens)`.)"
   [tokens]
+  #{:pre #{cc/seqable? tokens}}
   (->> tokens (mapcat lit) (label (format "'%s'" tokens))))
 
 (defrule <end-of-input>
@@ -785,6 +825,7 @@
   Its product is always the body-rule's product.
   A shortcut for `(for [_ prefix-rule, content body-rule] content)`."
   [prefix-rule body-rule]
+  {:pre #{(rule? prefix-rule) (rule? body-rule)}}
   (for [_ prefix-rule, content body-rule] content))
 
 (defmaker suffix [body-rule suffix-rule]
@@ -793,6 +834,7 @@
   the second rule's product.
   Its product is always the body-rule's product.
   A shortcut for `(for [content body-rule, _ suffix-rule] content)`."
+  {:pre #{(rule? suffix-rule) (rule? body-rule)}}
   (for [content body-rule, _ suffix-rule] content))
 
 (defmaker circumfix
@@ -802,15 +844,17 @@
   Its product is always the body-rule's product.
   A shortcut for `(prefix prefix-rule (suffix body-rule suffix-rule))`."
   [prefix-rule body-rule suffix-rule]
+  {:pre #{(rule? prefix-rule) (rule? body-rule) (rule? suffix-rule)}}
   (prefix prefix-rule (suffix body-rule suffix-rule)))
 
 (defmaker separated-rep
   "Creates a greedy repetition rule with a separator.
   The `separator` is a rule that must succeed between
-  each `element` success."
+  each `element` rule's success."
   {:success "If `element` succeeds at least once."
    :product "The vector of `element`'s successes."}
   [separator element]
+  {:pre #{(rule? separator) (rule? element)}}
   (for [first-element element
         rest-elements (rep* (prefix separator element))]
     (into [first-element] rest-elements)))
@@ -826,6 +870,7 @@
   Acts very similarly to `clojure.template/do-template`,
   but instead sums each rule together."
   [argv expr & values]
+  {:pre #{(zero? (mod (count values) (count argv)))}}
   (let [c (count argv)]
    `(+ ~@(map (fn [a] (t/apply-template argv expr a))
            (partition c values)))))
@@ -838,6 +883,7 @@
               the upper or lowercase of the given `token`."
    :consumes "One character."}
   [#^Character token]
+  {:pre #{(char? token)}}
   (+ (lit (Character/toLowerCase token))
      (lit (Character/toUpperCase token))))
 
@@ -849,8 +895,9 @@
    :product "The result of `(apply f args)`."
    :consumes "No tokens."}
   [f & args]
-  (fn effects-rule [state]
-    (fnp/apply state (prod (apply f args)))))
+  {:pre #{(ifn? f)}}
+  (make-rule effects-rule [state]
+    (base/apply state (prod (apply f args)))))
 
 (defmaker except
   "Creates a subtracted rule. Matches using
@@ -867,10 +914,12 @@
    :consumes "Whatever `minuend` consumes."
    :error "Uses the `label-str` you provide."}
   ([label-str minuend subtrahend]
+   {:pre #{(rule? minuend) (rule? subtrahend)}}
    (for [_ (antipeek label-str subtrahend)
          product (label label-str minuend)]
      product))
   ([label-str message-fn minuend subtrahend]
+   {:pre #{(ifn? message-fn) (rule? minuend) (rule? subtrahend)}}
    (for [_ (antipeek label-str message-fn subtrahend)
          product (label label-str minuend)]
      product)))
@@ -889,21 +938,23 @@
   `:edu.arizona.fnparse/ParseError`.
   See its documentation for more information.)"
   [message-fn rule]
+  {:pre #{(ifn? message-fn) (rule? rule)}}
   (letfn [(annotate [result]
             (delay (let [{error :error, :as forced-result} (force result)
                          new-message (message-fn error)]
                      (if new-message
                        (update-in forced-result [:error :descriptors]
-                         conj (fnp/ErrorDescriptor :message new-message))
+                         conj (base/ErrorDescriptor :message new-message))
                        forced-result))))]
-    (fn error-annotation-rule [state]
-      (let [reply (fnp/apply state rule)]
+    (make-rule error-annotation-rule [state]
+      (let [reply (base/apply state rule)]
         (update-in reply [:result] annotate)))))
 
 (defmaker factor=
   "Creates a non-greedy repetition rule.
   Concatenates the given `rule` to itself `n` times."
   [n rule]
+  {:pre #{(pos? n) (integer? n) (rule? rule)}}
   (->> rule (replicate n) (apply cat)))
 
 (defrule <fetch-context>
@@ -911,8 +962,8 @@
   {:success "Always."
    :product "The current context."
    :consumes "Zero tokens."}
-  (fn fetch-context-rule [state]
-    (fnp/apply state (prod (:context state)))))
+  (make-rule fetch-context-rule [state]
+    (base/apply state (prod (:context state)))))
 
 (defn alter-context
   "A rule that alters the curent context."
@@ -921,9 +972,10 @@
    :consumes "Zero tokens."
    :no-memoize? true}
   [f & args]
-  (fn context-altering-rule [state]
+  {:pre #{(ifn? f)}}
+  (make-rule context-altering-rule [state]
     (let [altered-state (apply update-in state [:context] f args)]
-      (fnp/apply altered-state <fetch-context>))))
+      (base/apply altered-state <fetch-context>))))
 
 (def ascii-digits "0123456789")
 (def lowercase-ascii-alphabet "abcdefghijklmnopqrstuvwxyz")

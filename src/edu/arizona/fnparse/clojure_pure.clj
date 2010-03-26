@@ -3,11 +3,9 @@
   It, and all functions it uses in its referred libraries, except
   `clojure.core`, use *no* direct Java calls (with the exception
   of the Exception thrown in the final read-string function.)"
-  (:require [edu.arizona.fnparse.hound :as p] [edu.arizona.fnparse :as fnp]
+  (:require [edu.arizona.fnparse [hound :as p] [base :as pbase]]
             [clojure [template :as t] [set :as set]]
-            [clojure.contrib.seq :as seq]
-            [clojure.contrib.except :as except]
-            edu.arizona.fnparse.hound.test)
+            [clojure.contrib [seq :as seq] [except :as except]])
   (:refer-clojure :exclude #{read-string})
   (:import [clojure.lang IPersistentMap]))
 
@@ -546,4 +544,4 @@
       (fn [product position] product)
       (fn [error]
         (except/throwf "FnParse parsing error: %s"
-          (fnp/format-parse-error error))))))
+          (base/format-parse-error error))))))

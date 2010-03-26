@@ -1,6 +1,5 @@
 (ns edu.arizona.fnparse.math
-  (:require [edu.arizona.fnparse.cat :as r]
-            [clojure.template :as template]))
+  (:require [edu.arizona.fnparse.cat :as r] [clojure.template :as template]))
 
 (set! *warn-on-reflection* true)
 
