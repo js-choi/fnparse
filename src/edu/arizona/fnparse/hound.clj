@@ -1,5 +1,5 @@
 (ns edu.arizona.fnparse.hound
-  "This is *FnParse Hound*, which can create unambiguous,
+  "This is *FnParse Hound*, which can create unambiguous
   LL(1) or LL(n) parsers."
   (:require [edu.arizona.fnparse [base :as base] [common :as c]]
             [clojure.contrib [seq :as seq] [monads :as m] [def :as d]
@@ -29,10 +29,10 @@
   ([remainder context]
    (State remainder 0 context)))
 
-(defn- state? [obj]
+(defn state? [obj]
   (isa? (type obj) ::State))
 
-(defn- rule? [obj]
+(defn rule? [obj]
   (or (isa? (type obj) ::Rule) (var? obj)))
 
 (d/defalias match c/match)
