@@ -150,10 +150,18 @@
   [fn-name & forms]
   (list* `c/general-defmaker `defmacro fn-name forms))
 
+(d/defvar *format-remainder-limit*
+  10
+  "The limit at which `format-remainder`, as well as the
+  default functions of `parse`, will cut off lengthy
+  remainders at. Must be a positive integer.")
+
 (defn format-remainder [string-input? subinput]
   (let [remainder-size (count subinput)
         subinput (cond (= remainder-size 0) "the end of input"
-                       (> remainder-size 7) (concat (take 7 subinput) ["..."])
+                       (> remainder-size *format-remainder-limit*)
+                         (concat (take *format-remainder-limit* subinput)
+                                 ["..."])
                        true subinput)
         subinput (seq subinput)]
     (if string-input?
@@ -163,8 +171,8 @@
 (defn- format-parse-error-data
   "Returns a formatted string with the given error data.
   The descriptor map should be returned from group-descriptors."
-  [position descriptor-map]
-  (let [unexpected-tokens "TODO"
+  [position remainder descriptor-map]
+  (let [unexpected-tokens (format-remainder true remainder)
         {labels :label, messages :message} descriptor-map
         expectation-text (when (seq labels)
                            (->> labels (str/join ", or ") (str "expected ")
@@ -188,8 +196,9 @@
 (defn format-parse-error
   "Returns a formatted string from the given error."
   [error]
-  (let [{:keys #{position descriptors unexpected-token}} error]
-    (format-parse-error-data position (group-descriptors descriptors))))
+  (let [{:keys #{position remainder descriptors}} error]
+    (format-parse-error-data
+      position remainder (group-descriptors descriptors))))
 
 (defmulti parse
   "Use `match` instead of this multimethod.

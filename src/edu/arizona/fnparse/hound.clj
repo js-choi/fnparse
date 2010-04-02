@@ -9,6 +9,12 @@
                   :exclude #{for + peek find})
   (:import [clojure.lang IPersistentMap]))
 
+
+; TODO
+; ====
+; user=> (c/match clj/<form> nil "# (3 + 2)")
+; At position 1, ' (3 + 2...': expected '(', or ''', or '"', or '^', or '=', or '<', or '{', or whitespace
+
 (declare make-state)
 
 (deftype State [remainder position context] :as this
