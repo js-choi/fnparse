@@ -1,17 +1,14 @@
 (ns edu.arizona.fnparse.common
   {:author "Joshua Choi", :skip-wiki true}
-  (:require [clojure.contrib.def :as d] [clojure.set :as set])
+  (:require [clojure.contrib [def :as d] [string :as str]]
+            [clojure.set :as set])
   (:refer-clojure :exclude #{find})
   (:import [clojure.lang IPersistentMap]))
 
-(defn- rule-doc-summary-header [obj-type-str]
-  (format "\n
-  Summary
-  ======="
-    obj-type-str))
-
-(defn- rule-doc-first-header [library-name obj-type-str]
-  (format "%s %s.\n\n  " library-name obj-type-str))
+(d/defvar- rule-doc-summary-header
+  "\n
+  Rule Summary
+  ============")
 
 (d/defvar- rule-doc-info
   {:succeeds "Success"
@@ -19,32 +16,29 @@
    :consumes "Consumes"
    :error "Error"})
 
-(defn rule-doc-str [doc-str library-name obj-type-str meta-opts]
+(defn rule-doc-str [doc-str meta-opts]
   (let [doc-str (or doc-str "No description available.")
-        doc-str (str (rule-doc-first-header library-name obj-type-str) doc-str)
         doc-opts (select-keys meta-opts (keys rule-doc-info))
         opt-seq (seq doc-opts)]
     (if opt-seq
       (->> doc-opts sort
         (map #(format "  * %s: %s" (rule-doc-info (key %)) (val %)))
         (interpose "\n")
-        (apply str doc-str (rule-doc-summary-header obj-type-str) "\n"))
+        (apply str doc-str rule-doc-summary-header "\n"))
       doc-str)))
 
-(defmacro general-defrule [library-name rule-name doc-string meta-opts form]
+(defmacro general-defrule [rule-name doc-string meta-opts form]
  `(let [rule-var# (d/defvar ~rule-name ~form ~doc-string)]
-    (alter-meta! rule-var# update-in [:doc] rule-doc-str
-      ~library-name "rule" ~meta-opts)
+    (alter-meta! rule-var# update-in [:doc] rule-doc-str ~meta-opts)
     rule-var#))
 
-(defmacro general-defmaker [library-name obj-type-str def-form fn-name & forms]
+(defmacro general-defmaker [def-form fn-name & forms]
  `(let [maker-var# (~def-form ~fn-name ~@forms)]
     (alter-var-root maker-var# identity)
     ; Add extended documentation.
-    (alter-meta! maker-var# update-in [:doc] rule-doc-str
-      ~library-name ~obj-type-str (meta maker-var#))
+    (alter-meta! maker-var# update-in [:doc] rule-doc-str (meta maker-var#))
     ; Memoize unless the :no-memoize meta flag is true.
-    (if-not (:no-memoize? (meta maker-var#))
+    (when-not (:no-memoize? (meta maker-var#))
       (alter-var-root maker-var# memoize))
     maker-var#))
 

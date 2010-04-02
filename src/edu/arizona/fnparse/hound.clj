@@ -9,8 +9,6 @@
                   :exclude #{for + peek find})
   (:import [clojure.lang IPersistentMap]))
 
-(def library-name "FnParse Hound")
-
 (declare make-state)
 
 (deftype State [remainder position context] :as this
@@ -68,8 +66,7 @@
   ([rule-name form] `(defrule ~rule-name nil ~form))
   ([rule-name doc-string form] `(defrule ~rule-name ~doc-string nil ~form))
   ([rule-name doc-string meta-opts form]
-  `(c/general-defrule ~library-name ~rule-name ~doc-string ~meta-opts
-     ~form)))
+  `(c/general-defrule ~rule-name ~doc-string ~meta-opts ~form)))
 
 (defmacro defrule-
   "Like `defrule`, but also makes the var private."
@@ -111,7 +108,7 @@
   rule when given `[1 2 3]` versus `'(1 2 3)`, then you should
   give `{:no-memoize? true}` in your metadata."
   [fn-name & forms]
-  (list* `c/general-defmaker library-name "rule maker" `defn fn-name forms))
+  (list* `c/general-defmaker `defn fn-name forms))
 
 (defmacro defmaker-
   "Like `defmaker`, but also makes the var private."
@@ -122,8 +119,7 @@
   "Like `defmaker`, but makes a macro rule-maker
   instead of a function rule-maker."
   [fn-name & forms]
-  (list* `c/general-defmaker library-name "rule maker (macro)" `defmacro fn-name
-    forms))
+  (list* `c/general-defmaker `defmacro fn-name forms))
 
 (defmacro make-rule [rule-symbol [state-symbol :as args] & body]
   {:pre #{(symbol? rule-symbol) (symbol? state-symbol) (empty? (rest args))}}
