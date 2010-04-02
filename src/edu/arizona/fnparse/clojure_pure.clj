@@ -3,7 +3,7 @@
   It, and all functions it uses in its referred libraries, except
   `clojure.core`, use *no* direct Java calls (with the exception
   of the Exception thrown in the final read-string function.)"
-  (:require [edu.arizona.fnparse [hound :as p] [core :as pcore]]
+  (:require [edu.arizona.fnparse [hound :as p] [core :as c]]
             [clojure [template :as t] [set :as set]]
             [clojure.contrib [seq :as seq] [except :as except]])
   (:refer-clojure :exclude #{read-string})
@@ -95,7 +95,7 @@
     2 "a binary digit"
     (format "a core-%s digit" core)))
 
-(p/defmaker radix-digit
+(c/defmaker radix-digit
   "Returns a rule that accepts one digit character
   token in the number system with the given `core`.
   For instance, `(radix-digit 12)` is a rule
@@ -118,40 +118,40 @@
   (->> core-36-digit-map (filter #(< (val %) core)) (into {})
     (p/term* (radix-label core))))
 
-(p/defrule <decimal-digit>
+(c/defrule <decimal-digit>
   "A rule matching a single core-10 digit
   character token (i.e. \\0 through \\9)."
   {:product "The matching digit's corresponding Integer object, 0 through 9."
    :consumes "One character."}
   (radix-digit 10))
 
-(p/defrule <hexadecimal-digit>
+(c/defrule <hexadecimal-digit>
   "A rule matching a single core-16 digit
   character token (i.e. \\0 through \\F)."
   {:product "The matching digit's corresponding Integer object, 0 through 15."
    :consumes "One character."}
   (radix-digit 16))
 
-(p/defrule <uppercase-ascii-letter>
+(c/defrule <uppercase-ascii-letter>
   "A rule matching a single uppercase ASCII letter."
   {:product "The matching character itself."
    :consumes "One character."}
   (p/set-term "an uppercase ASCII letter" uppercase-ascii-alphabet))
 
-(p/defrule <lowercase-ascii-letter>
+(c/defrule <lowercase-ascii-letter>
   "A rule matching a single lowercase ASCII letter."
   {:product "The matching character itself."
    :consumes "One character."}
   (p/set-term "a lowercase ASCII letter" lowercase-ascii-alphabet))
 
-(p/defrule <ascii-letter>
+(c/defrule <ascii-letter>
   "A rule matching a single uppercase or lowercase ASCII letter."
   {:product "The matching character itself."
    :consumes "One character."}
   (p/label "an ASCII letter"
     (p/+ <uppercase-ascii-letter> <lowercase-ascii-letter>)))
 
-(p/defrule <ascii-digit>
+(c/defrule <ascii-digit>
   "A rule matching a single ASCII numeric digit. You may
   want to use instead `decimal-digit`, which automatically
   converts digits to Integer objects."
@@ -159,7 +159,7 @@
    :consumes "One character."}
   (p/set-term "an ASCII digit" ascii-digits))
 
-(p/defrule <ascii-alphanumeric>
+(c/defrule <ascii-alphanumeric>
   "A rule matching a single alphanumeric ASCII letter."
   {:product "The matching character itself."
    :consumes "One character."}
@@ -250,22 +250,22 @@
 
 (def <peek-ns-separator> (p/peek <ns-separator>))
 
-(p/defmaker fetch-referred-namespace [context namespace-alias]
+(c/defmaker fetch-referred-namespace [context namespace-alias]
   (p/only-when (get-in context [:ns-aliases namespace-alias])
     (format "no namespace with alias '%s'" namespace-alias)))
 
-(p/defmaker ns-qualified-keyword-end-with-slash [pre-slash]
+(c/defmaker ns-qualified-keyword-end-with-slash [pre-slash]
   (p/for [_ <peek-ns-separator>
           context p/<fetch-context>
           prefix (fetch-referred-namespace context pre-slash)
           suffix <symbol-suffix>]
     [prefix suffix]))
 
-(p/defmaker ns-qualified-keyword-empty-end [pre-slash]
+(c/defmaker ns-qualified-keyword-empty-end [pre-slash]
   (p/for [context p/<fetch-context>]
     [(:ns-name context) pre-slash]))
 
-(p/defmaker ns-resolved-keyword-end [pre-slash]
+(c/defmaker ns-resolved-keyword-end [pre-slash]
   (p/+ (ns-qualified-keyword-end-with-slash pre-slash)
        (ns-qualified-keyword-empty-end pre-slash)))
 
@@ -282,7 +282,7 @@
 
 ;; Numbers.
 
-(p/defmaker radix-natural-number [core]
+(c/defmaker radix-natural-number [core]
   (p/hooked-rep #(+ (* core %1) %2) 0 (p/radix-digit core)))
 
 (def <decimal-natural-number>
@@ -332,7 +332,7 @@
       (p/antivalidate zero? "a fraction's denominator cannot be zero"
         <decimal-natural-number>))))
 
-(p/defmaker radix-coefficient-tail [core]
+(c/defmaker radix-coefficient-tail [core]
   (p/hook constantly
     (p/prefix
       (p/set-term "radix indicator" "rR")
@@ -340,7 +340,7 @@
         ; use (case-insensitive-p/lit \r) above instead.
       (radix-natural-number core))))
 
-(p/defmaker number-tail [core]
+(c/defmaker number-tail [core]
   (p/+ <imprecise-number-tail> <fraction-denominator-tail>
        (radix-coefficient-tail core) <empty-number-tail>))
 
@@ -406,7 +406,7 @@
 
 ;; Simple prefix forms: syntax-quote, deref, etc.
 
-(p/defmaker padded-lit [token]
+(c/defmaker padded-lit [token]
   (p/prefix (p/lit token) <opt-ws>))
 
 (t/do-template [<rule> prefix product-fn-symbol]
@@ -544,4 +544,4 @@
       (fn [product position] product)
       (fn [error]
         (except/throwf "FnParse parsing error: %s"
-          (core/format-parse-error error))))))
+          (c/format-parse-error error))))))

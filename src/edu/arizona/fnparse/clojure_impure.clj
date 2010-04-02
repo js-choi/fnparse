@@ -1,5 +1,5 @@
 (ns edu.arizona.fnparse.clojure-impure
-  (:require [edu.arizona.fnparse [hound :as p] [core :as pcore]]
+  (:require [edu.arizona.fnparse [hound :as p] [core :as c]]
             [clojure [template :as t] [set :as set]]
             [clojure.contrib [seq :as seq] [except :as except]])
   (:refer-clojure :exclude #{read-string})
@@ -148,22 +148,22 @@
 
 (def <peek-ns-separator> (p/peek <ns-separator>))
 
-(p/defmaker fetch-referred-namespace [context namespace-alias]
+(c/defmaker fetch-referred-namespace [context namespace-alias]
   (p/only-when (get-in context [:ns-aliases namespace-alias])
     (format "no namespace with alias '%s'" namespace-alias)))
 
-(p/defmaker ns-qualified-keyword-end-with-slash [pre-slash]
+(c/defmaker ns-qualified-keyword-end-with-slash [pre-slash]
   (p/for [_ <peek-ns-separator>
           context p/<fetch-context>
           prefix (fetch-referred-namespace context pre-slash)
           suffix <symbol-suffix>]
     [prefix suffix]))
 
-(p/defmaker ns-qualified-keyword-empty-end [pre-slash]
+(c/defmaker ns-qualified-keyword-empty-end [pre-slash]
   (p/for [context p/<fetch-context>]
     [(:ns-name context) pre-slash]))
 
-(p/defmaker ns-resolved-keyword-end [pre-slash]
+(c/defmaker ns-resolved-keyword-end [pre-slash]
   (p/+ (ns-qualified-keyword-end-with-slash pre-slash)
        (ns-qualified-keyword-empty-end pre-slash)))
 
@@ -180,7 +180,7 @@
 
 ;; Numbers.
 
-(p/defmaker radix-natural-number [core]
+(c/defmaker radix-natural-number [core]
   (p/hooked-rep #(+ (* core %1) %2) 0 (p/radix-digit core)))
 
 (def <decimal-natural-number>
@@ -228,13 +228,13 @@
       (p/antivalidate zero? "a fraction's denominator cannot be zero"
         <decimal-natural-number>))))
 
-(p/defmaker radix-coefficient-tail [core]
+(c/defmaker radix-coefficient-tail [core]
   (p/hook constantly
     (p/prefix
       (p/case-insensitive-lit \r)
       (radix-natural-number core))))
 
-(p/defmaker number-tail [core]
+(c/defmaker number-tail [core]
   (p/+ <imprecise-number-tail> <fraction-denominator-tail>
        (radix-coefficient-tail core) <empty-number-tail>))
 
@@ -300,7 +300,7 @@
 
 ;; Simple prefix forms: syntax-quote, deref, etc.
 
-(p/defmaker padded-lit [token]
+(c/defmaker padded-lit [token]
   (p/prefix (p/lit token) <opt-ws>))
 
 (t/do-template [<rule> prefix product-fn-symbol]
@@ -438,4 +438,4 @@
       (fn [product position] product)
       (fn [error]
         (except/throwf "FnParse parsing error: %s"
-          (pcore/format-parse-error error))))))
+          (c/format-parse-error error))))))

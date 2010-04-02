@@ -1,7 +1,7 @@
 (ns edu.arizona.fnparse.core
   {:author "Joshua Choi"}
   (:require [clojure.contrib [string :as str] [seq :as seq] [def :as d]]
-            [clojure.template :as temp] [edu.arizona.fnparse.common :as common])
+            [clojure.template :as temp] [edu.arizona.fnparse.common :as c])
   (:refer-clojure :rename {apply apply-seq}, :exclude #{find})
   (:import [clojure.lang IPersistentMap]))
 
@@ -32,7 +32,7 @@
                     at which the error was detected.
                     If the token is actually the end
                     of the input, then this is the
-                    keyword ::common/end-of-input
+                    keyword ::c/end-of-input
                     instead.
   descriptors: The set of ErrorDescriptors that
                describe this error."}
@@ -69,6 +69,84 @@
   "Applies the given rule to the given state."
   [state rule]
   (rule state))
+
+(defmacro defrule
+  "Defines a rule var. You should use this instead of `def`,
+  if only because it gives you cool shortcuts to write documentation.
+  
+  Metadata documentation options
+  ==============================
+  The `meta-opts` parameter expects a map argument,
+  and makes it the new var's metadata. Giving certain
+  options in the metadata also does appends certain
+  things to the rule's `doc-string`.
+  
+  *  `:succeeds` expects a short description on when
+     the rule succeeds.
+  *  `:product` expects a short description on what
+     products the rule gives when it succeeds.
+  *  `:consumes` expects a short description on how
+     many and what kinds of tokens the rule consumes
+     when it succeeds.
+  *  `:error` expects a short description on the
+     error that the rule gives when it fails."
+  ([rule-name form] `(defrule ~rule-name nil ~form))
+  ([rule-name doc-string form] `(defrule ~rule-name ~doc-string nil ~form))
+  ([rule-name doc-string meta-opts form]
+  `(c/general-defrule ~rule-name ~doc-string ~meta-opts ~form)))
+
+(defmacro defrule-
+  "Like `defrule`, but also makes the var private."
+  [fn-name & forms]
+  (list* `defrule (vary-meta fn-name assoc :private true) forms))
+
+(defmacro defmaker
+  "Creates a rule-making function. Use this instead of
+  `clojure.k/defn` whenever you make a rule-making
+  function. (It does other stuff like memoization and
+  and stuff.) Also see `defmaker-` and `defmaker-macro`.
+  
+  Arguments
+  =========
+  `defmaker` requires exactly the same arguments as
+  `clojure.k/defn`. Particularly important is being
+  able to give metadata easily.
+  
+  Metadata options
+  ================
+  `defmaker` accepts all metadata options that `defrule`
+  does too. There is also a special `:no-memoize?` option
+  that does something special, detailed below.
+  
+  Memoization
+  ===========
+  `defmaker` rule-makers *memoize by default*. This means
+  that they save the arguments they receive and their
+  corresponding results in a cache, and search the cache
+  every time they are called for equal arguments. See
+  `clojure.k/memoize` for more information.
+  
+  95% of the time, you won't have to worry about the warning below.
+  
+  A warning: memoization uses Clojure equality. This
+  means that *giving vector arguments must always return the
+  same rule as giving list arguments*, because vectors can
+  be equal to lists. If your function must return a different
+  rule when given `[1 2 3]` versus `'(1 2 3)`, then you should
+  give `{:no-memoize? true}` in your metadata."
+  [fn-name & forms]
+  (list* `c/general-defmaker `defn fn-name forms))
+
+(defmacro defmaker-
+  "Like `defmaker`, but also makes the var private."
+  [fn-name & forms]
+  (list* `defmaker (vary-meta fn-name assoc :private true) forms))
+
+(defmacro defmaker-macro
+  "Like `defmaker`, but makes a macro rule-maker
+  instead of a function rule-maker."
+  [fn-name & forms]
+  (list* `c/general-defmaker `defmacro fn-name forms))
 
 (defn format-remainder [string-input? subinput]
   (let [remainder-size (count subinput)

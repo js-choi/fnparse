@@ -10,7 +10,8 @@
   
   [JSON]: http://json.org
   [RFC]: http://www.ietf.org/rfc/rfc4627"
-  (:require [edu.arizona.fnparse.hound :as p] [clojure.set :as set]
+  (:require [edu.arizona.fnparse [hound :as p] [core :as c]]
+            [clojure.set :as set]
             [clojure.contrib [seq :as seq] [except :as except]])
   (:use [clojure.template :only #{do-template}]
         [clojure.test :only #{set-test is run-tests}])
@@ -19,14 +20,14 @@
 (defn str* [objects]
   (apply str objects))
 
-(p/defrule <ws?>
+(c/defrule <ws?>
   "Optional, ignored JSON whitespace."
   (p/rep* (p/set-term "whitespace" " \t\n\r")))
 
 ; Define single-character indicator rules.
 ; I use `clojure.template/do-template` to reduce repetition.
 (do-template [rule-name token]
-  (p/defrule rule-name
+  (c/defrule rule-name
     "Padded on the front with optional whitespace."
     (p/prefix <ws?> (p/lit token)))
   <escape-char-start> \\
@@ -41,18 +42,18 @@
 ; Define special value rules: true, false, and null.
 ; Again, I use `clojure.template/do-template` to reduce repetition.
 (do-template [rule-name tokens product]
-  (p/defrule rule-name
+  (c/defrule rule-name
     "Padded on the front with optional whitespace."
     (p/prefix <ws?> (p/chook product (p/phrase tokens))))
   <true>  "true"  true
   <false> "false" false
   <null>  "null"  nil)
 
-(p/defrule <control-char>
+(c/defrule <control-char>
   "An ASCII control character, which is not allowed in strings."
   (p/chook ::control-char p/<ascii-control>))
 
-(p/defrule <normal-str-char>
+(c/defrule <normal-str-char>
   "A normal, non-espaced string character. No control characters allowed."
   {:product "A character."}
   (p/except "a normal string character"
@@ -69,7 +70,7 @@
 (defn combine-hexadecimal-digits [digits]
   (reduce #(+ (* 16 %1) %2) digits))
 
-(p/defrule <unicode-sequence>
+(c/defrule <unicode-sequence>
   "The lowercase u followed by hexadecimal digits."
   {:product "The character with the given digits' Unicode code."}
   (p/prefix
@@ -77,7 +78,7 @@
     (p/hook (comp char combine-hexadecimal-digits)
       (p/factor= 4 p/<hexadecimal-digit>))))
 
-(p/defrule <escaped-str-char>
+(c/defrule <escaped-str-char>
   "An escaped character in a string: a backslash
   followed by an escape sequence."
   {:product "A character."}
@@ -86,18 +87,18 @@
     (p/+ (p/term* "escape sequence" normal-escape-sequences)
          <unicode-sequence>)))
 
-(p/defrule <str-char>
+(c/defrule <str-char>
   "A general string character."
   {:product "A character or a sequence of characters."
    :consumes "One character."}
   (p/+ <escaped-str-char> <normal-str-char>))
 
-(p/defrule <str-content>
+(c/defrule <str-content>
   "A sequence of string characters."
   {:product "A string.", :consumes "Zero or more characters."}
   (p/hook (comp str* concat) (p/rep* (p/+ <str-char>))))
 
-(p/defrule <str>
+(c/defrule <str>
   "A JSON string."
   {:product "A string."}
   (p/label "a string"
@@ -108,40 +109,40 @@
 
 (declare <value>)
 
-(p/defrule <array-content>
+(c/defrule <array-content>
   "A sequence of JSON values separated by commas, with optional
   whitespace padding on the front."
   {:product "A vector."}
   (p/separated-rep* <value-separator> #'<value>))
 
-(p/defrule <array>
+(c/defrule <array>
   "A JSON array. Optionally padded on the front with whitespace."
   {:product "A vector."}
   (p/circumfix <array-start> <array-content> <array-end>))
 
-(p/defrule <object-entry>
+(c/defrule <object-entry>
   "A string-value pair with a colon. They appear in objects.
   Optionally padded on the front with whitespace."
   {:product "A vector pair."}
   (p/for [name <str>, _ <name-separator>, val #'<value>]
     [name val]))
 
-(p/defrule <object-content>
+(c/defrule <object-content>
   "A sequence of object entries separated by commas. Optionally
   padded with whitepace on the front."
   (p/hook #(into {} %) (p/separated-rep* <value-separator> <object-entry>)))
 
-(p/defrule <object>
+(c/defrule <object>
   "A JSON object. Optionally padded on the front with whitespace."
   {:product "A map."}
   (p/circumfix <object-start> <object-content> <object-end>))
 
-(p/defrule <value>
+(c/defrule <value>
   "A general JSON value, optionally padded with whitespace on the front."
   {:product "A vector, map, number, true, false, or nil."}
   (p/prefix <ws?> (p/+ <object> <array> <str> <true> <false> <null>)))
 
-(p/defrule <document>
+(c/defrule <document>
   "A general JSON document, optionally padded with whitespace on both sides.
   The root rule of the JSON grammar."
   (p/suffix <value> <ws?>))
