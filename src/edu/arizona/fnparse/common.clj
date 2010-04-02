@@ -31,6 +31,23 @@
         (apply str doc-str (rule-doc-summary-header obj-type-str) "\n"))
       doc-str)))
 
+(defmacro general-defrule [library-name rule-name doc-string meta-opts form]
+ `(let [rule-var# (d/defvar ~rule-name ~form ~doc-string)]
+    (alter-meta! rule-var# update-in [:doc] rule-doc-str
+      ~library-name "rule" ~meta-opts)
+    rule-var#))
+
+(defmacro general-defmaker [library-name obj-type-str def-form fn-name & forms]
+ `(let [maker-var# (~def-form ~fn-name ~@forms)]
+    (alter-var-root maker-var# identity)
+    ; Add extended documentation.
+    (alter-meta! maker-var# update-in [:doc] rule-doc-str
+      ~library-name ~obj-type-str (meta maker-var#))
+    ; Memoize unless the :no-memoize meta flag is true.
+    (if-not (:no-memoize? (meta maker-var#))
+      (alter-var-root maker-var# memoize))
+    maker-var#))
+
 (defn merge-parse-errors
   "Merges two ParseErrors together. If the two errors are at the same
   position, their descriptors are combined. If one of the errors

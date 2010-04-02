@@ -9,6 +9,8 @@
                   :exclude #{for + peek find})
   (:import [clojure.lang IPersistentMap]))
 
+(def library-name "FnParse Hound")
+
 (declare make-state)
 
 (deftype State [remainder position context] :as this
@@ -43,8 +45,6 @@
     (update-in (-> merger :result force) [:error]
       c/merge-parse-errors (-> mergee :result force :error))))
 
-(def library-name "FnParse Hound")
-
 (defmacro defrule
   "Defines a rule var. You should use this instead of `def`,
   if only because it gives you cool shortcuts to write documentation.
@@ -68,7 +68,7 @@
   ([rule-name form] `(defrule ~rule-name nil ~form))
   ([rule-name doc-string form] `(defrule ~rule-name ~doc-string nil ~form))
   ([rule-name doc-string meta-opts form]
-  `(k/general-defrule ~library-name ~rule-name ~doc-string ~meta-opts
+  `(c/general-defrule ~library-name ~rule-name ~doc-string ~meta-opts
      ~form)))
 
 (defmacro defrule-
@@ -111,7 +111,7 @@
   rule when given `[1 2 3]` versus `'(1 2 3)`, then you should
   give `{:no-memoize? true}` in your metadata."
   [fn-name & forms]
-  (list* `k/general-defmaker library-name "rule maker" `defn fn-name forms))
+  (list* `c/general-defmaker library-name "rule maker" `defn fn-name forms))
 
 (defmacro defmaker-
   "Like `defmaker`, but also makes the var private."
@@ -122,14 +122,14 @@
   "Like `defmaker`, but makes a macro rule-maker
   instead of a function rule-maker."
   [fn-name & forms]
-  (list* `k/general-defmaker library-name "rule maker (macro)" `defmacro fn-name
+  (list* `c/general-defmaker library-name "rule maker (macro)" `defmacro fn-name
     forms))
 
 (defmacro make-rule [rule-symbol [state-symbol :as args] & body]
   {:pre #{(symbol? rule-symbol) (symbol? state-symbol) (empty? (rest args))}}
  `(with-meta
     (fn [~state-symbol] ~@body)
-    {:type ::Rule}))
+    {:type ::Rule, ::k/library library-name}))
 
 (defmethod k/parse ::Rule [rule context input]
   (k/apply (make-state input context) rule))

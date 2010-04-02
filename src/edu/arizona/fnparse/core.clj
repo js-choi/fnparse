@@ -120,23 +120,6 @@
   to the given `rule`."
   (fn [rule context input & _] (type rule)))
 
-(defmacro general-defrule [library-name rule-name doc-string meta-opts form]
- `(let [rule-var# (d/defvar ~rule-name ~form ~doc-string)]
-    (alter-meta! rule-var# update-in [:doc] common/rule-doc-str
-      ~library-name "rule" ~meta-opts)
-    rule-var#))
-
-(defmacro general-defmaker [library-name obj-type-str def-form fn-name & forms]
- `(let [maker-var# (~def-form ~fn-name ~@forms)]
-    (alter-var-root maker-var# identity)
-    ; Add extended documentation.
-    (alter-meta! maker-var# update-in [:doc] common/rule-doc-str
-      ~library-name ~obj-type-str (meta maker-var#))
-    ; Memoize unless the :no-memoize meta flag is true.
-    (if-not (:no-memoize? (meta maker-var#))
-      (alter-var-root maker-var# memoize))
-    maker-var#))
-
 (defn- print-complete [product]
   (printf
     "COMPLETE MATCH
