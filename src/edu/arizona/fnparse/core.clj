@@ -102,7 +102,7 @@
 
 (defmacro defmaker
   "Creates a rule-making function. Use this instead of
-  `clojure.k/defn` whenever you make a rule-making
+  `clojure.core/defn` whenever you make a rule-making
   function. (It does other stuff like memoization and
   and stuff.) Also see `defmaker-` and `defmaker-macro`.
   
