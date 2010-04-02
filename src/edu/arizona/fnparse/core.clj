@@ -1,7 +1,9 @@
 (ns edu.arizona.fnparse.core
   {:author "Joshua Choi"}
-  (:require [clojure.contrib [string :as str] [seq :as seq] [def :as d]]
-            [clojure.template :as temp] [edu.arizona.fnparse.common :as c])
+  (:require [clojure.contrib [string :as str] [seq :as seq] [def :as d]
+                             [core :as cljcore]]
+            [clojure.template :as temp]
+            [edu.arizona.fnparse.common :as c])
   (:refer-clojure :rename {apply apply-seq}, :exclude #{find})
   (:import [clojure.lang IPersistentMap]))
 
@@ -145,11 +147,12 @@
 
 (d/defvar *format-remainder-limit*
   10
-  "The limit at which `format-remainder`, as well as the
-  default functions of `parse`, will cut off lengthy
+  "The limit at which `format-remainder`will cut off lengthy
   remainders at. Must be a positive integer.")
 
 (defn format-remainder [string-input? subinput]
+  {:pre #{(cljcore/seqable? subinput) (pos? *format-remainder-limit*)
+          (integer? *format-remainder-limit*)}}
   (let [remainder-size (count subinput)
         subinput (cond (= remainder-size 0) "the end of input"
                        (> remainder-size *format-remainder-limit*)
@@ -164,16 +167,14 @@
 (defn- format-parse-error-data
   "Returns a formatted string with the given error data.
   The descriptor map should be returned from group-descriptors."
-  [position remainder descriptor-map]
-  (let [unexpected-tokens (format-remainder true remainder)
-        {labels :label, messages :message} descriptor-map
+  [position descriptor-map]
+  (let [{labels :label, messages :message} descriptor-map
         expectation-text (when (seq labels)
                            (->> labels (str/join ", or ") (str "expected ")
                                 list))
         message-text (->> expectation-text (concat messages)
                           (str/join "; "))]
-    (format "At position %s, %s: %s"
-      position unexpected-tokens message-text)))
+    (format "At position %s: %s" position message-text)))
 
 (defn- group-descriptors
   "From the given set of descriptors, returns a map with
@@ -189,9 +190,8 @@
 (defn format-parse-error
   "Returns a formatted string from the given error."
   [error]
-  (let [{:keys #{position remainder descriptors}} error]
-    (format-parse-error-data
-      position remainder (group-descriptors descriptors))))
+  (let [{:keys #{position descriptors}} error]
+    (format-parse-error-data position (group-descriptors descriptors))))
 
 (defmulti parse
   "Use `match` instead of this multimethod.
