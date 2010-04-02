@@ -28,6 +28,7 @@
   #^{:doc "Represents FnParse errors.
   position: An integer. The position in the token
             sequence that the error was detected at.
+  remainder: TODO
   unexpected-token: A token—specifically, the token
                     at which the error was detected.
                     If the token is actually the end
@@ -37,7 +38,7 @@
   descriptors: The set of ErrorDescriptors that
                describe this error."}
   ParseError
-  [position unexpected-token descriptors] IPersistentMap)
+  [position remainder unexpected-token descriptors] IPersistentMap)
 
 (defprotocol AParseAnswer
   "The protocol of FnParse Answers: what
