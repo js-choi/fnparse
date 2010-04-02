@@ -38,7 +38,7 @@
   descriptors: The set of ErrorDescriptors that
                describe this error."}
   ParseError
-  [position remainder unexpected-token descriptors] IPersistentMap)
+  [position remainder descriptors] IPersistentMap)
 
 (defprotocol AParseAnswer
   "The protocol of FnParse Answers: what

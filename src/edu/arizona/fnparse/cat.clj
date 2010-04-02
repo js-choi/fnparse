@@ -61,11 +61,11 @@
 (defmethod c/parse ::Rule [rule context input]
   (c/apply (make-state input context) rule))
 
-(defn- make-failure [state unexpected-token descriptors]
+(defn- make-failure [state descriptors]
   (set-bank
     (c/Failure
       (c/ParseError
-        (:position state) (c/get-remainder state) unexpected-token descriptors))
+        (:position state) (c/get-remainder state) descriptors))
     (get-bank state)))
 
 (defn prod
@@ -83,7 +83,7 @@
   [product]
   (make-rule product-rule [state]
     (c/Success product state
-      (c/ParseError (:position state) (c/get-remainder state) nil nil))))
+      (c/ParseError (:position state) (c/get-remainder state) #{}))))
 
 (defmacro defrm [& forms]
   `(d/defn-memo ~@forms))
@@ -114,11 +114,11 @@
   
   Is the zero monadic value of the parser monad."
   [state]
-  (make-failure state nil #{}))
+  (make-failure state #{}))
 
 (defn with-error [message]
   (make-rule with-error-rule [state]
-    (make-failure state nil #{(c/ErrorDescriptor :message message)})))
+    (make-failure state #{(c/ErrorDescriptor :message message)})))
 
 (defn only-when [valid? message]
   (if-not valid? (with-error message) (prod valid?)))
@@ -324,9 +324,9 @@
         (if (not= token ::nothing)
           (if (validator token)
             (c/Success token (assoc state :position (inc position))
-              (c/ParseError position (c/get-remainder state) token nil))
-            (make-failure state token #{}))
-          (make-failure state ::c/end-of-input #{}))))))
+              (c/ParseError position (c/get-remainder state) #{}))
+            (make-failure state #{}))
+          (make-failure state #{}))))))
 
 (defn antiterm [label-str pred]
   (term label-str (complement pred)))
