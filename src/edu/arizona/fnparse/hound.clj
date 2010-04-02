@@ -74,7 +74,7 @@
   (make-rule prod-rule [state]
     (Reply false
       (c/Success product state
-        (c/ParseError (:position state) (c/get-remainder state) #{})))))
+        (c/ParseError (:position state) #{})))))
 
 (c/defrule <emptiness>
   "The general emptiness rule. (Actually just `(prod nil)`)."
@@ -91,7 +91,7 @@
    {:pre #{(state? state) (set? descriptors)}}
    (Reply false
      (c/Failure
-       (c/ParseError (:position state) (c/get-remainder state) descriptors)))))
+       (c/ParseError (:position state) descriptors)))))
 
 (d/defvar nothing-descriptors
   #{(c/ErrorDescriptor :label "absolutely nothing")}
@@ -380,7 +380,7 @@
                   (c/Success (if pred-product? f-result first-token)
                     (assoc state :remainder (next remainder)
                                  :position (inc position))
-                    (c/ParseError position (c/get-remainder state) #{}))))
+                    (c/ParseError position #{}))))
               (make-failed-reply state first-token #{})))
           (make-failed-reply state ::c/end-of-input #{}))))))
 

@@ -63,9 +63,7 @@
 
 (defn- make-failure [state descriptors]
   (set-bank
-    (c/Failure
-      (c/ParseError
-        (:position state) (c/get-remainder state) descriptors))
+    (c/Failure (c/ParseError (:position state) descriptors))
     (get-bank state)))
 
 (defn prod
@@ -83,7 +81,7 @@
   [product]
   (make-rule product-rule [state]
     (c/Success product state
-      (c/ParseError (:position state) (c/get-remainder state) #{}))))
+      (c/ParseError (:position state) #{}))))
 
 (defmacro defrm [& forms]
   `(d/defn-memo ~@forms))
@@ -324,7 +322,7 @@
         (if (not= token ::nothing)
           (if (validator token)
             (c/Success token (assoc state :position (inc position))
-              (c/ParseError position (c/get-remainder state) #{}))
+              (c/ParseError position #{}))
             (make-failure state #{}))
           (make-failure state #{}))))))
 
