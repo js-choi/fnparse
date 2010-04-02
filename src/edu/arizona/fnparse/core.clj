@@ -1,7 +1,7 @@
-(ns edu.arizona.fnparse.base
+(ns edu.arizona.fnparse.core
   {:author "Joshua Choi"}
-  (:require [clojure.contrib [string :as str] [seq :as seq]]
-            [clojure.template :as temp])
+  (:require [clojure.contrib [string :as str] [seq :as seq] [def :as d]]
+            [clojure.template :as temp] [edu.arizona.fnparse.common :as common])
   (:refer-clojure :rename {apply apply-seq}, :exclude #{find})
   (:import [clojure.lang IPersistentMap]))
 
@@ -118,5 +118,138 @@
   `context` and `input` and returns the raw
   `AParseAnswer` returned from applying that state
   to the given `rule`."
-  (fn [rule context input] (type rule)))
+  (fn [rule context input & _] (type rule)))
 
+(defmacro general-defrule [library-name rule-name doc-string meta-opts form]
+ `(let [rule-var# (d/defvar ~rule-name ~form ~doc-string)]
+    (alter-meta! rule-var# update-in [:doc] common/rule-doc-str
+      ~library-name "rule" ~meta-opts)
+    rule-var#))
+
+(defmacro general-defmaker [library-name obj-type-str def-form fn-name & forms]
+ `(let [maker-var# (~def-form ~fn-name ~@forms)]
+    (alter-var-root maker-var# identity)
+    ; Add extended documentation.
+    (alter-meta! maker-var# update-in [:doc] common/rule-doc-str
+      ~library-name ~obj-type-str (meta maker-var#))
+    ; Memoize unless the :no-memoize meta flag is true.
+    (if-not (:no-memoize? (meta maker-var#))
+      (alter-var-root maker-var# memoize))
+    maker-var#))
+
+(defn- print-complete [product]
+  (printf
+    "COMPLETE MATCH
+==============
+* Final product: %s
+* Final product type: %s
+"
+    (pr-str product) (type product))
+  true)
+
+(defn- print-incomplete [string-input? product final-remainder]
+  (printf
+    "INCOMPLETE MATCH
+================
+* Final product: %s
+* Final product type: %s
+* Unmatched remainder: %s
+"
+    (pr-str product) (type product)
+    (format-remainder string-input? final-remainder))
+  false)
+
+(defn- print-success [string-input? product final-remainder]
+  (if (empty? final-remainder)
+    (print-complete product)
+    (print-incomplete string-input? product final-remainder)))
+
+(defn- print-failure [error]
+  (printf
+    "FAILED MATCH
+=============
+%s
+"
+    (format-parse-error error))
+  false)
+
+(defn match
+  "The general matching function of FnParse. Attempts to
+  match the given rule to at least the beginning of the given input.
+  
+  *   `rule`: The rule to match with.
+  *   `state`: The initial state.
+  *   `success-fn`: An optional function called when the rule
+      matches the input.
+      `(complete-fn final-product final-remainder)` is called.
+  *   `failure-fn`: An optional function called when the rule does not
+      match the input. `(failure-fn final-error)` is called,
+      where `final-error` is an object of type
+      `:edu.arizona.fnparse.ParseError`.
+    
+  If `success-fn` and `failure-fn` aren't included, then
+  `match` will print out a report of the parsing result."
+  ([rule context success-fn failure-fn input]
+   (let [result (->> input (parse rule context) answer-result)]
+     (if (failure? result)
+       (failure-fn (:error result))
+       (success-fn (:product result) (-> result :state get-remainder)))))
+  ([rule context input]
+   (let [string-input? (string? input)]
+     (match rule context
+       (partial print-success string-input?)
+       print-failure
+       input))))
+
+#_(defn find
+  "Finds all occurrences of a rule in a sequence of tokens.
+  Returns a lazy sequence of the rule's products at each
+  occurence. The occurences do not overlap."
+  [rule context input]
+  (when-let [input (seq input)]
+    (lazy-seq
+      (match rule context
+        (fn find-success [product remainder]
+          (cons product (find rule context remainder)))
+        (fn find-failure [e]
+          (find rule context (rest input)))
+        input))))
+
+#_(defn substitute
+  "Substitutes all occurences of a rule in a sequence of tokens
+  with their respective products. Returns a lazy sequence of
+  tokens and products.
+  
+  `flatten?` is a boolean. If it is true, then the substituting
+  products will be flattened into the input sequence; in that
+  case the products must always be Seqables."
+  [rule flatten? state]
+  (let [combining-fn (if flatten? concat cons)]
+    (when-let [input (seq input)]
+      (lazy-seq
+        (match rule context
+          (fn substitute-success [product remainder]
+            (combining-fn product
+              (substitute match-fn rule context flatten? remainder)))
+          (fn substitute-failure [_]
+            (cons (first input)
+              (substitute match-fn rule context flatten? (rest input))))
+          input)))))
+
+#_(defn substitute-1
+  "Substitutes the first occurence of a rule in a sequence of
+  tokens with its respective product. Returns a lazy sequence
+  of tokens and products.
+  
+  See `substitute`'s docs for information on `flatten?`."
+  [rule context flatten? input]
+  (let [combining-fn (if flatten? concat cons)]
+    (when-let [input (seq input)]
+      (lazy-seq
+        (match-fn rule context
+          (fn substitute-1-success [product remainder]
+            (combining-fn product remainder))
+          (fn substitute-1-failure [_]
+            (cons (first input)
+              (substitute-1 match-fn rule context flatten? (rest input))))
+          input)))))

@@ -3,7 +3,7 @@
   It, and all functions it uses in its referred libraries, except
   `clojure.core`, use *no* direct Java calls (with the exception
   of the Exception thrown in the final read-string function.)"
-  (:require [edu.arizona.fnparse [hound :as p] [base :as pbase]]
+  (:require [edu.arizona.fnparse [hound :as p] [core :as pcore]]
             [clojure [template :as t] [set :as set]]
             [clojure.contrib [seq :as seq] [except :as except]])
   (:refer-clojure :exclude #{read-string})
@@ -25,8 +25,8 @@
 (defn str* [chars]
   (apply str chars))
 
-(defn expt-int [base pow]
-  (loop [n (int pow), y 1, z base]
+(defn expt-int [core pow]
+  (loop [n (int pow), y 1, z core]
     (let [t (bit-and n 1), n (bit-shift-right n 1)]
       (cond
         (zero? t) (recur n y (* z z))
@@ -76,57 +76,57 @@
 (def ascii-digits "0123456789")
 (def lowercase-ascii-alphabet "abcdefghijklmnopqrstuvwxyz")
 (def uppercase-ascii-alphabet "ABCEDFGHIJKLMNOPQRSTUVWXYZ")
-(def base-36-digits (concat ascii-digits lowercase-ascii-alphabet))
-(def base-36-digit-map
+(def core-36-digits (concat ascii-digits lowercase-ascii-alphabet))
+(def core-36-digit-map
   (letfn [(digit-entries [[index digit-char]]
             (let [digit-char (char digit-char)]
               [[(Character/toUpperCase digit-char) index]
                [(Character/toLowerCase digit-char) index]]))]
-    (->> base-36-digits seq/indexed (mapcat digit-entries) (into {}))))
+    (->> core-36-digits seq/indexed (mapcat digit-entries) (into {}))))
 
 (defn radix-label
   "The function used by radix-digit to smartly
-  create digit labels for the given `base`."
-  [base]
-  (case base
+  create digit labels for the given `core`."
+  [core]
+  (case core
     10 "a decimal digit"
     16 "a hexadecimal digit"
     8 "an octal digit"
     2 "a binary digit"
-    (format "a base-%s digit" base)))
+    (format "a core-%s digit" core)))
 
 (p/defmaker radix-digit
   "Returns a rule that accepts one digit character
-  token in the number system with the given `base`.
+  token in the number system with the given `core`.
   For instance, `(radix-digit 12)` is a rule
   of a single duodecimal digit.
   
   Digits past 9 are case-insensitive letters:
-  11, for instance, is \\b or \\B. Bases above
+  11, for instance, is \\b or \\B. cores above
   36 are accepted, but there's no way to use
   digits beyond \\Z (which corresponds to 36).
   
   The rules `<decimal-digit>` and
   `<hexadecimal-digit>` are already provided."
   {:succeeds "If the next token is a digit
-    character in the given `base`'s number
+    character in the given `core`'s number
     system."
    :product "The digit's corresponding integer."
    :consumes "One character."}
-  [base]
-  {:pre #{(integer? base) (> base 0)}}
-  (->> base-36-digit-map (filter #(< (val %) base)) (into {})
-    (p/term* (radix-label base))))
+  [core]
+  {:pre #{(integer? core) (> core 0)}}
+  (->> core-36-digit-map (filter #(< (val %) core)) (into {})
+    (p/term* (radix-label core))))
 
 (p/defrule <decimal-digit>
-  "A rule matching a single base-10 digit
+  "A rule matching a single core-10 digit
   character token (i.e. \\0 through \\9)."
   {:product "The matching digit's corresponding Integer object, 0 through 9."
    :consumes "One character."}
   (radix-digit 10))
 
 (p/defrule <hexadecimal-digit>
-  "A rule matching a single base-16 digit
+  "A rule matching a single core-16 digit
   character token (i.e. \\0 through \\F)."
   {:product "The matching digit's corresponding Integer object, 0 through 15."
    :consumes "One character."}
@@ -282,8 +282,8 @@
 
 ;; Numbers.
 
-(p/defmaker radix-natural-number [base]
-  (p/hooked-rep #(+ (* base %1) %2) 0 (p/radix-digit base)))
+(p/defmaker radix-natural-number [core]
+  (p/hooked-rep #(+ (* core %1) %2) 0 (p/radix-digit core)))
 
 (def <decimal-natural-number>
   (radix-natural-number 10))
@@ -332,17 +332,17 @@
       (p/antivalidate zero? "a fraction's denominator cannot be zero"
         <decimal-natural-number>))))
 
-(p/defmaker radix-coefficient-tail [base]
+(p/defmaker radix-coefficient-tail [core]
   (p/hook constantly
     (p/prefix
       (p/set-term "radix indicator" "rR")
         ; If I wasn't worrying about pure Clojure,
         ; use (case-insensitive-p/lit \r) above instead.
-      (radix-natural-number base))))
+      (radix-natural-number core))))
 
-(p/defmaker number-tail [base]
+(p/defmaker number-tail [core]
   (p/+ <imprecise-number-tail> <fraction-denominator-tail>
-       (radix-coefficient-tail base) <empty-number-tail>))
+       (radix-coefficient-tail core) <empty-number-tail>))
 
 (def <number>
   (p/for "a number"
@@ -544,4 +544,4 @@
       (fn [product position] product)
       (fn [error]
         (except/throwf "FnParse parsing error: %s"
-          (base/format-parse-error error))))))
+          (core/format-parse-error error))))))

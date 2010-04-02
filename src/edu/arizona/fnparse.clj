@@ -62,7 +62,7 @@
   same goes for Cat and Hound states and answers.)
   
   FnParse Cat and Hound both use the same _error_ type: the
-  `:edu.arizona.fnparse/ParseError` type.
+  `:edu.arizona.fnparse.core/ParseError` type.
   
   Differences between FnParse Hound and Cat
   =========================================

@@ -1,5 +1,5 @@
 (ns edu.arizona.fnparse.clojure-impure
-  (:require [edu.arizona.fnparse [hound :as p] [base :as pbase]]
+  (:require [edu.arizona.fnparse [hound :as p] [core :as pcore]]
             [clojure [template :as t] [set :as set]]
             [clojure.contrib [seq :as seq] [except :as except]])
   (:refer-clojure :exclude #{read-string})
@@ -21,8 +21,8 @@
 (defn str* [chars]
   (apply str chars))
 
-(defn expt-int [base pow]
-  (loop [n (int pow), y 1, z base]
+(defn expt-int [core pow]
+  (loop [n (int pow), y 1, z core]
     (let [t (bit-and n 1), n (bit-shift-right n 1)]
       (cond
         (zero? t) (recur n y (* z z))
@@ -180,8 +180,8 @@
 
 ;; Numbers.
 
-(p/defmaker radix-natural-number [base]
-  (p/hooked-rep #(+ (* base %1) %2) 0 (p/radix-digit base)))
+(p/defmaker radix-natural-number [core]
+  (p/hooked-rep #(+ (* core %1) %2) 0 (p/radix-digit core)))
 
 (def <decimal-natural-number>
   (radix-natural-number 10))
@@ -228,15 +228,15 @@
       (p/antivalidate zero? "a fraction's denominator cannot be zero"
         <decimal-natural-number>))))
 
-(p/defmaker radix-coefficient-tail [base]
+(p/defmaker radix-coefficient-tail [core]
   (p/hook constantly
     (p/prefix
       (p/case-insensitive-lit \r)
-      (radix-natural-number base))))
+      (radix-natural-number core))))
 
-(p/defmaker number-tail [base]
+(p/defmaker number-tail [core]
   (p/+ <imprecise-number-tail> <fraction-denominator-tail>
-       (radix-coefficient-tail base) <empty-number-tail>))
+       (radix-coefficient-tail core) <empty-number-tail>))
 
 (def <number>
   (p/for "a number"
@@ -438,4 +438,4 @@
       (fn [product position] product)
       (fn [error]
         (except/throwf "FnParse parsing error: %s"
-          (pbase/format-parse-error error))))))
+          (pcore/format-parse-error error))))))

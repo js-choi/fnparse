@@ -1,5 +1,5 @@
 (ns edu.arizona.fnparse.cat
-  (:require [edu.arizona.fnparse [base :as base] [common :as c]]
+  (:require [edu.arizona.fnparse [core :as k] [common :as c]]
             [clojure.contrib [monads :as m] [def :as d] [seq :as seq]]
             [clojure.template :as template])
   (:refer-clojure :rename {peek vec-peek}, :exclude #{for + mapcat find})
@@ -12,16 +12,13 @@
 (defn- vary-bank [bankable f & args]
   (set-bank bankable (apply f (get-bank bankable) args)))
 
-(declare make-state)
-
 (deftype State [tokens position context] :as this
-  base/AState
+  k/AState
     (get-position [] position)
     (get-remainder [] (drop position tokens))
   ABankable
     (get-bank [] (meta this))
     (set-bank [new-bank] (with-meta this new-bank))
-    (make-another-state [input context] (make-state input context))
   IPersistentMap)
 
 (deftype Bank [memory lr-stack position-heads] IPersistentMap)
@@ -44,18 +41,25 @@
 
 (deftype Head [involved-rules rules-to-be-evaluated] IPersistentMap)
 
-(extend ::base/Success ABankable
+(extend ::k/Success ABankable
   {:get-bank (comp get-bank :state)
    :set-bank #(update-in %1 [:state] set-bank %2)})
 
-(extend ::base/Failure ABankable
+(extend ::k/Failure ABankable
   {:get-bank meta
    :set-bank with-meta})
 
 (defn make-state [input context]
   (State input 0 context (Bank {} [] {}) nil))
 
-(d/defalias match c/match)
+(defmacro make-rule [rule-symbol [state-symbol :as args] & body]
+  {:pre #{(symbol? rule-symbol) (symbol? state-symbol) (empty? (rest args))}}
+ `(with-meta
+    (fn [~state-symbol] ~@body)
+    {:type ::Rule}))
+
+(defmethod k/parse ::Rule [rule context input]
+  (k/apply (make-state input context) rule))
 
 (defn prod
   "Creates a product rule.
@@ -70,9 +74,9 @@
   
   Is the result monadic function of the `parser-m` monad."
   [product]
-  (fn product-rule [state]
-    (base/Success product state
-      (base/ParseError (:position state) nil nil))))
+  (make-rule product-rule [state]
+    (k/Success product state
+      (k/ParseError (:position state) nil nil))))
 
 (defmacro defrm [& forms]
   `(d/defn-memo ~@forms))
@@ -92,8 +96,8 @@
 
 (defn- make-failure [state unexpected-token descriptors]
   (set-bank
-    (base/Failure
-      (base/ParseError (:position state) unexpected-token descriptors))
+    (k/Failure
+      (k/ParseError (:position state) unexpected-token descriptors))
     (get-bank state)))
 
 (defn <nothing>
@@ -112,19 +116,19 @@
   (make-failure state nil #{}))
 
 (defn with-error [message]
-  (fn with-error-rule [state]
-    (make-failure state nil #{(base/ErrorDescriptor :message message)})))
+  (make-rule with-error-rule [state]
+    (make-failure state nil #{(k/ErrorDescriptor :message message)})))
 
 (defn only-when [valid? message]
   (if-not valid? (with-error message) (prod valid?)))
 
 (defn combine [rule product-fn]
-  (fn [state]
-    (let [{first-error :error, :as first-result} (base/apply state rule)]
+  (make-rule combined-rule [state]
+    (let [{first-error :error, :as first-result} (k/apply state rule)]
       ;(prn ">" first-result)
-      (if (base/success? first-result)
+      (if (k/success? first-result)
         (let [next-rule (-> first-result :product product-fn)
-              next-result (-> first-result :state (base/apply next-rule))
+              next-result (-> first-result :state (k/apply next-rule))
               next-error (:error next-result)]
           ;(prn ">>" next-result)
           ;(prn ">>>" (c/merge-parse-errors first-error next-error))
@@ -153,10 +157,10 @@
       (let [cur-bank (update-in cur-bank [:lr-stack node-index]
                        #(assoc % :rules-to-be-evaluated
                           (:involved-rules %)))
-            cur-result (base/apply (set-bank state-0 cur-bank) subrule)
+            cur-result (k/apply (set-bank state-0 cur-bank) subrule)
             cur-result-bank (get-bank cur-result)
             cur-memory-val (get-memory cur-result-bank subrule position-0)]
-        (if (or (base/failure? cur-result)
+        (if (or (k/failure? cur-result)
                 (<= (-> cur-result :state :position)
                     (-> cur-memory-val :state :position)))
           (let [cur-result-bank (update-in cur-result-bank [:position-heads]
@@ -187,7 +191,7 @@
     (if (-> lr-node :rule (not= subrule))
       node-seed
       (let [bank (store-memory bank subrule (:position state) node-seed)]
-        (if (base/failure? node-seed)
+        (if (k/failure? node-seed)
           (set-bank node-seed bank)
           (grow-lr subrule (set-bank state bank) node-index))))))
 
@@ -206,12 +210,12 @@
           (if (-> head :rules-to-be-evaluated (contains? subrule))
             (let [bank (update-in [:lr-stack node-index :rules-to-be-evalated]
                          disj subrule)
-                  result (-> state (set-bank bank) (base/apply subrule))]
+                  result (-> state (set-bank bank) (k/apply subrule))]
               (vary-bank result store-memory subrule position result))
             memory))))))
 
 (defn- remember [subrule]
-  (fn remembering-rule [state]
+  (make-rule remembering-rule [state]
     (let [bank (get-bank state)
           state-position (:position state)
           found-memory-val (recall bank subrule state)]
@@ -227,7 +231,7 @@
               bank (update-in bank [:lr-stack] conj
                      (LRNode nil subrule nil))
               state-0b (set-bank state bank)
-              subresult (base/apply  state-0b subrule)
+              subresult (k/apply  state-0b subrule)
               bank (get-bank subresult)
               submemory (get-memory bank subrule state-position)
               current-lr-node (-> bank :lr-stack vec-peek)
@@ -247,16 +251,16 @@
           (apply-next-rule [state prev-result next-rule]
             (-> state
               (set-bank (get-bank prev-result))
-              (base/apply next-rule)
+              (k/apply next-rule)
               (update-in [:error] (partial merge-result-errors prev-result))))]
     (remember
-      (fn summed-rule [state]
+      (make-rule summed-rule [state]
         (let [apply-next-rule (partial apply-next-rule state)
               initial-result (<emptiness> state)
               results (rest (seq/reductions apply-next-rule
                               initial-result rules))]
           #_ (str results) #_ (prn "results" results)
-          (or (seq/find-first base/success? results) (last results)))))))
+          (or (seq/find-first k/success? results) (last results)))))))
 
 (m/defmonad parser-m
   "The monad that FnParse uses."
@@ -267,11 +271,11 @@
 
 (defn label [label-str rule]
   {:pre #{(string? label-str)}}
-  (fn labelled-rule [state]
-    (let [result (base/apply state rule), initial-position (:position state)]
+  (make-rule labelled-rule [state]
+    (let [result (k/apply state rule), initial-position (:position state)]
       (if (-> result :error :position (<= initial-position))
         (assoc-in result [:error :descriptors]
-          #{(base/ErrorDescriptor :label label-str)})
+          #{(k/ErrorDescriptor :label label-str)})
         result))))
 
 (defmacro for
@@ -313,14 +317,15 @@
   validator."
   [label-str validator]
   (label label-str
-    (fn terminal-rule [{:keys #{tokens position} :as state}]
-      (let [token (nth tokens position ::nothing)]
+    (make-rule terminal-rule [state]
+      (let [{:keys #{tokens position}} state
+            token (nth tokens position ::nothing)]
         (if (not= token ::nothing)
           (if (validator token)
-            (base/Success token (assoc state :position (inc position))
-              (base/ParseError position token nil))
+            (k/Success token (assoc state :position (inc position))
+              (k/ParseError position token nil))
             (make-failure state token #{}))
-          (make-failure state ::base/end-of-input #{}))))))
+          (make-failure state ::k/end-of-input #{}))))))
 
 (defn antiterm [label-str pred]
   (term label-str (complement pred)))
@@ -402,9 +407,9 @@
   (+ rule <emptiness>))
 
 (defn peek [rule]
-  (fn [state]
-    (let [result (base/apply state rule)]
-      (if (base/success? result)
+  (make-rule peeking-rule [state]
+    (let [result (k/apply state rule)]
+      (if (k/success? result)
         ((prod (:product result)) state)
         result))))
 
@@ -415,11 +420,11 @@
   rule's product is always true."
   [rule]
   (label "<not followed by something>"
-    (fn antipeek-rule [state]
-      (let [result (base/apply state rule)]
-        (if (base/failure? result)
-          (base/Success true state (:error result))
-          (base/apply state <nothing>))))))
+    (make-rule antipeek-rule [state]
+      (let [result (k/apply state rule)]
+        (if (k/failure? result)
+          (k/Success true state (:error result))
+          (k/apply state <nothing>))))))
 
 (defn mapcat [f tokens]
   (->> tokens (map f) (apply cat)))
@@ -461,16 +466,16 @@
 (defmacro template-sum [argv expr & values]
   (let [c (count argv)]
    `(+ ~@(map (fn [a] (template/apply-template argv expr a)) 
-             (partition c values)))))
+              (partition c values)))))
 
 (defn case-insensitive-lit [#^Character token]
   (+ (lit (Character/toLowerCase token))
        (lit (Character/toUpperCase token))))
 
 (defn effects [f & args]
-  (fn effects-rule [state]
+  (make-rule effects-rule [state]
     (apply f args)
-    (base/apply state <emptiness>)))
+    (k/apply state <emptiness>)))
 
 (defn except
   "Creates a rule that is the exception from
@@ -495,22 +500,22 @@
             (let [new-message (message-fn error)]
               (if new-message
                 (update-in error [:descriptors]
-                  conj (base/ErrorDescriptor :message new-message))
+                  conj (k/ErrorDescriptor :message new-message))
                 error)))]
-    (fn error-annotation-rule [state]
-      (let [reply (base/apply state rule)]
+    (make-rule error-annotation-rule [state]
+      (let [reply (k/apply state rule)]
         (update-in reply [:error] annotate)))))
 
 (def ascii-digits "0123456789")
 (def lowercase-ascii-alphabet "abcdefghijklmnopqrstuvwxyz")
 (def uppercase-ascii-alphabet "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
-(def base-36-digits (str ascii-digits lowercase-ascii-alphabet))
+(def core-36-digits (str ascii-digits lowercase-ascii-alphabet))
 
 (defrm radix-digit
-  ([base] (radix-digit (format "a base-%s digit" base) base))
-  ([label-str base]
-   {:pre #{(integer? base) (<= 0 base 36)}}
-   (->> base-36-digits (take base) seq/indexed
+  ([core] (radix-digit (format "a core-%s digit" core) core))
+  ([label-str core]
+   {:pre #{(integer? core) (<= 0 core 36)}}
+   (->> core-36-digits (take core) seq/indexed
      (mapsum (fn [[index token]] (chook index (case-insensitive-lit token))))
      (label label-str))))
 
