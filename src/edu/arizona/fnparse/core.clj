@@ -109,13 +109,14 @@
   Arguments
   =========
   `defmaker` requires exactly the same arguments as
-  `clojure.k/defn`. Particularly important is being
+  `clojure.core/defn`. Particularly important is being
   able to give metadata easily.
   
   Metadata options
   ================
-  `defmaker` accepts all metadata options that `defrule`
-  does too. There is also a special `:no-memoize?` option
+  `defmaker` accepts all special metadata options that
+  `defrule` does; see `defrule` for more information.
+  There is also a `:no-memoize?` option
   that does something special, detailed below.
   
   Memoization
@@ -128,9 +129,9 @@
   
   95% of the time, you won't have to worry about the warning below.
   
-  A warning: memoization uses Clojure equality. This
-  means that *giving vector arguments must always return the
-  same rule as giving list arguments*, because vectors can
+  A warning: memoization uses *Clojure equality*. This
+  means that giving vector arguments must always return the
+  same rule as giving list arguments, because vectors can
   be equal to lists. If your function must return a different
   rule when given `[1 2 3]` versus `'(1 2 3)`, then you should
   give `{:no-memoize? true}` in your metadata."
