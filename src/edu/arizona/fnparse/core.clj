@@ -164,14 +164,17 @@
       (->> subinput (apply-seq str) (format "'%s'"))
       subinput)))
 
+(defn- join-labels [labels]
+  {:pre (seq? labels)}
+  (str (->> labels drop-last (str/join ", ")) ", or " (last labels)))
+
 (defn- format-parse-error-data
   "Returns a formatted string with the given error data.
   The descriptor map should be returned from group-descriptors."
   [position descriptor-map]
   (let [{labels :label, messages :message} descriptor-map
-        expectation-text (when (seq labels)
-                           (->> labels (str/join ", or ") (str "expected ")
-                                list))
+        expectation-text (when-let [labels (seq labels)]
+                           (->> labels join-labels (str "expected ") list))
         message-text (->> expectation-text (concat messages)
                           (str/join "; "))]
     (format "At position %s: %s" position message-text)))
