@@ -273,8 +273,8 @@
   (make-rule labelled-rule [state]
     (let [result (c/apply state rule), initial-position (:position state)]
       (if (-> result :error :position (<= initial-position))
-        (assoc-in result [:error :descriptors]
-          #{(c/ErrorDescriptor :label label-str)})
+        (update-in result [:error :descriptors]
+          k/assoc-label-in-descriptors label-str)
         result))))
 
 (defmacro for

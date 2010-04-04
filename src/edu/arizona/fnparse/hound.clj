@@ -253,21 +253,12 @@
    m-bind combine
    m-plus +])
 
-(defn- assoc-label-in-descriptors
-  "Removes all labels from the given `descriptors` set, then adds the
-  given `label-str`."
-  [descriptors label-str]
-  {:pre #{(set? descriptors) (string? label-str)}}
-  (let [descriptors (set/select #(not= (:kind %) :label) descriptors)
-        descriptors (conj descriptors (c/ErrorDescriptor :label label-str))]
-    descriptors))
-
 (defn- assoc-label-in-result [result label-str initial-position]
   (let [result (force result)
         error (:error result)]
     (if (-> error :position (<= initial-position))
       (assoc result :error
-        (update-in error [:descriptors] assoc-label-in-descriptors label-str))
+        (update-in error [:descriptors] k/assoc-label-in-descriptors label-str))
       result)))
 
 (c/defmaker label

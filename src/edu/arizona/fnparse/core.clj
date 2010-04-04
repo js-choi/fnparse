@@ -3,7 +3,7 @@
   (:require [clojure.contrib [string :as str] [seq :as seq] [def :as d]
                              [core :as cljcore]]
             [clojure.template :as temp]
-            [edu.arizona.fnparse.common :as c])
+            [edu.arizona.fnparse.core-private :as cp])
   (:refer-clojure :rename {apply apply-seq}, :exclude #{find})
   (:import [clojure.lang IPersistentMap]))
 
@@ -89,7 +89,7 @@
   ([rule-name form] `(defrule ~rule-name nil ~form))
   ([rule-name doc-string form] `(defrule ~rule-name ~doc-string nil ~form))
   ([rule-name doc-string meta-opts form]
-  `(c/general-defrule ~rule-name ~doc-string ~meta-opts ~form)))
+  `(cp/general-defrule ~rule-name ~doc-string ~meta-opts ~form)))
 
 (defmacro defrule-
   "Like `defrule`, but also makes the var private."
@@ -132,7 +132,7 @@
   rule when given `[1 2 3]` versus `'(1 2 3)`, then you should
   give `{:no-memoize? true}` in your metadata."
   [fn-name & forms]
-  (list* `c/general-defmaker `defn fn-name forms))
+  (list* `cp/general-defmaker `defn fn-name forms))
 
 (defmacro defmaker-
   "Like `defmaker`, but also makes the var private."
@@ -143,7 +143,7 @@
   "Like `defmaker`, but makes a macro rule-maker
   instead of a function rule-maker."
   [fn-name & forms]
-  (list* `c/general-defmaker `defmacro fn-name forms))
+  (list* `cp/general-defmaker `defmacro fn-name forms))
 
 (d/defvar *format-remainder-limit*
   10
