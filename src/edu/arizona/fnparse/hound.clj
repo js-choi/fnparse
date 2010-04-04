@@ -41,9 +41,6 @@
 (defn rule? [obj]
   (or (isa? (type obj) ::Rule) (var? obj)))
 
-(d/defalias match c/match)
-#_(d/defalias find c/find)
-
 (defn merge-replies [mergee merger]
   (assoc merger :result
     (update-in (-> merger :result force) [:error]
@@ -265,11 +262,13 @@
         descriptors (conj descriptors (c/ErrorDescriptor :label label-str))]
     descriptors))
 
-(defn- assoc-label-in-result [result label-str]
-  (-> result
-    force
-    (update-in [:error :descriptors] assoc-label-in-descriptors label-str)
-    delay))
+(defn- assoc-label-in-result [result label-str initial-position]
+  (let [result (force result)
+        error (:error result)]
+    (if (-> error :position (<= initial-position))
+      (assoc result :error
+        (update-in error [:descriptors] assoc-label-in-descriptors label-str))
+      result)))
 
 (c/defmaker label
   "Creates a labelled rule.
@@ -296,9 +295,11 @@
   [label-str rule]
   {:pre #{(string? label-str) (rule? rule)}}
   (make-rule labelled-rule [state]
-    (let [reply (c/apply state rule)]
+    (let [initial-position (:position state)
+          reply (c/apply state rule)]
       (if-not (:tokens-consumed? reply)
-        (update-in reply [:result] assoc-label-in-result label-str)
+        (update-in reply [:result] assoc-label-in-result
+          label-str initial-position)
         reply))))
 
 (c/defmaker-macro for

@@ -407,7 +407,7 @@
 ;; Simple prefix forms: syntax-quote, deref, etc.
 
 (c/defmaker padded-lit [token]
-  (p/prefix (p/lit token) <opt-ws>))
+  (p/suffix (p/lit token) <opt-ws>))
 
 (t/do-template [<rule> prefix product-fn-symbol]
   (def <rule>

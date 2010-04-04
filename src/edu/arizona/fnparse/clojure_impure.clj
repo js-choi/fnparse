@@ -301,7 +301,7 @@
 ;; Simple prefix forms: syntax-quote, deref, etc.
 
 (c/defmaker padded-lit [token]
-  (p/prefix (p/lit token) <opt-ws>))
+  (p/suffix (p/lit token) <opt-ws>))
 
 (t/do-template [<rule> prefix product-fn-symbol]
   (def <rule>
@@ -411,8 +411,7 @@
        <unquote-spliced> <unquoted> <deprecated-meta> <character> <keyword>
        <anonymous-fn-parameter> <symbol> <number>))
 
-(def <form>
-  (p/label "a form" (p/prefix <opt-ws> <form-content>)))
+(def <form> (p/label "a form" (p/prefix <opt-ws> <form-content>)))
 
 ;;; THE FINAL READ FUNCTION.
 
@@ -434,7 +433,7 @@
                 Defaults to *read-eval*."
   [input & opts]
   (let [{:keys #{ns-name ns-aliases reader-eval?}} (apply hash-map opts)]
-    (p/match <form> input (ClojureContext ns-name ns-aliases nil reader-eval?)
+    (c/match <form> input (ClojureContext ns-name ns-aliases nil reader-eval?)
       (fn [product position] product)
       (fn [error]
         (except/throwf "FnParse parsing error: %s"

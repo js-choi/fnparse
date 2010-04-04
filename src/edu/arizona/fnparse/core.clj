@@ -166,7 +166,10 @@
 
 (defn- join-labels [labels]
   {:pre (seq? labels)}
-  (str (->> labels drop-last (str/join ", ")) ", or " (last labels)))
+  (when-let [labels (sort labels)]
+    (if-not (= (count labels) 1)
+      (str (->> labels drop-last (str/join ", ")) ", or " (last labels))
+      (first labels))))
 
 (defn- format-parse-error-data
   "Returns a formatted string with the given error data.
