@@ -70,22 +70,35 @@
 
 ;; Whitespace.
 
-(def <comment-indicator> (p/+ (p/lit \;) (p/lex (p/phrase "#!"))))
+(c/defrule <comment-indicator>
+  "There are two line comment indicators, `;` and `#!`.
+  This matches either of them."
+  (p/+ (p/lit \;) (p/lex (p/phrase "#!"))))
 
-(def <comment-char> (p/antilit \newline))
+(c/defrule <comment-char>
+  "A character inside a line comment, i.e. any non-break character."
+  (p/antilit \newline))
 
-(def <comment> (p/cat <comment-indicator> (p/rep* <comment-char>)))
+(c/defrule <comment>
+  "A line comment."
+  (p/cat <comment-indicator> (p/rep* <comment-char>)))
 
-(def <discarded> (p/prefix (p/lex (p/phrase "#_")) #'<form>))
+(c/defrule <discarded>
+  "A discarded form (prefixed by `#_`), which counts as whitespace."
+  (p/prefix (p/lex (p/phrase "#_")) #'<form>))
 
-(def <normal-ws-char>
+(c/defrule <normal-ws-char>
+  "A normal whitespace character such as space or newline."
   (p/term "a whitespace character" ws-set))
 
-(def <ws>
+(c/defrule <ws>
+  "The general whitespace rule: spaces, line comments, and discarded forms."
   (p/label "whitespace"
     (p/rep (p/+ <normal-ws-char> <comment> <discarded>))))
 
-(def <opt-ws> (p/opt <ws>))
+(c/defrule <ws?>
+  "Optional whitespace."
+  (p/opt <ws>))
 
 ;; Indicators and form separators.
 
@@ -285,7 +298,7 @@
 
 ;; Circumflex compound forms: lists, vectors, maps, and sets.
 
-(def <form-series> (p/suffix (p/rep* #'<form>) <opt-ws>))
+(def <form-series> (p/suffix (p/rep* #'<form>) <ws?>))
 
 (t/do-template [<rule> start-token end-token product-fn]
   (def <rule>
@@ -301,12 +314,12 @@
 ;; Simple prefix forms: syntax-quote, deref, etc.
 
 (c/defmaker padded-lit [token]
-  (p/suffix (p/lit token) <opt-ws>))
+  (p/suffix (p/lit token) <ws?>))
 
 (t/do-template [<rule> prefix product-fn-symbol]
   (def <rule>
     (p/hook (prefix-list-fn product-fn-symbol)
-      (p/prefix (p/cat (padded-lit prefix) <opt-ws>) #'<form>)))
+      (p/prefix (p/cat (padded-lit prefix) <ws?>) #'<form>)))
   <quoted> \' `quote
   <syntax-quoted> \` `syntax-quote
   <unquoted> \~ `unquote
@@ -316,7 +329,7 @@
 
 (def <unquote-spliced>
   (p/hook (prefix-list-fn `unquote-splicing)
-    (p/prefix (p/cat (p/lex (p/phrase "~@")) <opt-ws>) #'<form>)))
+    (p/prefix (p/cat (p/lex (p/phrase "~@")) <ws?>) #'<form>)))
 
 (def <deprecated-meta>
   (p/suffix <deprecated-meta>
@@ -334,7 +347,7 @@
 
 (def <with-meta-inner>
   (p/prefix (padded-lit \^)
-    (p/for [metadata <metadata>, _ <opt-ws>, content #'<form>]
+    (p/for [metadata <metadata>, _ <ws?>, content #'<form>]
       (list `with-meta content metadata))))
 
 ;; Anonymous functions.
@@ -411,7 +424,7 @@
        <unquote-spliced> <unquoted> <deprecated-meta> <character> <keyword>
        <anonymous-fn-parameter> <symbol> <number>))
 
-(def <form> (p/label "a form" (p/prefix <opt-ws> <form-content>)))
+(def <form> (p/label "a form" (p/prefix <ws?> <form-content>)))
 
 ;;; THE FINAL READ FUNCTION.
 
