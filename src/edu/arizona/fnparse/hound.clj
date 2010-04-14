@@ -9,12 +9,6 @@
                   :exclude #{for + peek find})
   (:import [clojure.lang IPersistentMap]))
 
-
-; TODO
-; ====
-; user=> (c/match clj/<form> nil "# (3 + 2)")
-; At position 1, ' (3 + 2...': expected '(', or ''', or '"', or '^', or '=', or '<', or '{', or whitespace
-
 (declare make-state)
 
 (deftype State [remainder position context] :as this
@@ -35,10 +29,14 @@
   ([remainder context]
    (State remainder 0 context)))
 
-(defn state? [obj]
+(defn state?
+  "Tests if the given object is a Hound State."
+  [obj]
   (isa? (type obj) ::State))
 
-(defn rule? [obj]
+(defn rule?
+  "Tests if the given object is a Hound Rule."
+  [obj]
   (or (isa? (type obj) ::Rule) (var? obj)))
 
 (defn merge-replies [mergee merger]
@@ -204,10 +202,11 @@
   The order of the sub-rules matters.
   
   This is the FnParse *Hound* version of +. It does *not*
-  backtrack.
+  backtrack. This is the heart of the LL(1) properties of
+  FnParse Hound.
   
   This means that it *first* searches for a successful parse from its
-  subrules that *consumed any tokens*. The first such success is
+  sub-rules that *consumed any tokens*. The first such success is
   *immediately returned*.
   
   If all sub-rules that consumed tokens failed, then

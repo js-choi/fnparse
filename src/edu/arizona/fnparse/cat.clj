@@ -52,6 +52,16 @@
 (defn make-state [input context]
   (State input 0 context (Bank {} [] {}) nil))
 
+(defn state?
+  "Tests if the given object is a Hound State."
+  [obj]
+  (isa? (type obj) ::State))
+
+(defn rule?
+  "Tests if the given object is a Hound Rule."
+  [obj]
+  (or (isa? (type obj) ::Rule) (var? obj)))
+
 (defmacro make-rule [rule-symbol [state-symbol :as args] & body]
   {:pre #{(symbol? rule-symbol) (symbol? state-symbol) (empty? (rest args))}}
  `(with-meta
@@ -66,18 +76,18 @@
     (c/Failure (c/ParseError (:position state) descriptors))
     (get-bank state)))
 
-(defn prod
-  "Creates a product rule.
-  *   Succeeds? Always.
-      *   Product: The given `product`.
-      *   Consumes: Zero tokens.
-  *   Fails? Never.
+(c/defmaker prod
+  "Creates a rule that always returns the given `product`.
   
   Use the `:let` modifier in preference to this function
-  when you use this inside rule comprehensions with the
-  for macro.
+  when you use this inside rule comprehensions from the
+  `for` macro.
   
   Is the result monadic function of the `parser-m` monad."
+  {:succeeds "Always."
+   :product "The given `product`."
+   :consumes "No tokens."
+   :no-memoize? true}
   [product]
   (make-rule product-rule [state]
     (c/Success product state
@@ -89,48 +99,92 @@
 (defmacro defrm- [& forms]
   `(defrm ~@forms))
 
-(d/defvar <emptiness> (prod nil)
-  "The general emptiness rule.
-  
-  *   Succeeds? Always.
-      *   Product: `nil`.
-      *   Consumes: Zero tokens.
-  *   Fails? Never.
-  
-  Happens to be equivalent to `(prod nil)`.")
+(c/defrule <emptiness>
+  "The general emptiness rule. (Actually just `(prod nil)`)."
+  {:succeeds "Always."
+   :product "`nil`."
+   :consumes "No tokens."}
+  (prod nil))
 
-(defn <nothing>
+(c/defrule <nothing>
   "The general failing rule.
   
-  *   Succeeds? Never.
-  *   Fails? Always.
-      *   Labels: \"absolutely nothing\"
-      *   Message: None.
+  Use `with-error` or `only-when` in preference to `<nothing>`,
+  because the first two rule-makers can attach meaningful
+  error messages.
   
-  Use `with-error` in preference to this rule,
-  because 
-  
-  Is the zero monadic value of the parser monad."
-  [state]
-  (make-failure state #{}))
+  Is the zero monadic value of the `parser-m` monad."
+  {:succeeds "Never."
+   :error "`\"Expected: absolutely nothing\"`."}
+  (make-rule nothing-rule [state]
+    (make-failure state #{})))
 
-(defn with-error [message]
+(c/defmaker with-error
+  "Creates an always-failing rule with the given
+  message. Use this in preference to `<nothing>`."
+  {:succeeds "Never."
+   :error "An error with the given `message`."}
+  [message]
   (make-rule with-error-rule [state]
     (make-failure state #{(c/ErrorDescriptor :message message)})))
 
-(defn only-when [valid? message]
+(c/defmaker only-when
+  "Creates a maybe-failing rule—
+  an either succeeding or a failing rule—
+  depending on if `valid?` is logical true. If
+  `valid?`, then the rule always succeeds and acts
+  like `(prod valid?)`. If not `valid?`, then the
+  rule always fails and acts like `(with-error message)`.
+  
+  Examples
+  ========
+  This function is very useful for when you want
+  to validate a certain rule.
+  
+    (for [value <number>
+            _ (only-when (< odd 10)
+                \"number must be less than ten\")]
+        value)
+  
+  The rule given above succeeds only when `<number>`
+  matches and `<number>`'s product is less than 10."
+  {:succeeds "If `valid?` is a true value."
+   :product "The value of `valid?`."
+   :consumes "No tokens."
+   :error-messages "The given `message`."
+   :no-memoize? true}
+  [valid? message]
   (if-not valid? (with-error message) (prod valid?)))
 
-(defn combine [rule product-fn]
+(c/defmaker combine
+  "Creates a rule combining the given `rule` into the
+  `product-fn`.
+  
+  *Use `cat` or `for`* instead of this function.
+  You *shouldn't have to use this function*
+  at all, unless you're doing something special.
+
+  The product-fn must return a rule when given the
+  product of the first rule. `combine` is the bind
+  monadic function of the parser monad.
+  
+  Below, the rule returned by `(product-fn
+  state-after-first-rule)` will be referred to as
+  `second-rule`."
+  {:success "If both `rule` and `(product-fn state-after-first-rule)` succeed."
+   :product "The product of `(product-fn state-after-first-rule)`."
+   :consumes "All tokens that `rule` and then `(product-fn
+             state-after-first-rule)` consume."
+   :fail "If either `rule` and `(product-fn state-after-first-rule)` fail."
+   :labels "Any labels that the failing rule gives."
+   :messages "Any messages that the failing rule gives."}
+  [rule product-fn]
   (make-rule combined-rule [state]
     (let [{first-error :error, :as first-result} (c/apply state rule)]
-      ;(prn ">" first-result)
       (if (c/success? first-result)
         (let [next-rule (-> first-result :product product-fn)
               next-result (-> first-result :state (c/apply next-rule))
               next-error (:error next-result)]
-          ;(prn ">>" next-result)
-          ;(prn ">>>" (k/merge-parse-errors first-error next-error))
           (assoc next-result :error
             (k/merge-parse-errors first-error next-error)))
         first-result))))
@@ -244,7 +298,31 @@
               result (vary-bank result update-in [:lr-stack] pop)]
           result)))))
 
-(defn + [& rules]
+(c/defmaker +
+  "Creates a summed rule.
+  
+  Adds the given sub-rules together, forming a new rule.
+  The order of the sub-rules matters.
+  
+  This is the FnParse *Cat* version of +. Unlike
+  FnParse Hound's `+` rule-maker, Cat's *does* backtrack.
+  
+  This means that it searches for the *first successful*
+  match from its sub-rules, regardless of whether they
+  consume tokens or not.
+  
+  Otherwise, if every sub-rule failed, then a failure
+  is returned with the proper error descriptors.
+  
+  This is the plus monadic operator of the `parser-m` monad."
+  {:success "If any sub-rule succeeds."
+   :failure "If not a single sub-rule succeeds."
+   :product "The product of the succeeding sub-rule."
+   :consumes "Whatever the succeeding sub-rule consumes."
+   :error "An intelligent combination of the errors
+                from all the failed sub-rules."
+   :no-memoize? true}
+  [& rules]
   (letfn [(merge-result-errors [prev-result next-error]
             (k/merge-parse-errors (:error prev-result) next-error))
           (apply-next-rule [state prev-result next-rule]
