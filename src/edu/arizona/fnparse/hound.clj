@@ -246,13 +246,14 @@
         (first consuming-replies)))))
 
 (m/defmonad parser-m
-  "The monad that FnParse uses."
+  "The monad that FnParse Hound uses."
   [m-zero <nothing>
    m-result prod
    m-bind combine
    m-plus +])
 
 (defn- assoc-label-in-result [result label-str initial-position]
+  ; TODO Move to common
   (let [result (force result)
         error (:error result)]
     (if (-> error :position (<= initial-position))
@@ -294,7 +295,7 @@
 
 (c/defmaker-macro for
   "Creates a rule comprehension, very much like
-  `clojure.c/for`. If it succeeds or fails and
+  `clojure.core/for`. If it succeeds or fails and
   also how many tokens it consumes is similar to `cat`.
   How the final product is calculated is similar to `hook`.
   
@@ -315,7 +316,7 @@
       symbol bound to in a previous pair.
       The only current recommended modifier
       is `:let`, which works like how it does it
-      `clojure.c/for`.
+      `clojure.core/for`.
   *   `product-expr`: The final product of the new rule.
       Only is reached after every sub-rule
       succeeds. The expression can refer
@@ -324,7 +325,7 @@
    :product "Whatever is calculated by `product-expr`."
    :consumes "All tokens that each step consecutively consumes."
    :error "Whatever error the failed rule returns."
-   :no-memoize? true}
+   :no-memoize? true} ; TODO decide if this right
   ([label-str steps product-expr]
    `(->> (for ~steps ~product-expr) (label ~label-str)))
   ([steps product-expr]
@@ -356,8 +357,8 @@
   (validate (complement pred) message rule))
 
 (defn- term-
-  "All terminal rules, including `term` and
-  `term*`, are cored on this function."
+  "All terminal Hound rules, including `term` and
+  `term*`, are based on this function."
   [pred-product? label-str f]
   {:pre #{(string? label-str) (ifn? f)}}
   (label label-str
@@ -589,27 +590,21 @@
   `message-fn`, if given, creates a detailed error
   message when the sub-rule succeeds. `message-fn`
   should be a function that takes one argument: `rule`'s
-  product, and returns a string."
+  product, and returns a string (or `nil`, for no message)."
   {:success "If `rule` succeeds."
    :product "Always `true`."}
-  ([label-str rule]
-   {:pre #{(rule? rule)}}
-   (label label-str
-     (make-rule antipeek-rule [state]
-       (let [result (-> state (c/apply rule) :result force)]
-         (if (c/failure? result)
-           (Reply false (c/Success true state (:error result)))
-           (c/apply state <nothing>))))))
+  ([label-str <r>] (antipeek label-str nil <r>))
   ([label-str message-fn rule]
-   {:pre #{(rule? rule)}}
+   {:pre #{(string? label-str) (rule? rule) (ifn? message-fn)}}
    (label label-str
      (make-rule antipeek-rule [state]
        (let [result (-> state (c/apply rule) :result force)]
          (if (c/failure? result)
            (Reply false (c/Success true state (:error result)))
-           (let [message (message-fn (:product result))
-                 error-rule (if message (with-error message) <nothing>)]
-             (c/apply state error-rule))))))))
+           (c/apply state
+             (if-let [message (when message-fn (message-fn (:product result)))]
+               (with-error (message-fn (:product result)))
+               <nothing>))))))))
 
 (defn- apply-reply-and-rule [f prev-reply next-rule]
   (c/apply nil
@@ -661,7 +656,8 @@
   
   *Warning!* Do not use this with any rules that
   possibly may succeed without consuming any tokens.
-  An error will be thrown, because it doesn't make sense."
+  An error will be thrown, because it would otherwise
+  create an infinite loop."
   {:no-memoize? true
    :success "If rule succeeds at least once."
    :consumes "As many tokens as rule can consecutively consume."
@@ -676,7 +672,8 @@
   
   *Warning!* Do not use this with any rules that
   possibly may succeed without consuming any tokens.
-  An error will be thrown, because it doesn't make sense."
+  An error will be thrown, because it would otherwise
+  create an infinite loop."
   {:success "If rule succeeds at least once."
    :consumes "As many tokens as rule can consecutively consume."
    :product "A *vector* of all of `rule`'s consecutive products."}
@@ -690,7 +687,8 @@
   
   *Warning!* Do not use this with any rules that
   possibly may succeed without consuming any tokens.
-  An error will be thrown, because it doesn't make sense."
+  An error will be thrown, because it would otherwise
+  create an infinite loop."
   {:success "If rule succeeds at least once."
    :consumes "As many tokens as rule can consecutively consume."
    :product "A *vector* of all of `rule`'s consecutive products.
@@ -723,7 +721,6 @@
   consecutively match the given tokens.
   (Actually, it's just `(mapcat lit tokens)`.)"
   [tokens]
-  #{:pre #{cljcore/seqable? tokens}}
   (->> tokens (mapcat lit) (label (format "'%s'" tokens))))
 
 (c/defrule <end-of-input>
@@ -807,12 +804,12 @@
   arguments to the given function. You may prefer `prod`."
   {:succeeds "Always."
    :no-memoize? true
-   :product "The result of `(apply f args)`."
+   :product "Always `nil`."
    :consumes "No tokens."}
   [f & args]
   {:pre #{(ifn? f)}}
   (make-rule effects-rule [state]
-    (c/apply state (prod (apply f args)))))
+    (c/apply state <emptiness>)))
 
 (c/defmaker except
   "Creates a subtracted rule. Matches using
