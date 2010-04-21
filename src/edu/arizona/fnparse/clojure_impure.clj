@@ -72,23 +72,23 @@
 
 (c/defrule <comment-indicator>
   "There are two line comment indicators, `;` and `#!`.
-  This matches either of them."
+  This rule consumes either of them."
   (p/+ (p/lit \;) (p/lex (p/phrase "#!"))))
 
 (c/defrule <comment-char>
-  "A character inside a line comment, i.e. any non-break character."
+  "Consumes a character inside a line comment, i.e. any non-break character."
   (p/antilit \newline))
 
 (c/defrule <comment>
-  "A line comment."
+  "Consumes a line comment."
   (p/cat <comment-indicator> (p/rep* <comment-char>)))
 
 (c/defrule <discarded>
-  "A discarded form (prefixed by `#_`), which counts as whitespace."
+  "Consumes a discarded form (prefixed by `#_`), which counts as whitespace."
   (p/prefix (p/lex (p/phrase "#_")) #'<form>))
 
 (c/defrule <normal-ws-char>
-  "A normal whitespace character such as space or newline."
+  "Consumes a normal whitespace character such as space or newline."
   (p/term "a whitespace character" ws-set))
 
 (c/defrule <ws>
@@ -97,22 +97,32 @@
     (p/rep (p/+ <normal-ws-char> <comment> <discarded>))))
 
 (c/defrule <ws?>
-  "Optional whitespace."
+  "Consumes optional whitespace."
   (p/opt <ws>))
 
 ;; Indicators and form separators.
 
-(def <indicator> (p/term "an indicator" indicator-set))
+(c/defrule <indicator>
+  "Consumes a Clojure indicator character."
+  (p/term "an indicator" indicator-set))
 
-(def <separator> (p/+ <ws> <indicator>))
+(c/defrule <separator>
+  "Consumes a separator of Clojure forms: whitespace or an indicator."
+  (p/+ <ws> <indicator>))
 
-(def <form-end> (p/+ (p/peek <separator>) p/<end-of-input>))
+(c/defrule <form-end>
+  "Peeks and checks for a separator or the end of input."
+  {:consumes "No characters."}
+  (p/+ (p/peek <separator>) p/<end-of-input>))
 
 ;; Symbols.
 
-(def <ns-separator> (p/lit \/))
+(c/defrule <ns-separator>
+  "Consumes a forward slash: the separator of namespaces."
+  (p/lit \/))
 
-(def <non-alphanumeric-symbol-char>
+(c/defrule <non-alphanumeric-symbol-char>
+  "Consumes a non-alphanumeric character allowed in Clojure symbols."
   (p/set-term "a non-alphanumeric symbol character" "*+!---?."))
 
 (def <symbol-first-char>
