@@ -630,6 +630,8 @@
    :product "Always `true`."}
   ([label-str <r>] (antipeek label-str nil <r>))
   ([label-str message-fn rule]
+   {:pre #{(string? label-str) (rule? rule)
+           (or (ifn? message-fn) (nil? message-fn))}}
    (label label-str
      (make-rule antipeek-rule [state]
        (let [result (c/apply state rule)]
@@ -648,7 +650,7 @@
   function when `f` is just `lit`."
   [f & token-colls]
   #{:pre #{(ifn? f) (every? cljcore/seqable? token-colls)}}
-  (->> tokens (map f) (apply cat)))
+  (->> token-colls (apply map f) (apply cat)))
 
 (c/defmaker mapsum
   "Creates a rule that is the result of applying `+` to the
@@ -656,7 +658,7 @@
   Use the `set-term` function instead of this
   function when `f` is just `lit`."
   [f & token-colls]
-  (->> tokens (map f) (apply +)))
+  (->> token-colls (apply map f) (apply +)))
 
 (c/defmaker phrase
   "Creates a phrase rule, which succeeds
@@ -709,7 +711,7 @@
   [argv expr & values]
   {:pre #{(zero? (mod (count values) (count argv)))}}
   (let [c (count argv)]
-   `(+ ~@(map (fn [a] (t/apply-template argv expr a))
+   `(+ ~@(map (fn [a] (template/apply-template argv expr a))
            (partition c values)))))
 
 (c/defmaker case-insensitive-lit

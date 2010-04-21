@@ -595,7 +595,8 @@
    :product "Always `true`."}
   ([label-str <r>] (antipeek label-str nil <r>))
   ([label-str message-fn rule]
-   {:pre #{(string? label-str) (rule? rule) (ifn? message-fn)}}
+   {:pre #{(string? label-str) (rule? rule)
+           (or (ifn? message-fn) (nil? message-fn))}}
    (label label-str
      (make-rule antipeek-rule [state]
        (let [result (-> state (c/apply rule) :result force)]

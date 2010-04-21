@@ -9,7 +9,7 @@
   (r/hook #(Integer/parseInt (str %))
     (r/term "a decimal digit" #(Character/isDigit (char %)))))
 
-(def <ws?> (r/opt (r/set-lit "whitespace" " \n\t")))
+(def <ws?> (r/opt (r/set-term "whitespace" " \n\t")))
 
 (template/do-template [rule-name token]
   (def rule-name (r/circumfix <ws?> (r/lit token) <ws?>))
