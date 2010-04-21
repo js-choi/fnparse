@@ -4,8 +4,7 @@
                              [core :as cljcore]]
             [clojure.template :as temp]
             [edu.arizona.fnparse.core-private :as cp])
-  (:refer-clojure :rename {apply apply-seq}, :exclude #{find})
-  (:import [clojure.lang IPersistentMap]))
+  (:refer-clojure :rename {apply apply-seq}, :exclude #{find}))
 
 (defprotocol AState
   "The protocol of FnParse states, which must
@@ -14,7 +13,7 @@
   (get-position [state])
   (make-another-state [state input context]))
 
-(deftype
+(defrecord
   #^{:doc "Represents descriptors representing a single
    potential cause of a FnParse error.
   kind: Either of the keywords :message or :label.
@@ -23,17 +22,16 @@
         the label of a rule that was expected at a
         certain position but was not found.
   text: A string. The text of the descriptor."}
-  ErrorDescriptor [kind text]
-  IPersistentMap)
+  ErrorDescriptor [kind text])
 
-(deftype
+(defrecord
   #^{:doc "Represents FnParse errors.
   position: An integer. The position in the token
             sequence that the error was detected at.
   descriptors: The set of ErrorDescriptors that
                describe this error."}
   ParseError
-  [position descriptors] IPersistentMap)
+  [position descriptors])
 
 (defprotocol AParseAnswer
   "The protocol of FnParse Answers: what
@@ -47,13 +45,11 @@
   contain Results."
   (answer-result [answer]))
 
-(deftype Success [product state error] :as this
-  IPersistentMap
-  AParseAnswer (answer-result [] this))
+(defrecord Success [product state error]
+  AParseAnswer (answer-result [this] this))
 
-(deftype Failure [error] :as this
-  IPersistentMap
-  AParseAnswer (answer-result [] this))
+(defrecord Failure [error]
+  AParseAnswer (answer-result [this] this))
 
 (temp/do-template [fn-name type-name doc-string]
   (defn fn-name doc-string [result]

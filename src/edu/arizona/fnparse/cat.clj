@@ -3,8 +3,7 @@
             [clojure.contrib [monads :as m] [def :as d] [seq :as seq]
                              [core :as cljcore]]
             [clojure.template :as template])
-  (:refer-clojure :rename {peek vec-peek}, :exclude #{for + mapcat find})
-  (:import [clojure.lang IPersistentMap]))
+  (:refer-clojure :rename {peek vec-peek}, :exclude #{for + mapcat find}))
 
 (defprotocol ABankable
   (get-bank [o])
@@ -13,16 +12,15 @@
 (defn- vary-bank [bankable f & args]
   (set-bank bankable (apply f (get-bank bankable) args)))
 
-(deftype State [tokens position context] :as this
+(defrecord State [tokens position context] :as this
   c/AState
     (get-position [] position)
     (get-remainder [] (drop position tokens))
   ABankable
     (get-bank [] (meta this))
-    (set-bank [new-bank] (with-meta this new-bank))
-  IPersistentMap)
+    (set-bank [new-bank] (with-meta this new-bank)))
 
-(deftype Bank [memory lr-stack position-heads] IPersistentMap)
+(defrecord Bank [memory lr-stack position-heads])
   ; memory: a nested map with function keys and map vals
     ; The keys are rules
     ; The vals are maps with integer keys and result vals
@@ -34,13 +32,11 @@
     ; The keys correspond to token positions
     ; The vals correspond to LRNodes' indexes in the lr-stack
 
-(deftype LRNode [seed rule head] :as this
-  ABankable
+(defrecord LRNode [seed rule head] :as this ABankable
     (get-bank [] (meta this))
-    (set-bank [new-bank] (with-meta this new-bank))
-  IPersistentMap)
+    (set-bank [new-bank] (with-meta this new-bank)))
 
-(deftype Head [involved-rules rules-to-be-evaluated] IPersistentMap)
+(defrecord Head [involved-rules rules-to-be-evaluated])
 
 (extend ::c/Success ABankable
   {:get-bank (comp get-bank :state)
@@ -51,7 +47,7 @@
    :set-bank with-meta})
 
 (defn make-state [input context]
-  (State input 0 context (Bank {} [] {}) nil))
+  (State. input 0 context (Bank {} [] {}) nil))
 
 (defn state?
   "Tests if the given object is a Hound State."
@@ -74,7 +70,7 @@
 
 (defn- make-failure [state descriptors]
   (set-bank
-    (c/Failure (c/ParseError (:position state) descriptors))
+    (c/Failure. (c/ParseError. (:position state) descriptors))
     (get-bank state)))
 
 (c/defmaker prod
@@ -91,8 +87,8 @@
    :no-memoize? true}
   [product]
   (make-rule product-rule [state]
-    (c/Success product state
-      (c/ParseError (:position state) #{}))))
+    (c/Success. product state
+      (c/ParseError. (:position state) #{}))))
 
 (defmacro defrm [& forms]
   `(d/defn-memo ~@forms))
@@ -127,7 +123,7 @@
    :error "An error with the given `message`."}
   [message]
   (make-rule with-error-rule [state]
-    (make-failure state #{(c/ErrorDescriptor :message message)})))
+    (make-failure state #{(c/ErrorDescriptor. :message message)})))
 
 (c/defmaker only-when
   "Creates a maybe-failing rule—
@@ -450,9 +446,9 @@
             token (nth tokens position ::nothing)]
         (if (not= token ::nothing)
           (if-let [f-result (f token)]
-            (c/Success (if pred-product? f-result token)
+            (c/Success. (if pred-product? f-result token)
               (assoc state :position (inc position))
-              (c/ParseError position #{}))
+              (c/ParseError. position #{}))
             (make-failure state #{}))
           (make-failure state #{}))))))
 
@@ -636,7 +632,7 @@
      (make-rule antipeek-rule [state]
        (let [result (c/apply state rule)]
          (if (c/failure? result)
-           (c/Success true state (:error result))
+           (c/Success. true state (:error result))
            (c/apply state
              (if-let [message (when message-fn (message-fn (:product result)))]
                (with-error (message-fn (:product result)))
@@ -782,7 +778,7 @@
             (let [new-message (message-fn error)]
               (if new-message
                 (update-in error [:descriptors]
-                  conj (c/ErrorDescriptor :message new-message))
+                  conj (c/ErrorDescriptor. :message new-message))
                 error)))]
     (make-rule error-annotation-rule [state]
       (let [reply (c/apply state rule)]

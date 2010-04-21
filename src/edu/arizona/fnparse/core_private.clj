@@ -5,8 +5,7 @@
   {:author "Joshua Choi", :skip-wiki true}
   (:require [clojure.contrib [def :as d] [string :as str]]
             [clojure.set :as set])
-  (:refer-clojure :exclude #{find})
-  (:import [clojure.lang IPersistentMap]))
+  (:refer-clojure :exclude #{find}))
 
 (d/defvar- rule-doc-summary-header
   "\n

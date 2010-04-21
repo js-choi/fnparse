@@ -5,8 +5,7 @@
   {:author "Joshua Choi", :skip-wiki true}
   (:require [clojure.contrib [def :as d] [string :as str]]
             [clojure.set :as set] [edu.arizona.fnparse.core :as c])
-  (:refer-clojure :exclude #{find})
-  (:import [clojure.lang IPersistentMap]))
+  (:refer-clojure :exclude #{find}))
 
 (defn merge-parse-errors
   "Merges two ParseErrors together. If the two errors are at the same
@@ -28,5 +27,5 @@
   [descriptors label-str]
   {:pre #{(set? descriptors) (string? label-str)}}
   (let [descriptors (set/select #(not= (:kind %) :label) descriptors)
-        descriptors (conj descriptors (c/ErrorDescriptor :label label-str))]
+        descriptors (conj descriptors (c/ErrorDescriptor. :label label-str))]
     descriptors))

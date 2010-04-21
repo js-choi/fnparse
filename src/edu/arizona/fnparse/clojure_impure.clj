@@ -2,18 +2,16 @@
   (:require [edu.arizona.fnparse [hound :as p] [core :as c]]
             [clojure [template :as t] [set :as set]]
             [clojure.contrib [seq :as seq] [except :as except]])
-  (:refer-clojure :exclude #{read-string})
-  (:import [clojure.lang IPersistentMap]))
+  (:refer-clojure :exclude #{read-string}))
 
 ; TODO: Fix implementation of decimal numbers.
 
 ;;; HELPER FUNCTIONS AND TYPES.
 
-(deftype ClojureContext [ns-name ns-aliases anonymous-fn-context reader-eval?]
-  IPersistentMap)
+(defrecord ClojureContext
+  [ns-name ns-aliases anonymous-fn-context reader-eval?])
 
-(deftype AnonymousFnContext [normal-parameters slurping-parameter]
-  IPersistentMap)
+(defrecord AnonymousFnContext [normal-parameters slurping-parameter])
 
 (defn prefix-list-fn [prefix-rule]
   (fn [product] (list prefix-rule product)))
@@ -387,7 +385,7 @@
           _ (p/only-when (not (:anonymous-fn-context pre-context))
               "nested anonymous functions are not allowed")
           _ (p/alter-context assoc
-              :anonymous-fn-context (AnonymousFnContext [] nil))
+              :anonymous-fn-context (AnonymousFnContext. [] nil))
           content <form-series>
           post-context p/<fetch-context>
           _ (p/alter-context assoc :anonymous-fn-context nil)
@@ -456,7 +454,7 @@
                 Defaults to *read-eval*."
   [input & opts]
   (let [{:keys #{ns-name ns-aliases reader-eval?}} (apply hash-map opts)]
-    (c/match <form> input (ClojureContext ns-name ns-aliases nil reader-eval?)
+    (c/match <form> input (ClojureContext. ns-name ns-aliases nil reader-eval?)
       (fn [product position] product)
       (fn [error]
         (except/throwf "FnParse parsing error: %s"

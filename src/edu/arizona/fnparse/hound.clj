@@ -6,20 +6,17 @@
                              [except :as except] [core :as cljcore]]
             [clojure [template :as t] [set :as set]])
   (:refer-clojure :rename {mapcat seq-mapcat}
-                  :exclude #{for + peek find})
-  (:import [clojure.lang IPersistentMap]))
+                  :exclude #{for + peek find}))
 
 (declare make-state)
 
-(deftype State [remainder position context] :as this
-  IPersistentMap
+(defrecord State [remainder position context] :as this
   c/AState
     (get-position [] (:position this))
     (get-remainder [] (:remainder this))
     (make-another-state [input context] (make-state input context)))
 
-(deftype Reply [tokens-consumed? result] :as this
-  IPersistentMap
+(defrecord Reply [tokens-consumed? result] :as this
   c/AParseAnswer (answer-result [] (-> this :result force)))
 
 (defn make-state
@@ -27,7 +24,7 @@
   ([remainder]
    (make-state remainder nil))
   ([remainder context]
-   (State remainder 0 context)))
+   (State. remainder 0 context)))
 
 (defn state?
   "Tests if the given object is a Hound State."
@@ -67,9 +64,9 @@
    :no-memoize? true}
   [product]
   (make-rule prod-rule [state]
-    (Reply false
-      (c/Success product state
-        (c/ParseError (:position state) #{})))))
+    (Reply. false
+      (c/Success. product state
+        (c/ParseError. (:position state) #{})))))
 
 (c/defrule <emptiness>
   "The general emptiness rule. (Actually just `(prod nil)`)."
@@ -84,12 +81,12 @@
    (make-failed-reply state (first (:remainder state)) descriptors))
   ([state unexpected-token descriptors]
    {:pre #{(state? state) (set? descriptors)}}
-   (Reply false
+   (Reply. false
      (c/Failure
-       (c/ParseError (:position state) descriptors)))))
+       (c/ParseError. (:position state) descriptors)))))
 
 (d/defvar nothing-descriptors
-  #{(c/ErrorDescriptor :label "absolutely nothing")}
+  #{(c/ErrorDescriptor. :label "absolutely nothing")}
   "The error descriptors that `<nothing>` uses.")
 
 (c/defrule <nothing>
@@ -113,7 +110,7 @@
   [message]
   {:pre #{(string? message)}}
   (make-rule with-error-rule [state]
-    (make-failed-reply state #{(c/ErrorDescriptor :message message)})))
+    (make-failed-reply state #{(c/ErrorDescriptor. :message message)})))
 
 (c/defmaker only-when
   "Creates a maybe-failing rule—
@@ -193,7 +190,7 @@
                           next-error (:error next-result)]
                       (assoc next-result :error
                         (k/merge-parse-errors first-error next-error))))))
-              (Reply false first-result))))))))
+              (Reply. false first-result))))))))
 
 (c/defmaker +
   "Creates a summed rule.
@@ -367,12 +364,12 @@
         (if-let [remainder (-> state :remainder seq)]
           (let [first-token (first remainder), f-result (f first-token)]
             (if f-result
-              (Reply true
+              (Reply. true
                 (delay
-                  (c/Success (if pred-product? f-result first-token)
+                  (c/Success. (if pred-product? f-result first-token)
                     (assoc state :remainder (next remainder)
                                  :position (inc position))
-                    (c/ParseError position #{}))))
+                    (c/ParseError. position #{}))))
               (make-failed-reply state first-token #{})))
           (make-failed-reply state ::c/end-of-input #{}))))))
 
@@ -578,7 +575,7 @@
   (make-rule peeking-rule [state]
     (let [result (-> state (c/apply rule) :result force)]
       (if (c/failure? result)
-        (Reply false result)
+        (Reply. false result)
         ((prod (:product result)) state)))))
 
 (c/defmaker antipeek
@@ -601,7 +598,7 @@
      (make-rule antipeek-rule [state]
        (let [result (-> state (c/apply rule) :result force)]
          (if (c/failure? result)
-           (Reply false (c/Success true state (:error result)))
+           (Reply. false (c/Success. true state (:error result)))
            (c/apply state
              (if-let [message (when message-fn (message-fn (:product result)))]
                (with-error (message-fn (:product result)))
@@ -857,7 +854,7 @@
                          new-message (message-fn error)]
                      (if new-message
                        (update-in forced-result [:error :descriptors]
-                         conj (c/ErrorDescriptor :message new-message))
+                         conj (c/ErrorDescriptor. :message new-message))
                        forced-result))))]
     (make-rule error-annotation-rule [state]
       (let [reply (c/apply state rule)]
