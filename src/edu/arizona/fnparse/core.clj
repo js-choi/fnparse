@@ -24,6 +24,9 @@
   text: A string. The text of the descriptor."}
   ErrorDescriptor [kind text])
 
+(defn make-error-descriptor [kind text]
+  (ErrorDescriptor. kind text))
+
 (defrecord
   #^{:doc "Represents FnParse errors.
   position: An integer. The position in the token
@@ -32,6 +35,9 @@
                describe this error."}
   ParseError
   [position descriptors])
+
+(defn make-parse-error [position descriptors]
+  (ParseError. position descriptors))
 
 (defprotocol AParseAnswer
   "The protocol of FnParse Answers: what
@@ -51,11 +57,17 @@
 (defrecord Failure [error]
   AParseAnswer (answer-result [this] this))
 
+(defn make-success [product state error]
+  (Success. product state error))
+
+(defn make-failure [error]
+  (Failure. error))
+
 (temp/do-template [fn-name type-name doc-string]
   (defn fn-name doc-string [result]
     (-> result type (isa? type-name)))
-  failure? ::Failure "Is the given result a Failure?"
-  success? ::Success "Is the given result is a Success?")
+  failure? Failure "Is the given result a Failure?"
+  success? Success "Is the given result is a Success?")
 
 (defn apply
   "Applies the given rule to the given state."

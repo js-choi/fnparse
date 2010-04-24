@@ -41,7 +41,9 @@
 
 ; Define special value rules: true, false, and null.
 ; Again, I use `clojure.template/do-template` to reduce repetition.
-(do-template [rule-name tokens product]
+
+(def <true> (p/chook true (p/phrase "true")))
+#_(do-template [rule-name tokens product]
   (c/defrule rule-name
     "Padded on the front with optional whitespace."
     (p/prefix <ws?> (p/chook product (p/phrase tokens))))

@@ -10,14 +10,13 @@
 
 (declare make-state)
 
-(defrecord State [remainder position context] :as this
-  c/AState
-    (get-position [] (:position this))
-    (get-remainder [] (:remainder this))
-    (make-another-state [input context] (make-state input context)))
+(defrecord State [remainder position context] c/AState
+  (get-position [this] (:position this))
+  (get-remainder [this] (:remainder this))
+  (make-another-state [this input context] (make-state input context)))
 
-(defrecord Reply [tokens-consumed? result] :as this
-  c/AParseAnswer (answer-result [] (-> this :result force)))
+(defrecord Reply [tokens-consumed? result]
+  c/AParseAnswer (answer-result [this] (-> this :result force)))
 
 (defn make-state
   "Creates a state with the given remainder and context."
@@ -65,8 +64,8 @@
   [product]
   (make-rule prod-rule [state]
     (Reply. false
-      (c/Success. product state
-        (c/ParseError. (:position state) #{})))))
+      (c/make-success product state
+        (c/make-parse-error (:position state) #{})))))
 
 (c/defrule <emptiness>
   "The general emptiness rule. (Actually just `(prod nil)`)."
@@ -82,11 +81,11 @@
   ([state unexpected-token descriptors]
    {:pre #{(state? state) (set? descriptors)}}
    (Reply. false
-     (c/Failure
-       (c/ParseError. (:position state) descriptors)))))
+     (c/make-failure
+       (c/make-parse-error (:position state) descriptors)))))
 
 (d/defvar nothing-descriptors
-  #{(c/ErrorDescriptor. :label "absolutely nothing")}
+  #{(c/make-parse-error :label "absolutely nothing")}
   "The error descriptors that `<nothing>` uses.")
 
 (c/defrule <nothing>
@@ -110,7 +109,7 @@
   [message]
   {:pre #{(string? message)}}
   (make-rule with-error-rule [state]
-    (make-failed-reply state #{(c/ErrorDescriptor. :message message)})))
+    (make-failed-reply state #{(c/make-parse-error :message message)})))
 
 (c/defmaker only-when
   "Creates a maybe-failing rule—
@@ -366,10 +365,10 @@
             (if f-result
               (Reply. true
                 (delay
-                  (c/Success. (if pred-product? f-result first-token)
+                  (c/make-success (if pred-product? f-result first-token)
                     (assoc state :remainder (next remainder)
                                  :position (inc position))
-                    (c/ParseError. position #{}))))
+                    (c/make-parse-error position #{}))))
               (make-failed-reply state first-token #{})))
           (make-failed-reply state ::c/end-of-input #{}))))))
 
@@ -598,7 +597,7 @@
      (make-rule antipeek-rule [state]
        (let [result (-> state (c/apply rule) :result force)]
          (if (c/failure? result)
-           (Reply. false (c/Success. true state (:error result)))
+           (Reply. false (c/make-success true state (:error result)))
            (c/apply state
              (if-let [message (when message-fn (message-fn (:product result)))]
                (with-error (message-fn (:product result)))
@@ -701,7 +700,7 @@
   Use the `phrase` function instead of this
   function when `f` is just `lit`."
   [f & token-colls]
-  #{:pre #{(ifn? f) (every? cljcore/seqable? token-colls)}}
+  {:pre #{(ifn? f) (every? cljcore/seqable? token-colls)}}
   (->> token-colls (apply map f) (apply cat)))
 
 (c/defmaker mapsum
@@ -710,7 +709,7 @@
   Use the `set-term` function instead of this
   function when `f` is just `lit`."
   [f & token-colls]
-  #{:pre #{(ifn? f) (every? cljcore/seqable? token-colls)}}
+  {:pre #{(ifn? f) (every? cljcore/seqable? token-colls)}}
   (->> token-colls (apply map f) (apply +)))
 
 (c/defmaker phrase
@@ -738,12 +737,13 @@
   {:pre #{(rule? prefix-rule) (rule? body-rule)}}
   (for [_ prefix-rule, content body-rule] content))
 
-(c/defmaker suffix [body-rule suffix-rule]
+(c/defmaker suffix
   "Creates a suffixed rule. Use when you want to
   concatenate two rules, but you don't care about
   the second rule's product.
   Its product is always the body-rule's product.
   A shortcut for `(for [content body-rule, _ suffix-rule] content)`."
+  [body-rule suffix-rule]
   {:pre #{(rule? suffix-rule) (rule? body-rule)}}
   (for [content body-rule, _ suffix-rule] content))
 
@@ -854,7 +854,7 @@
                          new-message (message-fn error)]
                      (if new-message
                        (update-in forced-result [:error :descriptors]
-                         conj (c/ErrorDescriptor. :message new-message))
+                         conj (c/make-error-descriptor :message new-message))
                        forced-result))))]
     (make-rule error-annotation-rule [state]
       (let [reply (c/apply state rule)]

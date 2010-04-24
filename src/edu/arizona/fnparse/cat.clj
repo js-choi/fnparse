@@ -3,6 +3,7 @@
             [clojure.contrib [monads :as m] [def :as d] [seq :as seq]
                              [core :as cljcore]]
             [clojure.template :as template])
+  (:import [edu.arizona.fnparse.core Success Failure])
   (:refer-clojure :rename {peek vec-peek}, :exclude #{for + mapcat find}))
 
 (defprotocol ABankable
@@ -12,13 +13,13 @@
 (defn- vary-bank [bankable f & args]
   (set-bank bankable (apply f (get-bank bankable) args)))
 
-(defrecord State [tokens position context] :as this
+(defrecord State [tokens position context]
   c/AState
-    (get-position [] position)
-    (get-remainder [] (drop position tokens))
+    (get-position [this] position)
+    (get-remainder [this] (drop position tokens))
   ABankable
-    (get-bank [] (meta this))
-    (set-bank [new-bank] (with-meta this new-bank)))
+    (get-bank [this] (meta this))
+    (set-bank [this new-bank] (with-meta this new-bank)))
 
 (defrecord Bank [memory lr-stack position-heads])
   ; memory: a nested map with function keys and map vals
@@ -32,22 +33,22 @@
     ; The keys correspond to token positions
     ; The vals correspond to LRNodes' indexes in the lr-stack
 
-(defrecord LRNode [seed rule head] :as this ABankable
-    (get-bank [] (meta this))
-    (set-bank [new-bank] (with-meta this new-bank)))
+(defrecord LRNode [seed rule head] ABankable
+  (get-bank [this] (meta this))
+  (set-bank [this new-bank] (with-meta this new-bank)))
 
 (defrecord Head [involved-rules rules-to-be-evaluated])
 
-(extend ::c/Success ABankable
+(extend Success ABankable
   {:get-bank (comp get-bank :state)
    :set-bank #(update-in %1 [:state] set-bank %2)})
 
-(extend ::c/Failure ABankable
+(extend Failure ABankable
   {:get-bank meta
    :set-bank with-meta})
 
 (defn make-state [input context]
-  (State. input 0 context (Bank {} [] {}) nil))
+  (State. input 0 context (Bank. {} [] {}) nil))
 
 (defn state?
   "Tests if the given object is a Hound State."
@@ -70,7 +71,7 @@
 
 (defn- make-failure [state descriptors]
   (set-bank
-    (c/Failure. (c/ParseError. (:position state) descriptors))
+    (c/make-failure (c/make-parse-error (:position state) descriptors))
     (get-bank state)))
 
 (c/defmaker prod
@@ -87,8 +88,8 @@
    :no-memoize? true}
   [product]
   (make-rule product-rule [state]
-    (c/Success. product state
-      (c/ParseError. (:position state) #{}))))
+    (c/make-success product state
+      (c/make-parse-error (:position state) #{}))))
 
 (defmacro defrm [& forms]
   `(d/defn-memo ~@forms))
@@ -123,7 +124,7 @@
    :error "An error with the given `message`."}
   [message]
   (make-rule with-error-rule [state]
-    (make-failure state #{(c/ErrorDescriptor. :message message)})))
+    (make-failure state #{(c/make-error-descriptor :message message)})))
 
 (c/defmaker only-when
   "Creates a maybe-failing rule—
@@ -221,7 +222,7 @@
             (recur new-bank)))))))
 
 (defn- add-head-if-not-already-there [head involved-rules]
-  (update-in (or head (Head #{} #{})) [:involved-rules]
+  (update-in (or head (Head. #{} #{})) [:involved-rules]
     into involved-rules))
 
 (defn- setup-lr [lr-stack stack-index]
@@ -279,7 +280,7 @@
         (let [bank (store-memory bank subrule state-position
                      (-> bank :lr-stack count))
               bank (update-in bank [:lr-stack] conj
-                     (LRNode nil subrule nil))
+                     (LRNode. nil subrule nil))
               state-0b (set-bank state bank)
               subresult (c/apply  state-0b subrule)
               bank (get-bank subresult)
@@ -446,9 +447,9 @@
             token (nth tokens position ::nothing)]
         (if (not= token ::nothing)
           (if-let [f-result (f token)]
-            (c/Success. (if pred-product? f-result token)
+            (c/make-success (if pred-product? f-result token)
               (assoc state :position (inc position))
-              (c/ParseError. position #{}))
+              (c/make-parse-error position #{}))
             (make-failure state #{}))
           (make-failure state #{}))))))
 
@@ -632,7 +633,7 @@
      (make-rule antipeek-rule [state]
        (let [result (c/apply state rule)]
          (if (c/failure? result)
-           (c/Success. true state (:error result))
+           (c/make-success true state (:error result))
            (c/apply state
              (if-let [message (when message-fn (message-fn (:product result)))]
                (with-error (message-fn (:product result)))
@@ -645,7 +646,7 @@
   Use the `phrase` function instead of this
   function when `f` is just `lit`."
   [f & token-colls]
-  #{:pre #{(ifn? f) (every? cljcore/seqable? token-colls)}}
+  {:pre #{(ifn? f) (every? cljcore/seqable? token-colls)}}
   (->> token-colls (apply map f) (apply cat)))
 
 (c/defmaker mapsum
@@ -654,6 +655,7 @@
   Use the `set-term` function instead of this
   function when `f` is just `lit`."
   [f & token-colls]
+  {:pre #{(ifn? f) (every? cljcore/seqable? token-colls)}}
   (->> token-colls (apply map f) (apply +)))
 
 (c/defmaker phrase
@@ -681,12 +683,13 @@
   {:pre #{(rule? prefix-rule) (rule? body-rule)}}
   (for [_ prefix-rule, content body-rule] content))
 
-(c/defmaker suffix [body-rule suffix-rule]
+(c/defmaker suffix
   "Creates a suffixed rule. Use when you want to
   concatenate two rules, but you don't care about
   the second rule's product.
   Its product is always the body-rule's product.
   A shortcut for `(for [content body-rule, _ suffix-rule] content)`."
+  [body-rule suffix-rule]
   {:pre #{(rule? suffix-rule) (rule? body-rule)}}
   (for [content body-rule, _ suffix-rule] content))
 
@@ -778,7 +781,7 @@
             (let [new-message (message-fn error)]
               (if new-message
                 (update-in error [:descriptors]
-                  conj (c/ErrorDescriptor. :message new-message))
+                  conj (c/make-error-descriptor :message new-message))
                 error)))]
     (make-rule error-annotation-rule [state]
       (let [reply (c/apply state rule)]

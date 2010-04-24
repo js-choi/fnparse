@@ -27,5 +27,6 @@
   [descriptors label-str]
   {:pre #{(set? descriptors) (string? label-str)}}
   (let [descriptors (set/select #(not= (:kind %) :label) descriptors)
-        descriptors (conj descriptors (c/ErrorDescriptor. :label label-str))]
+        new-descriptor (c/make-error-descriptor :label label-str)
+        descriptors (conj descriptors new-descriptor)]
     descriptors))
