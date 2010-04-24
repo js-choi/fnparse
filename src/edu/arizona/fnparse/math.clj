@@ -1,71 +1,71 @@
 (ns edu.arizona.fnparse.math
-  (:require [edu.arizona.fnparse.cat :as r] [clojure.template :as template]))
+  (:require [edu.arizona.fnparse.cat :as k] [clojure.template :as template]))
 
 (set! *warn-on-reflection* true)
 
 (declare <expr>)
 
 (def <digit>
-  (r/hook #(Integer/parseInt (str %))
-    (r/term "a decimal digit" #(Character/isDigit (char %)))))
+  (k/hook #(Integer/parseInt (str %))
+    (k/term "a decimal digit" #(Character/isDigit (char %)))))
 
-(def <ws?> (r/opt (r/set-term "whitespace" " \n\t")))
+(def <ws?> (k/opt (k/set-term "whitespace" " \n\t")))
 
 (template/do-template [rule-name token]
-  (def rule-name (r/circumfix <ws?> (r/lit token) <ws?>))
+  (def rule-name (k/circumfix <ws?> (k/lit token) <ws?>))
   <plus-sign> \+, <minus-sign> \-, <multiplication-sign> \*, <division-sign> \/,
   <opening-parenthesis> \(, <closing-parenthesis> \))
 
 (def <indicator>
-  (r/label "an indicator"
-    (r/+ <plus-sign> <minus-sign> <multiplication-sign> <division-sign>
+  (k/label "an indicator"
+    (k/+ <plus-sign> <minus-sign> <multiplication-sign> <division-sign>
          <opening-parenthesis> <closing-parenthesis>)))
 
 (def <number>
-  (r/label "a number"
-    (r/+ (r/for [first-digits #'<number>, next-digit <digit>]
-           (r/+ (* 10 first-digits) next-digit))
+  (k/label "a number"
+    (k/+ (k/for [first-digits #'<number>, next-digit <digit>]
+           (k/+ (* 10 first-digits) next-digit))
          <digit>)))
 
-(def <symbol-char> (r/except "a symbol character" r/<anything> <indicator>))
+(def <symbol-char> (k/except "a symbol character" k/<anything> <indicator>))
 
 (def <symbol-content>
-  (r/+ (r/for [first-char <symbol-char>, next-chars #'<symbol-content>]
+  (k/+ (k/for [first-char <symbol-char>, next-chars #'<symbol-content>]
          (cons first-char next-chars))
-       (r/hook list <symbol-char>)))
+       (k/hook list <symbol-char>)))
 
 (def <symbol>
-  (r/label "a symbol" (r/hook #(apply str %) <symbol-content>)))
+  (k/label "a symbol" (k/hook #(apply str %) <symbol-content>)))
 
 (def <terminal-level>
-  (r/+ <number> <symbol>))
+  (k/+ <number> <symbol>))
 
 (def <parenthesized>
-  (r/circumfix <opening-parenthesis> #'<expr> <closing-parenthesis>))
+  (k/circumfix <opening-parenthesis> #'<expr> <closing-parenthesis>))
 
-(def <function> (r/vcat <symbol> <parenthesized>))
+(def <function> (k/vcat <symbol> <parenthesized>))
 
 (def <parenthesized-level>
-  (r/+ <parenthesized> <terminal-level>))
+  (k/+ <parenthesized> <terminal-level>))
 
 (def <function-level>
-  (r/+ <function> <parenthesized-level>))
+  (k/+ <function> <parenthesized-level>))
 
 (def <pos-neg-level>
-  (r/+ (r/vcat (r/+ <plus-sign> <minus-sign>) <function-level>)
+  (k/+ (k/vcat (k/+ <plus-sign> <minus-sign>) <function-level>)
        <function-level>))
 
 (def <multiplication-level>
-  (r/+ (r/vcat
+  (k/+ (k/vcat
          #'<multiplication-level>
-         (r/+ <multiplication-sign> <division-sign>)
+         (k/+ <multiplication-sign> <division-sign>)
          <pos-neg-level>)
        <pos-neg-level>))
 
 (def <addition-level>
-  (r/+ (r/vcat
+  (k/+ (k/vcat
          #'<addition-level>
-         (r/+ <plus-sign> <minus-sign>)
+         (k/+ <plus-sign> <minus-sign>)
          <multiplication-level>)
        <multiplication-level>))
 

@@ -75,8 +75,9 @@
   (rule state))
 
 (defmacro defrule
-  "Defines a rule var. You should use this instead of `def`,
-  if only because it gives you cool shortcuts to write documentation.
+  "Defines a rule var. You should use this instead of `def`
+  whenever you define rules, because it gives you cool
+  shortcuts to write rule-related documentation.
   
   Metadata documentation options
   ==============================

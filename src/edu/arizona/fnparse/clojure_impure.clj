@@ -1,5 +1,5 @@
 (ns edu.arizona.fnparse.clojure-impure
-  (:require [edu.arizona.fnparse [hound :as p] [core :as c]]
+  (:require [edu.arizona.fnparse [hound :as h] [core :as c]]
             [clojure [template :as t] [set :as set]]
             [clojure.contrib [seq :as seq] [except :as except]])
   (:refer-clojure :exclude #{read-string}))
@@ -71,82 +71,82 @@
 (c/defrule <comment-indicator>
   "There are two line comment indicators, `;` and `#!`.
   This rule consumes either of them."
-  (p/+ (p/lit \;) (p/lex (p/phrase "#!"))))
+  (h/+ (h/lit \;) (h/lex (h/phrase "#!"))))
 
 (c/defrule <comment-char>
   "Consumes a character inside a line comment, i.e. any non-break character."
-  (p/antilit \newline))
+  (h/antilit \newline))
 
 (c/defrule <comment>
   "Consumes a line comment."
-  (p/cat <comment-indicator> (p/rep* <comment-char>)))
+  (h/cat <comment-indicator> (h/rep* <comment-char>)))
 
 (c/defrule <discarded>
   "Consumes a discarded form (prefixed by `#_`), which counts as whitespace."
-  (p/prefix (p/lex (p/phrase "#_")) #'<form>))
+  (h/prefix (h/lex (h/phrase "#_")) #'<form>))
 
 (c/defrule <normal-ws-char>
   "Consumes a normal whitespace character such as space or newline."
-  (p/term "a whitespace character" ws-set))
+  (h/term "a whitespace character" ws-set))
 
 (c/defrule <ws>
   "The general whitespace rule: spaces, line comments, and discarded forms."
-  (p/label "whitespace"
-    (p/rep (p/+ <normal-ws-char> <comment> <discarded>))))
+  (h/label "whitespace"
+    (h/rep (h/+ <normal-ws-char> <comment> <discarded>))))
 
 (c/defrule <ws?>
   "Consumes optional whitespace."
-  (p/opt <ws>))
+  (h/opt <ws>))
 
 ;; Indicators and form separators.
 
 (c/defrule <indicator>
   "Consumes a Clojure indicator character."
-  (p/term "an indicator" indicator-set))
+  (h/term "an indicator" indicator-set))
 
 (c/defrule <separator>
   "Consumes a separator of Clojure forms: whitespace or an indicator."
-  (p/+ <ws> <indicator>))
+  (h/+ <ws> <indicator>))
 
 (c/defrule <form-end>
   "Peeks and checks for a separator or the end of input."
   {:consumes "No characters."}
-  (p/+ (p/peek <separator>) p/<end-of-input>))
+  (h/+ (h/peek <separator>) h/<end-of-input>))
 
 ;; Symbols.
 
 (c/defrule <ns-separator>
   "Consumes a forward slash: the separator of namespaces."
-  (p/lit \/))
+  (h/lit \/))
 
 (c/defrule <non-alphanumeric-symbol-char>
   "Consumes a non-alphanumeric character allowed in Clojure symbols."
-  (p/set-term "a non-alphanumeric symbol character" "*+!---?."))
+  (h/set-term "a non-alphanumeric symbol character" "*+!---?."))
 
 (def <symbol-first-char>
-  (p/+ p/<ascii-letter> <non-alphanumeric-symbol-char>))
+  (h/+ h/<ascii-letter> <non-alphanumeric-symbol-char>))
 
 (def <symbol-char>
-  (p/label "a symbol character"
-    (p/+ <symbol-first-char> p/<decimal-digit>)))
+  (h/label "a symbol character"
+    (h/+ <symbol-first-char> h/<decimal-digit>)))
 
 (def <symbol-char-series>
-  (p/hook str* (p/rep <symbol-char>)))
+  (h/hook str* (h/rep <symbol-char>)))
 
 (def <symbol-end>
-  (p/annotate-error annotate-symbol-end <form-end>))
+  (h/annotate-error annotate-symbol-end <form-end>))
 
 (def <slash-symbol-suffix>
-  (p/chook "/" <ns-separator>))
+  (h/chook "/" <ns-separator>))
 
 (def <symbol-suffix>
-  (p/prefix <ns-separator> (p/+ <symbol-char-series> <slash-symbol-suffix>)))
+  (h/prefix <ns-separator> (h/+ <symbol-char-series> <slash-symbol-suffix>)))
 
 (def <symbol>
-  (p/for "a symbol"
+  (h/for "a symbol"
     [first-char <symbol-first-char>
-     rest-pre-slash (p/opt <symbol-char-series>)
-     post-slash (p/opt <symbol-suffix>)
+     rest-pre-slash (h/opt <symbol-char-series>)
+     post-slash (h/opt <symbol-suffix>)
      _ <symbol-end>]
     (let [pre-slash (str first-char rest-pre-slash)]
       (if post-slash
@@ -156,112 +156,112 @@
 
 ;; Keywords.
 
-(def <keyword-indicator> (p/lit \:))
+(def <keyword-indicator> (h/lit \:))
 
 (def <normal-keyword>
-  (p/for [_ <keyword-indicator>
-          pre-slash (p/opt <symbol-char-series>)
-          post-slash (p/opt <symbol-suffix>)
+  (h/for [_ <keyword-indicator>
+          pre-slash (h/opt <symbol-char-series>)
+          post-slash (h/opt <symbol-suffix>)
           _ <symbol-end>]
     (if post-slash
       (keyword pre-slash post-slash)
       (keyword pre-slash))))
 
-(def <peek-ns-separator> (p/peek <ns-separator>))
+(def <peek-ns-separator> (h/peek <ns-separator>))
 
 (c/defmaker fetch-referred-namespace [context namespace-alias]
-  (p/only-when (get-in context [:ns-aliases namespace-alias])
+  (h/only-when (get-in context [:ns-aliases namespace-alias])
     (format "no namespace with alias '%s'" namespace-alias)))
 
 (c/defmaker ns-qualified-keyword-end-with-slash [pre-slash]
-  (p/for [_ <peek-ns-separator>
-          context p/<fetch-context>
+  (h/for [_ <peek-ns-separator>
+          context h/<fetch-context>
           prefix (fetch-referred-namespace context pre-slash)
           suffix <symbol-suffix>]
     [prefix suffix]))
 
 (c/defmaker ns-qualified-keyword-empty-end [pre-slash]
-  (p/for [context p/<fetch-context>]
+  (h/for [context h/<fetch-context>]
     [(:ns-name context) pre-slash]))
 
 (c/defmaker ns-resolved-keyword-end [pre-slash]
-  (p/+ (ns-qualified-keyword-end-with-slash pre-slash)
+  (h/+ (ns-qualified-keyword-end-with-slash pre-slash)
        (ns-qualified-keyword-empty-end pre-slash)))
 
 (def <ns-resolved-keyword>
-  (p/for [_ (p/lex (p/factor= 2 <keyword-indicator>))
+  (h/for [_ (h/lex (h/factor= 2 <keyword-indicator>))
           pre-slash <symbol-char-series>
           [prefix suffix] (ns-resolved-keyword-end pre-slash)
           _ <form-end>]
     (keyword prefix suffix)))
 
 (def <keyword>
-  (p/label "a keyword"
-    (p/+ <ns-resolved-keyword> <normal-keyword>)))
+  (h/label "a keyword"
+    (h/+ <ns-resolved-keyword> <normal-keyword>)))
 
 ;; Numbers.
 
 (c/defmaker radix-natural-number [core]
-  (p/hooked-rep #(+ (* core %1) %2) 0 (p/radix-digit core)))
+  (h/hooked-rep #(+ (* core %1) %2) 0 (h/radix-digit core)))
 
 (def <decimal-natural-number>
   (radix-natural-number 10))
 
 (def <number-sign>
-  (p/template-sum [label token product]
-    (p/label label (p/chook product (p/lit token)))
+  (h/template-sum [label token product]
+    (h/label label (h/chook product (h/lit token)))
     "positive sign" \+ 1, "negative sign" \- -1))
 
 (def <empty-number-tail>
-  (p/chook identity p/<emptiness>))
+  (h/chook identity h/<emptiness>))
 
 (def <imprecise-fractional-part>
   (letfn [(reduce-digit-accumulator [[prev-num multiplier] next-digit]
             [(+ (* next-digit multiplier) prev-num) (/ multiplier 10)])]
-    (p/prefix
-      (p/lit \.)
-      (p/+ (->> p/<decimal-digit>
-             (p/hooked-rep reduce-digit-accumulator [0 0.1])
-             (p/hook #(partial + (get % 0))))
-           (p/hook #(partial + (/ % 10.)) <decimal-natural-number>)
+    (h/prefix
+      (h/lit \.)
+      (h/+ (->> h/<decimal-digit>
+             (h/hooked-rep reduce-digit-accumulator [0 0.1])
+             (h/hook #(partial + (get % 0))))
+           (h/hook #(partial + (/ % 10.)) <decimal-natural-number>)
            <empty-number-tail>))))
 
 (def <exponential-part>
-  (p/prefix
-    (p/case-insensitive-lit \e)
-    (p/hook #(partial * (expt-int 10 %)) <decimal-natural-number>)))
+  (h/prefix
+    (h/case-insensitive-lit \e)
+    (h/hook #(partial * (expt-int 10 %)) <decimal-natural-number>)))
 
 (def <fractional-exponential-part>
-  (p/for [frac-fn <imprecise-fractional-part>
-          exp-fn (p/+ <exponential-part> <empty-number-tail>)]
+  (h/for [frac-fn <imprecise-fractional-part>
+          exp-fn (h/+ <exponential-part> <empty-number-tail>)]
     (comp exp-fn frac-fn)))
 
 (def <imprecise-number-tail>
-  (p/for [tail-fn (p/+ <fractional-exponential-part> <exponential-part>)
-          big-dec? (p/opt (p/lit \M))]
+  (h/for [tail-fn (h/+ <fractional-exponential-part> <exponential-part>)
+          big-dec? (h/opt (h/lit \M))]
     (comp (if big-dec? bigdec double) tail-fn)))
 
 (def <fraction-denominator-tail>
   ; Product: a unary function on an integer.
-  (p/prefix
-    (p/lit \/)
-    (p/hook (fn [denominator] #(/ % denominator))
-      (p/antivalidate zero? "a fraction's denominator cannot be zero"
+  (h/prefix
+    (h/lit \/)
+    (h/hook (fn [denominator] #(/ % denominator))
+      (h/antivalidate zero? "a fraction's denominator cannot be zero"
         <decimal-natural-number>))))
 
 (c/defmaker radix-coefficient-tail [core]
-  (p/hook constantly
-    (p/prefix
-      (p/case-insensitive-lit \r)
+  (h/hook constantly
+    (h/prefix
+      (h/case-insensitive-lit \r)
       (radix-natural-number core))))
 
 (c/defmaker number-tail [core]
-  (p/+ <imprecise-number-tail> <fraction-denominator-tail>
+  (h/+ <imprecise-number-tail> <fraction-denominator-tail>
        (radix-coefficient-tail core) <empty-number-tail>))
 
 (def <number>
-  (p/for "a number"
-    [sign (p/opt <number-sign>)
+  (h/for "a number"
+    [sign (h/opt <number-sign>)
      prefix-number <decimal-natural-number>
      tail-fn (number-tail prefix-number)
      _ <form-end>]
@@ -270,49 +270,49 @@
 ;; Unicode escape sequences for chars and strings.
 
 (def <unicode-escape-sequence>
-  (p/prefix (p/lit \u)
-    (p/hook (comp char reduce-hexadecimal-digits)
-      (p/factor= 4 p/<hexadecimal-digit>))))
+  (h/prefix (h/lit \u)
+    (h/hook (comp char reduce-hexadecimal-digits)
+      (h/factor= 4 h/<hexadecimal-digit>))))
 
 ;; Characters.
 
-(def <character-indicator> (p/lit \\))
+(def <character-indicator> (h/lit \\))
 
 (def <character-name>
-  (p/+ (p/mapsum #(p/chook (key %) (p/phrase (val %))) char-name-string)
+  (h/+ (h/mapsum #(h/chook (key %) (h/phrase (val %))) char-name-string)
        <unicode-escape-sequence>))
 
-(def <character> (p/prefix <character-indicator> <character-name>))
+(def <character> (h/prefix <character-indicator> <character-name>))
 
 ;; Strings.
 
-(def <string-delimiter> (p/lit \"))
+(def <string-delimiter> (h/lit \"))
 
 (def <escaped-char>
-  (p/prefix <character-indicator>
-    (p/label "a valid escape sequence"
-      (p/+ (p/template-sum [token character]
-             (p/chook character (p/lit token))
+  (h/prefix <character-indicator>
+    (h/label "a valid escape sequence"
+      (h/+ (h/template-sum [token character]
+             (h/chook character (h/lit token))
              \t \tab, \n \newline, \\ \\, \" \")
            <unicode-escape-sequence>))))
 
-(def <normal-string-char> (p/antilit \"))
+(def <normal-string-char> (h/antilit \"))
 
-(def <string-char> (p/+ <escaped-char> <normal-string-char>))
+(def <string-char> (h/+ <escaped-char> <normal-string-char>))
 
 (def <string>
-  (p/hook #(->> % seq/flatten str*)
-    (p/circumfix <string-delimiter> (p/rep* <string-char>) <string-delimiter>)))
+  (h/hook #(->> % seq/flatten str*)
+    (h/circumfix <string-delimiter> (h/rep* <string-char>) <string-delimiter>)))
 
 ;; Circumflex compound forms: lists, vectors, maps, and sets.
 
-(def <form-series> (p/suffix (p/rep* #'<form>) <ws?>))
+(def <form-series> (h/suffix (h/rep* #'<form>) <ws?>))
 
 (t/do-template [<rule> start-token end-token product-fn]
   (def <rule>
-    (p/for [_ (p/lit start-token)
+    (h/for [_ (h/lit start-token)
             contents <form-series>
-            _ (p/lit end-token)]
+            _ (h/lit end-token)]
       (product-fn contents)))
   <list> \( \) #(apply list %)
   <vector> \[ \] identity
@@ -322,12 +322,12 @@
 ;; Simple prefix forms: syntax-quote, deref, etc.
 
 (c/defmaker padded-lit [token]
-  (p/suffix (p/lit token) <ws?>))
+  (h/suffix (h/lit token) <ws?>))
 
 (t/do-template [<rule> prefix product-fn-symbol]
   (def <rule>
-    (p/hook (prefix-list-fn product-fn-symbol)
-      (p/prefix (p/cat (padded-lit prefix) <ws?>) #'<form>)))
+    (h/hook (prefix-list-fn product-fn-symbol)
+      (h/prefix (h/cat (padded-lit prefix) <ws?>) #'<form>)))
   <quoted> \' `quote
   <syntax-quoted> \` `syntax-quote
   <unquoted> \~ `unquote
@@ -336,60 +336,60 @@
   <deprecated-meta> \^ `meta)
 
 (def <unquote-spliced>
-  (p/hook (prefix-list-fn `unquote-splicing)
-    (p/prefix (p/cat (p/lex (p/phrase "~@")) <ws?>) #'<form>)))
+  (h/hook (prefix-list-fn `unquote-splicing)
+    (h/prefix (h/cat (h/lex (h/phrase "~@")) <ws?>) #'<form>)))
 
 (def <deprecated-meta>
-  (p/suffix <deprecated-meta>
-    (p/effects println
+  (h/suffix <deprecated-meta>
+    (h/effects println
       "WARNING: The ^ indicator is deprecated (since Clojure 1.1).")))
 
 ;; With-meta #^ forms.
 
 (def <tag>
-  (p/hook #(hash-map :tag %)
-    (p/+ <keyword> <symbol>)))
+  (h/hook #(hash-map :tag %)
+    (h/+ <keyword> <symbol>)))
 
 (def <metadata>
-  (p/+ <map> <tag>))
+  (h/+ <map> <tag>))
 
 (def <with-meta-inner>
-  (p/prefix (padded-lit \^)
-    (p/for [metadata <metadata>, _ <ws?>, content #'<form>]
+  (h/prefix (padded-lit \^)
+    (h/for [metadata <metadata>, _ <ws?>, content #'<form>]
       (list `with-meta content metadata))))
 
 ;; Anonymous functions.
 
 (def <anonymous-fn-parameter-suffix>
-  (p/+ <decimal-natural-number> (p/lit \&) (p/chook 1 p/<emptiness>)))
+  (h/+ <decimal-natural-number> (h/lit \&) (h/chook 1 h/<emptiness>)))
 
 (def <anonymous-fn-parameter>
-  (p/for "a parameter"
-    [_ (p/lit \%)
-     context p/<fetch-context>
+  (h/for "a parameter"
+    [_ (h/lit \%)
+     context h/<fetch-context>
      :let [fn-context (:anonymous-fn-context context)]
-     _ (p/only-when fn-context
+     _ (h/only-when fn-context
          "a parameter literals must be inside an anonymous function")
      suffix <anonymous-fn-parameter-suffix>
      :let [already-existing-symbol (get-already-existing-symbol fn-context
                                                                 suffix)
            parameter-symbol (or already-existing-symbol (gensym "parameter"))]
      _ (if (nil? already-existing-symbol)
-         (p/alter-context update-fn-context suffix parameter-symbol)
-         p/<emptiness>)]
+         (h/alter-context update-fn-context suffix parameter-symbol)
+         h/<emptiness>)]
     parameter-symbol))
 
 (def <anonymous-fn-inner>
-  (p/for [_ (p/lit \()
-          pre-context p/<fetch-context>
-          _ (p/only-when (not (:anonymous-fn-context pre-context))
+  (h/for [_ (h/lit \()
+          pre-context h/<fetch-context>
+          _ (h/only-when (not (:anonymous-fn-context pre-context))
               "nested anonymous functions are not allowed")
-          _ (p/alter-context assoc
+          _ (h/alter-context assoc
               :anonymous-fn-context (AnonymousFnContext. [] nil))
           content <form-series>
-          post-context p/<fetch-context>
-          _ (p/alter-context assoc :anonymous-fn-context nil)
-          _ (p/lit \))]
+          post-context h/<fetch-context>
+          _ (h/alter-context assoc :anonymous-fn-context nil)
+          _ (h/lit \))]
     (let [anonymous-fn-context (:anonymous-fn-context post-context)
           parameters (make-parameter-vector anonymous-fn-context)]
       (list `fn 'anonymous-fn parameters (apply list content)))))
@@ -397,42 +397,42 @@
 ;; Regex patterns, EvalReaders, and unreadables.
 
 (def <pattern-inner>
-  (p/hook (comp re-pattern str*)
-    (p/circumfix <string-delimiter>
-                 (p/rep* <normal-string-char>)
+  (h/hook (comp re-pattern str*)
+    (h/circumfix <string-delimiter>
+                 (h/rep* <normal-string-char>)
                  <string-delimiter>)))
 
 (def <evaluated-inner>
-  (p/for [_ (p/lit \=)
-          context p/<fetch-context>
-          _ (p/only-when (:reader-eval? context)
+  (h/for [_ (h/lit \=)
+          context h/<fetch-context>
+          _ (h/only-when (:reader-eval? context)
               "EvalReader forms (i.e. #=(...)) have been prohibited.")
           content <list>]
     (eval content)))
 
 (def <unreadable-inner>
-  (p/for [_ (p/lit \<)
-          content (p/rep* (p/antilit \>))
-          _ (p/opt (p/lit \>))
-          _ (p/with-error
+  (h/for [_ (h/lit \<)
+          content (h/rep* (h/antilit \>))
+          _ (h/opt (h/lit \>))
+          _ (h/with-error
               (format "the data in #<%s> is unrecoverable" (str* content)))]
     nil))
 
 ;; All forms put together. (Order matters for lexed rules.)
 
 (def <dispatched-inner>
-  (p/+ <anonymous-fn-inner> <set-inner> <var-inner> <with-meta-inner>
+  (h/+ <anonymous-fn-inner> <set-inner> <var-inner> <with-meta-inner>
        <pattern-inner> <evaluated-inner> <unreadable-inner>))
 
 (def <dispatched>
-  (p/prefix (p/lit \#) <dispatched-inner>))
+  (h/prefix (h/lit \#) <dispatched-inner>))
 
 (def <form-content>
-  (p/+ <list> <vector> <map> <dispatched> <string> <syntax-quoted>
+  (h/+ <list> <vector> <map> <dispatched> <string> <syntax-quoted>
        <unquote-spliced> <unquoted> <deprecated-meta> <character> <keyword>
        <anonymous-fn-parameter> <symbol> <number>))
 
-(def <form> (p/label "a form" (p/prefix <ws?> <form-content>)))
+(def <form> (h/label "a form" (h/prefix <ws?> <form-content>)))
 
 ;;; THE FINAL READ FUNCTION.
 
