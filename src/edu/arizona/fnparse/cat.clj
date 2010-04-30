@@ -1,7 +1,7 @@
 (ns edu.arizona.fnparse.cat
   (:require [edu.arizona.fnparse [core :as c] [common :as k]]
-            [clojure.contrib [monads :as m] [def :as d] [seq :as seq]
-                             [core :as cljcore]]
+            [clojure.contrib [monads :as m] [def :as d]
+                             [seq :as seq] [core :as cljcore]]
             [clojure.template :as template])
   (:import [edu.arizona.fnparse.core Success Failure])
   (:refer-clojure :rename {peek vec-peek}, :exclude #{for + mapcat find}))
@@ -332,9 +332,8 @@
       (make-rule summed-rule [state]
         (let [apply-next-rule (partial apply-next-rule state)
               initial-result (<emptiness> state)
-              results (rest (seq/reductions apply-next-rule
+              results (rest (reductions apply-next-rule
                               initial-result rules))]
-          #_ (str results) #_ (prn "results" results)
           (or (seq/find-first c/success? results) (last results)))))))
 
 (m/defmonad parser-m

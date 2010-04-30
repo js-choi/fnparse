@@ -1,6 +1,6 @@
 (ns edu.arizona.fnparse.core
   {:author "Joshua Choi"}
-  (:require [clojure.contrib [string :as str] [seq :as seq] [def :as d]
+  (:require [clojure.contrib [string :as str] [def :as d]
                              [core :as cljcore]]
             [clojure.template :as temp]
             [edu.arizona.fnparse.core-private :as cp])
@@ -197,7 +197,7 @@
   If there are no descriptors of a certain descriptor kind,
   then the map's val for that kind is the empty set."
   [descriptors]
-  (->> descriptors (seq/group-by :kind)
+  (->> descriptors (group-by :kind)
        (map #(vector (key %) (set (map :text (val %)))))
        (filter #(seq (get % 1)))
        (into {:message #{}, :label #{}})))

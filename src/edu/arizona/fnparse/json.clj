@@ -12,7 +12,7 @@
   [RFC]: http://www.ietf.org/rfc/rfc4627"
   (:require [edu.arizona.fnparse [hound :as h] [core :as c]]
             [clojure.set :as set]
-            [clojure.contrib [seq :as seq] [except :as except]])
+            [clojure.contrib [except :as except]])
   (:use [clojure.template :only #{do-template}]
         [clojure.test :only #{set-test is run-tests}])
   (:refer-clojure :exclude #{read-string}))

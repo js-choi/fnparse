@@ -1,7 +1,7 @@
 (ns edu.arizona.fnparse.clojure-impure
   (:require [edu.arizona.fnparse [hound :as h] [core :as c]]
             [clojure [template :as t] [set :as set]]
-            [clojure.contrib [seq :as seq] [except :as except]])
+            [clojure.contrib [except :as except]])
   (:refer-clojure :exclude #{read-string}))
 
 ; TODO: Fix implementation of decimal numbers.
@@ -301,7 +301,7 @@
 (def <string-char> (h/+ <escaped-char> <normal-string-char>))
 
 (def <string>
-  (h/hook #(->> % seq/flatten str*)
+  (h/hook #(->> % flatten str*)
     (h/circumfix <string-delimiter> (h/rep* <string-char>) <string-delimiter>)))
 
 ;; Circumflex compound forms: lists, vectors, maps, and sets.

@@ -2,7 +2,7 @@
   "This is *FnParse Hound*, which can create unambiguous
   LL(1) or LL(n) parsers."
   (:require [edu.arizona.fnparse [core :as c] [common :as k]]
-            [clojure.contrib [seq :as seq] [monads :as m] [def :as d]
+            [clojure.contrib [monads :as m] [def :as d] [seq :as seq]
                              [except :as except] [core :as cljcore]]
             [clojure [template :as t] [set :as set]])
   (:refer-clojure :rename {mapcat seq-mapcat}
@@ -235,7 +235,7 @@
       (if (empty? consuming-replies)
         (if (empty? empty-replies)
           (c/apply <nothing> state)
-          (let [empty-replies (seq/reductions merge-replies empty-replies)]
+          (let [empty-replies (reductions merge-replies empty-replies)]
             (or (first (drop-while #(-> % :result force c/failure?)
                          empty-replies))
                 (last empty-replies))))
@@ -625,7 +625,7 @@
               (delay
                 (let [[last-success first-failure]
                       (->> rule repeat
-                        (seq/reductions apply-reduced-fn first-reply)
+                        (reductions apply-reduced-fn first-reply)
                         (partition 2 1)
                         (take-while #(-> % first :result force c/success?))
                         last)]
