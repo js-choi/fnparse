@@ -10,8 +10,11 @@
   "The protocol of FnParse states, which must
   be able to return a position."
   (get-remainder [state])
-  (get-position [state])
-  (make-another-state [state input context]))
+  (get-position [state]))
+
+(defprotocol ARule
+  (rule-parse [rule state])
+  (rule-state [rule context input]))
 
 (defrecord
   #^{:doc "Represents descriptors representing a single
@@ -253,6 +256,13 @@
     (format-parse-error error))
   false)
 
+(defn- match*
+  [rule success-fn failure-fn state]
+  (let [result (-> rule (rule-parse state) answer-result)]
+    (if (failure? result)
+      (failure-fn (:error result))
+      (success-fn (:product result) (-> result :state get-remainder)))))
+
 (defn match
   "The general matching function of FnParse. Attempts to
   match the given rule to at least the beginning of the given input.
@@ -270,10 +280,7 @@
   If `success-fn` and `failure-fn` aren't included, then
   `match` will print out a report of the parsing result."
   ([rule context success-fn failure-fn input]
-   (let [result (->> input (parse rule context) answer-result)]
-     (if (failure? result)
-       (failure-fn (:error result))
-       (success-fn (:product result) (-> result :state get-remainder)))))
+   (match* rule success-fn failure-fn (rule-state rule context input)))
   ([rule context input]
    (let [string-input? (string? input)]
      (match rule context
