@@ -16,6 +16,11 @@
   (rule-parse [rule state])
   (rule-state [rule context input]))
 
+(defrecord RuleMeta [make-state label unlabelled-rule])
+
+(defn make-rule-meta [make-state]
+  (RuleMeta. make-state nil nil))
+
 (defrecord
   #^{:doc "Represents descriptors representing a single
    potential cause of a FnParse error.
@@ -74,7 +79,7 @@
 
 (defn apply
   "Applies the given rule to the given state."
-  [state rule]
+  [rule state]
   (rule state))
 
 (defmacro defrule
@@ -256,9 +261,12 @@
     (format-parse-error error))
   false)
 
+(defn- rule-make-state [rule context input]
+  ((-> rule meta :make-state) context input))
+
 (defn- match*
   [rule success-fn failure-fn state]
-  (let [result (-> rule (rule-parse state) answer-result)]
+  (let [result (-> rule (apply state) answer-result)]
     (if (failure? result)
       (failure-fn (:error result))
       (success-fn (:product result) (-> result :state get-remainder)))))
@@ -280,7 +288,7 @@
   If `success-fn` and `failure-fn` aren't included, then
   `match` will print out a report of the parsing result."
   ([rule context success-fn failure-fn input]
-   (match* rule success-fn failure-fn (rule-state rule context input)))
+   (match* rule success-fn failure-fn (rule-make-state rule context input)))
   ([rule context input]
    (let [string-input? (string? input)]
      (match rule context

@@ -17,21 +17,15 @@
 
 (defn- make-state
   "Creates a state with the given remainder and context."
-  ([remainder]
-   (make-state remainder nil))
-  ([remainder context]
-   (State. remainder 0 context)))
-
-(defrecord Rule [f] c/ARule
-  (rule-parse [this state] (f state))
-  (rule-state [this context input] (make-state input context)))
+  [context remainder]
+  (State. remainder 0 context))
 
 (defmacro make-rule [rule-symbol [state-symbol :as args] & body]
   {:pre #{(symbol? rule-symbol) (symbol? state-symbol) (empty? (rest args))}}
- `(Rule. (fn [~state-symbol] ~@body)))
+ `(with-meta (fn [~state-symbol] ~@body) (c/make-rule-meta make-state)))
 
 (defmethod c/parse Rule [rule context input]
-  (c/rule-parse rule (make-state input context)))
+  (c/apply rule (make-state input context)))
 
 (defn state?
   "Tests if the given object is a Hound State."
@@ -41,7 +35,7 @@
 (defn rule?
   "Tests if the given object is a Hound Rule, or a var containing a Hound Rule."
   [obj]
-  (or (isa? (type obj) Rule) (var? obj)))
+  (or (-> obj meta :make-state (= make-state)) (var? obj)))
 
 (defn merge-replies [mergee merger]
   (assoc merger :result
@@ -164,9 +158,9 @@
   [rule product-fn]
   {:pre #{(rule? rule) (fn? product-fn)}}
   (letfn [(apply-product-fn [result]
-            (c/rule-parse (product-fn (:product result)) (:state result)))]
+            (c/apply (product-fn (:product result)) (:state result)))]
     (make-rule combined-rule [state]
-      (let [first-reply (c/rule-parse rule state)]
+      (let [first-reply (c/apply rule state)]
         (if (:tokens-consumed? first-reply)
           (assoc first-reply :result
             (delay
@@ -229,11 +223,11 @@
   (make-rule summed-rule [state]
     (let [[consuming-replies empty-replies]
             (->> rules
-              (map #(c/rule-parse % state))
+              (map #(c/apply % state))
               (seq/separate :tokens-consumed?))]
       (if (empty? consuming-replies)
         (if (empty? empty-replies)
-          (c/rule-parse <nothing> state)
+          (c/apply <nothing> state)
           (let [empty-replies (reductions merge-replies empty-replies)]
             (or (first (drop-while #(-> % :result force c/failure?)
                          empty-replies))
@@ -282,7 +276,7 @@
   {:pre #{(string? label-str) (rule? rule)}}
   (make-rule labelled-rule [state]
     (let [initial-position (:position state)
-          reply (c/rule-parse rule state)]
+          reply (c/apply rule state)]
       (if-not (:tokens-consumed? reply)
         (update-in reply [:result] assoc-label-in-result
           label-str initial-position)
@@ -559,7 +553,7 @@
   [subrule]
   {:pre #{(rule? subrule)}}
   (make-rule lexed-rule [state]
-    (-> subrule (c/rule-parse state) (assoc :tokens-consumed? false))))
+    (-> subrule (c/apply state) (assoc :tokens-consumed? false))))
 
 (c/defmaker peek
   "Creates a lookahead rule. Checks if the given
@@ -570,7 +564,7 @@
   [rule]
   {:pre #{(rule? rule)}}
   (make-rule peeking-rule [state]
-    (let [result (-> rule (c/rule-parse state) :result force)]
+    (let [result (-> rule (c/apply state) :result force)]
       (if (c/failure? result)
         (Reply. false result)
         ((prod (:product result)) state)))))
@@ -593,17 +587,17 @@
            (or (ifn? message-fn) (nil? message-fn))}}
    (label label-str
      (make-rule antipeek-rule [state]
-       (let [result (-> rule (c/rule-parse state) :result force)]
+       (let [result (-> rule (c/apply state) :result force)]
          (if (c/failure? result)
            (Reply. false (c/make-success true state (:error result)))
-           (c/rule-parse
+           (c/apply
              (if-let [message (when message-fn (message-fn (:product result)))]
                (with-error (message-fn (:product result)))
                <nothing>)
              state)))))))
 
 (defn- apply-reply-and-rule [f prev-reply next-rule]
-  (c/rule-parse
+  (c/apply
     (combine (make-rule constantly [_] prev-reply)
       (fn [prev-product]
         (combine next-rule
@@ -617,7 +611,7 @@
     (make-rule hooked-repeating-rule [state]
       (let [initial-product (initial-product-fn)
             first-fn (partial reduced-fn initial-product)
-            first-reply (c/rule-parse (hook first-fn rule) state)]
+            first-reply (c/apply (hook first-fn rule) state)]
         (if (:tokens-consumed? first-reply)
           (if (-> first-reply :result force c/failure?)
             first-reply
@@ -807,7 +801,7 @@
   [f & args]
   {:pre #{(ifn? f)}}
   (make-rule effects-rule [state]
-    (c/rule-parse <emptiness> state)))
+    (c/apply <emptiness> state)))
 
 (c/defmaker except
   "Creates a subtracted rule. Matches using
@@ -857,7 +851,7 @@
                          conj (c/make-error-descriptor :message new-message))
                        forced-result))))]
     (make-rule error-annotation-rule [state]
-      (let [reply (c/rule-parse rule state)]
+      (let [reply (c/apply rule state)]
         (update-in reply [:result] annotate)))))
 
 (c/defmaker factor=
@@ -873,7 +867,7 @@
    :product "The current context."
    :consumes "Zero tokens."}
   (make-rule fetch-context-rule [state]
-    (c/rule-parse (prod (:context state)) state)))
+    (c/apply (prod (:context state)) state)))
 
 (defn alter-context
   "A rule that alters the curent context."
@@ -885,7 +879,7 @@
   {:pre #{(ifn? f)}}
   (make-rule context-altering-rule [state]
     (let [altered-state (apply update-in state [:context] f args)]
-      (c/rule-parse <fetch-context> altered-state))))
+      (c/apply <fetch-context> altered-state))))
 
 (def ascii-digits "0123456789")
 (def lowercase-ascii-alphabet "abcdefghijklmnopqrstuvwxyz")

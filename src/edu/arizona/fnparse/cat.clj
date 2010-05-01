@@ -47,7 +47,7 @@
   {:get-bank meta
    :set-bank with-meta})
 
-(defn make-state [input context]
+(defn- make-state [context input]
   (State. input 0 context (Bank. {} [] {}) nil))
 
 (defn state?
@@ -58,16 +58,11 @@
 (defn rule?
   "Tests if the given object is a Hound Rule."
   [obj]
-  (or (isa? (type obj) ::Rule) (var? obj)))
+  (or (-> obj meta :make-state (= make-state)) (var? obj)))
 
 (defmacro make-rule [rule-symbol [state-symbol :as args] & body]
   {:pre #{(symbol? rule-symbol) (symbol? state-symbol) (empty? (rest args))}}
- `(with-meta
-    (fn [~state-symbol] ~@body)
-    {:type ::Rule}))
-
-(defmethod c/parse ::Rule [rule context input]
-  (c/apply (make-state input context) rule))
+ `(with-meta (fn [~state-symbol] ~@body) (c/make-rule-meta make-state)))
 
 (defn- make-failure [state descriptors]
   (set-bank
@@ -178,10 +173,10 @@
    :messages "Any messages that the failing rule gives."}
   [rule product-fn]
   (make-rule combined-rule [state]
-    (let [{first-error :error, :as first-result} (c/apply state rule)]
+    (let [{first-error :error, :as first-result} (c/apply rule state)]
       (if (c/success? first-result)
         (let [next-rule (-> first-result :product product-fn)
-              next-result (-> first-result :state (c/apply next-rule))
+              next-result (c/apply next-rule (:state first-result))
               next-error (:error next-result)]
           (assoc next-result :error
             (k/merge-parse-errors first-error next-error)))
@@ -208,7 +203,7 @@
       (let [cur-bank (update-in cur-bank [:lr-stack node-index]
                        #(assoc % :rules-to-be-evaluated
                           (:involved-rules %)))
-            cur-result (c/apply (set-bank state-0 cur-bank) subrule)
+            cur-result (c/apply subrule (set-bank state-0 cur-bank))
             cur-result-bank (get-bank cur-result)
             cur-memory-val (get-memory cur-result-bank subrule position-0)]
         (if (or (c/failure? cur-result)
@@ -261,7 +256,7 @@
           (if (-> head :rules-to-be-evaluated (contains? subrule))
             (let [bank (update-in [:lr-stack node-index :rules-to-be-evalated]
                          disj subrule)
-                  result (-> state (set-bank bank) (c/apply subrule))]
+                  result (c/apply subrule (set-bank state bank))]
               (vary-bank result store-memory subrule position result))
             memory))))))
 
@@ -282,7 +277,7 @@
               bank (update-in bank [:lr-stack] conj
                      (LRNode. nil subrule nil))
               state-0b (set-bank state bank)
-              subresult (c/apply  state-0b subrule)
+              subresult (c/apply subrule state-0b)
               bank (get-bank subresult)
               submemory (get-memory bank subrule state-position)
               current-lr-node (-> bank :lr-stack vec-peek)
@@ -324,14 +319,13 @@
   (letfn [(merge-result-errors [prev-result next-error]
             (k/merge-parse-errors (:error prev-result) next-error))
           (apply-next-rule [state prev-result next-rule]
-            (-> state
-              (set-bank (get-bank prev-result))
-              (c/apply next-rule)
+            (-> next-rule
+              (c/apply (set-bank state (get-bank prev-result)))
               (update-in [:error] (partial merge-result-errors prev-result))))]
     (remember
       (make-rule summed-rule [state]
         (let [apply-next-rule (partial apply-next-rule state)
-              initial-result (<emptiness> state)
+              initial-result (c/apply <emptiness> state)
               results (rest (reductions apply-next-rule
                               initial-result rules))]
           (or (seq/find-first c/success? results) (last results)))))))
@@ -368,7 +362,7 @@
   [label-str rule]
   {:pre #{(string? label-str)}}
   (make-rule labelled-rule [state]
-    (let [result (c/apply state rule), initial-position (:position state)]
+    (let [result (c/apply rule state), initial-position (:position state)]
       (if (-> result :error :position (<= initial-position))
         (update-in result [:error :descriptors]
           k/assoc-label-in-descriptors label-str)
@@ -607,7 +601,7 @@
    :consumes "No tokens."}
   [rule]
   (make-rule peeking-rule [state]
-    (let [result (c/apply state rule)]
+    (let [result (c/apply rule state)]
       (if (c/success? result)
         ((prod (:product result)) state)
         result))))
@@ -630,13 +624,14 @@
            (or (ifn? message-fn) (nil? message-fn))}}
    (label label-str
      (make-rule antipeek-rule [state]
-       (let [result (c/apply state rule)]
+       (let [result (c/apply rule state)]
          (if (c/failure? result)
            (c/make-success true state (:error result))
-           (c/apply state
+           (c/apply
              (if-let [message (when message-fn (message-fn (:product result)))]
                (with-error (message-fn (:product result)))
-               <nothing>))))))))
+               <nothing>)
+             state)))))))
 
 (c/defmaker mapcat
   "Creates a rule that is the result of
@@ -734,7 +729,7 @@
   [f & args]
   {:pre #{(ifn? f)}}
   (make-rule effects-rule [state]
-    (c/apply state <emptiness>)))
+    (c/apply <emptiness> state)))
 
 (c/defmaker except
   "Creates a subtracted rule. Matches using
@@ -783,7 +778,7 @@
                   conj (c/make-error-descriptor :message new-message))
                 error)))]
     (make-rule error-annotation-rule [state]
-      (let [reply (c/apply state rule)]
+      (let [reply (c/apply rule state)]
         (update-in reply [:error] annotate)))))
 
 (def ascii-digits "0123456789")
