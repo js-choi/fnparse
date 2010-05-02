@@ -17,6 +17,9 @@
   c/AState
     (get-position [this] position)
     (get-remainder [this] (drop position tokens))
+    (next-state [this]
+      (when-let [token (get tokens position)]
+        (assoc this :position (inc position))))
   ABankable
     (get-bank [this] (meta this))
     (set-bank [this new-bank] (with-meta this new-bank)))

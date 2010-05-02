@@ -10,11 +10,8 @@
   "The protocol of FnParse states, which must
   be able to return a position."
   (get-remainder [state])
-  (get-position [state]))
-
-(defprotocol ARule
-  (rule-parse [rule state])
-  (rule-state [rule context input]))
+  (get-position [state])
+  (next-state [state]))
 
 (defrecord RuleMeta [make-state label unlabelled-rule])
 
@@ -216,15 +213,6 @@
   (let [{:keys #{position descriptors}} error]
     (format-parse-error-data position (group-descriptors descriptors))))
 
-(defmulti parse
-  "Use `match` instead of this multimethod.
-  
-  Creates a state from the given
-  `context` and `input` and returns the raw
-  `AParseAnswer` returned from applying that state
-  to the given `rule`."
-  (fn [rule context input & _] (type rule)))
-
 (defn- print-complete [product]
   (printf
     "COMPLETE MATCH
@@ -269,7 +257,7 @@
   (let [result (-> rule (apply state) answer-result)]
     (if (failure? result)
       (failure-fn (:error result))
-      (success-fn (:product result) (-> result :state get-remainder)))))
+      (success-fn (:product result) (:state result)))))
 
 (defn match
   "The general matching function of FnParse. Attempts to
@@ -287,30 +275,48 @@
     
   If `success-fn` and `failure-fn` aren't included, then
   `match` will print out a report of the parsing result."
-  ([rule context success-fn failure-fn input]
-   (match* rule success-fn failure-fn (rule-make-state rule context input)))
+  ([rule success-fn failure-fn context input]
+   (match* rule #(success-fn %1 (get-remainder %2)) failure-fn
+     (rule-make-state rule context input)))
   ([rule context input]
    (let [string-input? (string? input)]
-     (match rule context
+     (match rule
        (partial print-success string-input?)
        print-failure
-       input))))
+       context input))))
 
-#_(defn find
+(defn- get-combining-fn [flatten?]
+  (if flatten? concat cons))
+
+(defn- find* [rule combining-fn state]
+  (lazy-seq
+    (when (seq (get-remainder state))
+      (match* rule
+        (fn find-success [product new-state]
+          (combining-fn product (find* rule combining-fn new-state)))
+        (fn find-failure [e]
+          (find* rule combining-fn (next-state state)))
+        state))))
+
+(defn find
   "Finds all occurrences of a rule in a sequence of tokens.
   Returns a lazy sequence of the rule's products at each
   occurence. The occurences do not overlap."
-  [rule context input]
-  (when-let [input (seq input)]
-    (lazy-seq
-      (match rule context
-        (fn find-success [product remainder]
-          (cons product (find rule context remainder)))
-        (fn find-failure [e]
-          (find rule context (rest input)))
-        input))))
+  [rule flatten? context input]
+  (find* rule (get-combining-fn flatten?) (rule-make-state rule context input)))
 
-#_(defn substitute
+(defn- substitute* [rule combining-fn state]
+  (lazy-seq
+    (when-let [remainder (seq (get-remainder state))]
+      (match* rule
+        (fn substitute-success [product new-state]
+          (combining-fn product (substitute* rule combining-fn new-state)))
+        (fn substitute-failure [e]
+          (cons (first remainder)
+            (substitute* rule combining-fn (next-state state))))
+        state))))
+
+(defn substitute
   "Substitutes all occurences of a rule in a sequence of tokens
   with their respective products. Returns a lazy sequence of
   tokens and products.
@@ -318,33 +324,27 @@
   `flatten?` is a boolean. If it is true, then the substituting
   products will be flattened into the input sequence; in that
   case the products must always be Seqables."
-  [rule flatten? state]
-  (let [combining-fn (if flatten? concat cons)]
-    (when-let [input (seq input)]
-      (lazy-seq
-        (match rule context
-          (fn substitute-success [product remainder]
-            (combining-fn product
-              (substitute match-fn rule context flatten? remainder)))
-          (fn substitute-failure [_]
-            (cons (first input)
-              (substitute match-fn rule context flatten? (rest input))))
-          input)))))
+  [rule flatten? context input]
+  (substitute* rule (get-combining-fn flatten?)
+    (rule-make-state rule context input)))
 
-#_(defn substitute-1
+(defn- substitute-1* [rule combining-fn state]
+  (lazy-seq
+    (when-let [remainder (seq (get-remainder state))]
+      (match* rule
+        (fn substitute-1-success [product new-state]
+          (combining-fn product (get-remainder new-state)))
+        (fn substitute-1-failure [e]
+          (cons (first remainder)
+            (substitute* rule combining-fn (next-state state))))
+        state))))
+
+(defn substitute-1
   "Substitutes the first occurence of a rule in a sequence of
   tokens with its respective product. Returns a lazy sequence
   of tokens and products.
   
   See `substitute`'s docs for information on `flatten?`."
   [rule context flatten? input]
-  (let [combining-fn (if flatten? concat cons)]
-    (when-let [input (seq input)]
-      (lazy-seq
-        (match-fn rule context
-          (fn substitute-1-success [product remainder]
-            (combining-fn product remainder))
-          (fn substitute-1-failure [_]
-            (cons (first input)
-              (substitute-1 match-fn rule context flatten? (rest input))))
-          input)))))
+  (substitute-1* rule (get-combining-fn flatten?)
+    (rule-make-state rule context input)))

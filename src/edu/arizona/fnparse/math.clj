@@ -9,7 +9,8 @@
   (k/hook #(Integer/parseInt (str %))
     (k/term "a decimal digit" #(Character/isDigit (char %)))))
 
-(def <ws?> (k/opt (k/set-term "whitespace" " \n\t")))
+(def <ws> (k/set-term "whitespace" " \n\t"))
+(def <ws?> (k/opt <ws>))
 
 (template/do-template [rule-name token]
   (def rule-name (k/circumfix <ws?> (k/lit token) <ws?>))
@@ -21,13 +22,15 @@
     (k/+ <plus-sign> <minus-sign> <multiplication-sign> <division-sign>
          <opening-parenthesis> <closing-parenthesis>)))
 
+(def <separator> (k/+ <ws> <indicator>))
+
 (def <number>
   (k/label "a number"
     (k/+ (k/for [first-digits #'<number>, next-digit <digit>]
-           (k/+ (* 10 first-digits) next-digit))
+           (+ (* 10 first-digits) next-digit))
          <digit>)))
 
-(def <symbol-char> (k/except "a symbol character" k/<anything> <indicator>))
+(def <symbol-char> (k/except "a symbol character" k/<anything> <separator>))
 
 (def <symbol-content>
   (k/+ (k/for [first-char <symbol-char>, next-chars #'<symbol-content>]

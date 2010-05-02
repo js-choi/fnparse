@@ -10,7 +10,10 @@
 
 (defrecord State [remainder position context] c/AState
   (get-position [this] (:position this))
-  (get-remainder [this] (:remainder this)))
+  (get-remainder [this] (:remainder this))
+  (next-state [this]
+    (when-let [remainder (seq remainder)]
+      (assoc this :remainder (next remainder), :position (inc position)))))
 
 (defrecord Reply [tokens-consumed? result]
   c/AParseAnswer (answer-result [this] (-> this :result force)))
@@ -23,9 +26,6 @@
 (defmacro make-rule [rule-symbol [state-symbol :as args] & body]
   {:pre #{(symbol? rule-symbol) (symbol? state-symbol) (empty? (rest args))}}
  `(with-meta (fn [~state-symbol] ~@body) (c/make-rule-meta make-state)))
-
-(defmethod c/parse Rule [rule context input]
-  (c/apply rule (make-state input context)))
 
 (defn state?
   "Tests if the given object is a Hound State."
