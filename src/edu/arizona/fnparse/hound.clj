@@ -5,7 +5,7 @@
             [clojure.contrib [monads :as m] [def :as d] [seq :as seq]
                              [except :as except] [core :as cljcore]]
             [clojure [template :as t] [set :as set]])
-  (:refer-clojure :rename {mapcat seq-mapcat}
+  (:refer-clojure :rename {mapcat seq-mapcat, when if-when}
                   :exclude #{for + peek find}))
 
 (defrecord State [remainder position context] c/AState
@@ -84,7 +84,7 @@
 (c/defrule <nothing>
   "The general failing rule.
   
-  Use `with-error` or `only-when` in preference to `<nothing>`,
+  Use `with-error` or `when` in preference to `<nothing>`,
   because the first two rule-makers can attach meaningful
   error messages.
   
@@ -104,7 +104,7 @@
   (make-rule with-error-rule [state]
     (make-failed-reply state #{(c/make-parse-error :message message)})))
 
-(c/defmaker only-when
+(c/defmaker when
   "Creates a maybe-failing rule—
   an either succeeding or a failing rule—
   depending on if `valid?` is logical true. If
@@ -118,7 +118,7 @@
   to validate a certain rule.
   
     (for [value <number>
-            _ (only-when (< odd 10)
+            _ (when (< odd 10)
                 \"number must be less than ten\")]
         value)
   
@@ -327,14 +327,14 @@
   A convenience function. Returns a new rule that
   acts like the given `rule`, but also validates
   `rule`'s products with the given predicate.
-  Basically just a shortcut for `for` and `only-when`."
+  Basically just a shortcut for `for` and `when`."
   {:success "When `rule` succeeds and its product fulfills `(pred product)`."
    :product "`rule`'s product."
    :consumes "What `rule` consumes."
    :no-memoize? true}
   [pred message rule]
   {:pre #{(ifn? pred) (string? message) (rule? rule)}}
-  (for [product rule, _ (only-when (pred product) message)]
+  (for [product rule, _ (when (pred product) message)]
     product))
 
 (c/defmaker antivalidate
@@ -591,7 +591,8 @@
          (if (c/failure? result)
            (Reply. false (c/make-success true state (:error result)))
            (c/apply
-             (if-let [message (when message-fn (message-fn (:product result)))]
+             (if-let [message (if-when message-fn
+                                (message-fn (:product result)))]
                (with-error (message-fn (:product result)))
                <nothing>)
              state)))))))
@@ -918,7 +919,7 @@
   {:pre #{(integer? core) (pos? core)}}
   (term* (radix-label core)
    #(let [product (Character/digit (char %) (int core))]
-      (when (not= product -1)
+      (if-when (not= product -1)
         product))))
 
 (c/defrule <decimal-digit>

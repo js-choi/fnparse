@@ -170,7 +170,7 @@
 (def <peek-ns-separator> (h/peek <ns-separator>))
 
 (c/defmaker fetch-referred-namespace [context namespace-alias]
-  (h/only-when (get-in context [:ns-aliases namespace-alias])
+  (h/when (get-in context [:ns-aliases namespace-alias])
     (format "no namespace with alias '%s'" namespace-alias)))
 
 (c/defmaker ns-qualified-keyword-end-with-slash [pre-slash]
@@ -368,7 +368,7 @@
     [_ (h/lit \%)
      context h/<fetch-context>
      :let [fn-context (:anonymous-fn-context context)]
-     _ (h/only-when fn-context
+     _ (h/when fn-context
          "a parameter literals must be inside an anonymous function")
      suffix <anonymous-fn-parameter-suffix>
      :let [already-existing-symbol (get-already-existing-symbol fn-context
@@ -382,7 +382,7 @@
 (def <anonymous-fn-inner>
   (h/for [_ (h/lit \()
           pre-context h/<fetch-context>
-          _ (h/only-when (not (:anonymous-fn-context pre-context))
+          _ (h/when (not (:anonymous-fn-context pre-context))
               "nested anonymous functions are not allowed")
           _ (h/alter-context assoc
               :anonymous-fn-context (AnonymousFnContext. [] nil))
@@ -405,7 +405,7 @@
 (def <evaluated-inner>
   (h/for [_ (h/lit \=)
           context h/<fetch-context>
-          _ (h/only-when (:reader-eval? context)
+          _ (h/when (:reader-eval? context)
               "EvalReader forms (i.e. #=(...)) have been prohibited.")
           content <list>]
     (eval content)))
