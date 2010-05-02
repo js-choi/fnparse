@@ -1,4 +1,4 @@
-(ns edu.arizona.fnparse.clojure-impure
+(ns edu.arizona.fnparse.clojure
   (:require [edu.arizona.fnparse [hound :as h] [core :as c]]
             [clojure [template :as t] [set :as set]]
             [clojure.contrib [except :as except]])
