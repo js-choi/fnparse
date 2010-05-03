@@ -12,6 +12,11 @@
 (d/defalias find c/find)
 (d/defalias substitute c/substitute)
 (d/defalias substitute-1 c/substitute-1)
+(d/defalias defrule c/defrule)
+(d/defalias defrule- c/defrule-)
+(d/defalias defmaker c/defmaker)
+(d/defalias defmaker- c/defmaker-)
+(d/defalias defmaker-macro c/defmaker-macro)
 
 (defrecord State
   [remainder position location warnings context alter-location]
