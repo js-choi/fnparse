@@ -455,8 +455,11 @@
                 Defaults to *read-eval*."
   [input & opts]
   (let [{:keys #{ns-name ns-aliases reader-eval?}} (apply hash-map opts)]
-    (c/match <form> input (ClojureContext. ns-name ns-aliases nil reader-eval?)
-      (fn [product position] product)
-      (fn [error]
-        (except/throwf "FnParse parsing error: %s"
-          (c/format-parse-error error))))))
+    (c/match
+      (h/make-state input
+        :context (ClojureContext. ns-name ns-aliases nil reader-eval?))
+      <form>
+      :success-fn (fn [product position] product)
+      :failure-fn (fn [error]
+                    (except/throwf "FnParse parsing error: %s"
+                      (c/format-parse-error error))))))

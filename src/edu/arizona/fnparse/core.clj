@@ -236,7 +236,7 @@
                            (->> labels join-labels (str "expected ") list))
         message-text (->> expectation-text (concat messages)
                           (str/join "; "))]
-    (format "Error [%s]: %s."
+    (format "[%s] %s."
       (location-code (or location position))
       message-text)))
 
@@ -305,7 +305,7 @@
   (printf
     "FAILED MATCH
 =============
-%s
+Error: %s
 "
     (format-parse-error error))
   false)
