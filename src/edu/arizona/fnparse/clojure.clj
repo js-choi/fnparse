@@ -340,9 +340,10 @@
     (h/prefix (h/cat (h/lex (h/phrase "~@")) <ws?>) #'<form>)))
 
 (def <deprecated-meta>
-  (h/suffix <deprecated-meta>
-    (h/effects println
-      "WARNING: The ^ indicator is deprecated (since Clojure 1.1).")))
+  (h/prefix
+    (h/add-warning
+      "the '^' indicator has been deprecated since Clojure 1.1; use (meta ...) instead")
+    <deprecated-meta>))
 
 ;; With-meta #^ forms.
 

@@ -3,17 +3,18 @@
 
 (set! *warn-on-reflection* true)
 
-(declare <expr>)
+(declare <expr> <ws>)
 
 (def <digit>
   (k/hook #(Integer/parseInt (str %))
     (k/term "a decimal digit" #(Character/isDigit (char %)))))
 
-(def <ws> (k/set-term "whitespace" " \n\t"))
+(def <ws-char> (k/set-term "whitespace" " \n\t"))
+(def <ws> (k/+ (k/cat #'<ws> <ws-char>) <ws-char>))
 (def <ws?> (k/opt <ws>))
 
 (template/do-template [rule-name token]
-  (def rule-name (k/circumfix <ws?> (k/lit token) <ws?>))
+  (def rule-name (k/suffix (k/lit token) <ws?>))
   <plus-sign> \+, <minus-sign> \-, <multiplication-sign> \*, <division-sign> \/,
   <opening-parenthesis> \(, <closing-parenthesis> \))
 
@@ -72,4 +73,4 @@
          <multiplication-level>)
        <multiplication-level>))
 
-(def <expr> <addition-level>)
+(def <expr> (k/prefix <ws?> <addition-level>))

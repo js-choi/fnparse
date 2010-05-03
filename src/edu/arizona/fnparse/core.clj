@@ -11,12 +11,14 @@
   be able to return a position."
   (get-remainder [state])
   (get-position [state])
-  (next-state [state]))
+  (next-state [state])
+  (state-warnings [state])
+  (state-location [state]))
 
-(defrecord RuleMeta [make-state label unlabelled-rule])
+(defrecord RuleMeta [type label unlabelled-rule])
 
-(defn make-rule-meta [make-state]
-  (RuleMeta. make-state nil nil))
+(defn make-rule-meta [type]
+  (RuleMeta. type nil nil))
 
 (defrecord
   #^{:doc "Represents descriptors representing a single
@@ -39,10 +41,10 @@
   descriptors: The set of ErrorDescriptors that
                describe this error."}
   ParseError
-  [position descriptors])
+  [position location descriptors])
 
-(defn make-parse-error [position descriptors]
-  (ParseError. position descriptors))
+(defn make-parse-error [position location descriptors]
+  (ParseError. position location descriptors))
 
 (defprotocol AParseAnswer
   "The protocol of FnParse Answers: what
@@ -73,6 +75,46 @@
     (-> result type (isa? type-name)))
   failure? Failure "Is the given result a Failure?"
   success? Success "Is the given result is a Success?")
+
+(defrecord Warning [position location message])
+
+(defn make-warning [state message]
+  (Warning. (get-position state) (state-location state) message))
+
+(defprotocol ALocation
+  (location-code [location]))
+
+(defn location? [obj]
+  (extends? ALocation (type obj)))
+
+(extend-protocol ALocation
+  Integer (location-code [position] (format "position %s" position)))
+
+(defprotocol ALineAndColumnLocation
+  (location-inc-line [location])
+  (location-inc-column [location]))
+
+(defrecord StandardLocation [line column]
+  ALocation
+    (location-code [this] (format "line %s, column %s" line column))
+  ALineAndColumnLocation
+    (location-inc-line [this] (assoc this :line (inc line), :column 0))
+    (location-inc-column [this] (assoc this :column (inc column))))
+
+(defn make-standard-location [line column]
+  {:pre #{(integer? line) (integer? column)}}
+  (StandardLocation. line column))
+
+(def standard-break-chars #{\newline \backspace \formfeed})
+
+(defn standard-alter-location [character]
+  {:pre #{(char? character)}}
+  (if (standard-break-chars character)
+    location-inc-line location-inc-column))
+
+(defn format-warning [warning]
+  (format "[%s] %s" (location-code (or (:location warning) (:position warning)))
+                    (:message warning)))
 
 (defn apply
   "Applies the given rule to the given state."
@@ -188,13 +230,15 @@
 (defn- format-parse-error-data
   "Returns a formatted string with the given error data.
   The descriptor map should be returned from group-descriptors."
-  [position descriptor-map]
+  [position location descriptor-map]
   (let [{labels :label, messages :message} descriptor-map
         expectation-text (when-let [labels (seq labels)]
                            (->> labels join-labels (str "expected ") list))
         message-text (->> expectation-text (concat messages)
                           (str/join "; "))]
-    (format "At position %s: %s" position message-text)))
+    (format "Error [%s]: %s."
+      (location-code (or location position))
+      message-text)))
 
 (defn- group-descriptors
   "From the given set of descriptors, returns a map with
@@ -210,35 +254,52 @@
 (defn format-parse-error
   "Returns a formatted string from the given error."
   [error]
-  (let [{:keys #{position descriptors}} error]
-    (format-parse-error-data position (group-descriptors descriptors))))
+  (let [{:keys #{position location descriptors}} error]
+    (format-parse-error-data position location
+      (group-descriptors descriptors))))
 
-(defn- print-complete [product]
+(defn- format-warning-set
+  "Returns a formatted string from the given set of Warnings."
+  [warnings]
+  (if-let [warnings (seq warnings)]
+    (->> warnings
+      (map #(str "  - " (format-warning %))) (str/join "\n") (str "\n"))
+    "None."))
+
+(defn- print-complete [product state]
   (printf
     "COMPLETE MATCH
 ==============
 * Final product: %s
 * Final product type: %s
+* Final location: %s
+* Warnings: %s
 "
-    (pr-str product) (type product))
+    (pr-str product) (type product)
+    (location-code (or (state-location state) (get-position state)))
+    (format-warning-set (state-warnings state)))
   true)
 
-(defn- print-incomplete [string-input? product final-remainder]
+(defn- print-incomplete [product state]
   (printf
     "INCOMPLETE MATCH
 ================
 * Final product: %s
 * Final product type: %s
 * Unmatched remainder: %s
+* Final location: %s
+* Warnings: %s
 "
     (pr-str product) (type product)
-    (format-remainder string-input? final-remainder))
+    (format-remainder true (get-remainder state))
+    (location-code (or (state-location state) (get-position state)))
+    (format-warning-set (state-warnings state)))
   false)
 
-(defn- print-success [string-input? product final-remainder]
-  (if (empty? final-remainder)
-    (print-complete product)
-    (print-incomplete string-input? product final-remainder)))
+(defn- print-success [product final-state]
+  (if (empty? (get-remainder final-state))
+    (print-complete product final-state)
+    (print-incomplete product final-state)))
 
 (defn- print-failure [error]
   (printf
@@ -249,8 +310,8 @@
     (format-parse-error error))
   false)
 
-(defn- rule-make-state [rule context input]
-  ((-> rule meta :make-state) context input))
+(defn rule-make-state [rule input location warnings context]
+  ((-> rule meta :make-state) input location warnings context))
 
 (defn- match*
   [rule success-fn failure-fn state]
@@ -275,15 +336,10 @@
     
   If `success-fn` and `failure-fn` aren't included, then
   `match` will print out a report of the parsing result."
-  ([rule success-fn failure-fn context input]
-   (match* rule #(success-fn %1 (get-remainder %2)) failure-fn
-     (rule-make-state rule context input)))
-  ([rule context input]
-   (let [string-input? (string? input)]
-     (match rule
-       (partial print-success string-input?)
-       print-failure
-       context input))))
+  ([state rule &
+    {:keys #{success-fn failure-fn}
+     :or {success-fn print-success, failure-fn print-failure}}]
+   (match* rule #(success-fn %1 %2) failure-fn state)))
 
 (defn- get-combining-fn [flatten?]
   (if flatten? concat cons))
@@ -302,8 +358,8 @@
   "Finds all occurrences of a rule in a sequence of tokens.
   Returns a lazy sequence of the rule's products at each
   occurence. The occurences do not overlap."
-  [rule flatten? context input]
-  (find* rule (get-combining-fn flatten?) (rule-make-state rule context input)))
+  [state rule & {:keys #{flatten?}}]
+  (find* rule (get-combining-fn flatten?) state))
 
 (defn- substitute* [rule combining-fn state]
   (lazy-seq
@@ -324,9 +380,8 @@
   `flatten?` is a boolean. If it is true, then the substituting
   products will be flattened into the input sequence; in that
   case the products must always be Seqables."
-  [rule flatten? context input]
-  (substitute* rule (get-combining-fn flatten?)
-    (rule-make-state rule context input)))
+  [state rule & {:keys #{flatten?}}]
+  (substitute* rule (get-combining-fn flatten?) state))
 
 (defn- substitute-1* [rule combining-fn state]
   (lazy-seq
@@ -345,6 +400,5 @@
   of tokens and products.
   
   See `substitute`'s docs for information on `flatten?`."
-  [rule context flatten? input]
-  (substitute-1* rule (get-combining-fn flatten?)
-    (rule-make-state rule context input)))
+  [state rule & {:keys #{flatten?}}]
+  (substitute-1* rule (get-combining-fn flatten?) state))

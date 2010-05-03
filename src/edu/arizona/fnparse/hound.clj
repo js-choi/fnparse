@@ -8,24 +8,38 @@
   (:refer-clojure :rename {mapcat seq-mapcat, when if-when}
                   :exclude #{for + peek find}))
 
-(defrecord State [remainder position context] c/AState
-  (get-position [this] (:position this))
-  (get-remainder [this] (:remainder this))
-  (next-state [this]
-    (when-let [remainder (seq remainder)]
-      (assoc this :remainder (next remainder), :position (inc position)))))
+(d/defalias match c/match)
+(d/defalias find c/find)
+(d/defalias substitute c/substitute)
+(d/defalias substitute-1 c/substitute-1)
+
+(defrecord State
+  [remainder position location warnings context alter-location]
+  c/AState
+    (get-position [this] position)
+    (get-remainder [this] remainder)
+    (state-location [this] location)
+    (state-warnings [this] warnings)
+    (next-state [this]
+      (when-let [remainder (seq remainder)]
+        (assoc this
+          :remainder (next remainder), :position (inc position),
+          :location ((alter-location (first remainder)) location)))))
 
 (defrecord Reply [tokens-consumed? result]
   c/AParseAnswer (answer-result [this] (-> this :result force)))
 
-(defn- make-state
-  "Creates a state with the given remainder and context."
-  [context remainder]
-  (State. remainder 0 context))
+(defn make-state
+  "Creates a state with the given parameters."
+  [input & {:keys #{location context alter-location}
+            :or {location (c/make-standard-location 0 0), alter-location
+                 c/standard-alter-location}}]
+  {:pre #{(or (nil? location) (c/location? location)) (ifn? alter-location)}}
+  (State. input 0 location #{} context alter-location))
 
 (defmacro make-rule [rule-symbol [state-symbol :as args] & body]
   {:pre #{(symbol? rule-symbol) (symbol? state-symbol) (empty? (rest args))}}
- `(with-meta (fn [~state-symbol] ~@body) (c/make-rule-meta make-state)))
+ `(with-meta (fn [~state-symbol] ~@body) (c/make-rule-meta ::Rule)))
 
 (defn state?
   "Tests if the given object is a Hound State."
@@ -35,7 +49,7 @@
 (defn rule?
   "Tests if the given object is a Hound Rule, or a var containing a Hound Rule."
   [obj]
-  (or (-> obj meta :make-state (= make-state)) (var? obj)))
+  (or (-> obj type (isa? ::Rule)) (var? obj)))
 
 (defn merge-replies [mergee merger]
   (assoc merger :result
@@ -58,7 +72,7 @@
   (make-rule prod-rule [state]
     (Reply. false
       (c/make-success product state
-        (c/make-parse-error (:position state) #{})))))
+        (c/make-parse-error (:position state) (:location state) #{})))))
 
 (c/defrule <emptiness>
   "The general emptiness rule. (Actually just `(prod nil)`)."
@@ -75,10 +89,10 @@
    {:pre #{(state? state) (set? descriptors)}}
    (Reply. false
      (c/make-failure
-       (c/make-parse-error (:position state) descriptors)))))
+       (c/make-parse-error (:position state) (:location state) descriptors)))))
 
 (d/defvar nothing-descriptors
-  #{(c/make-parse-error :label "absolutely nothing")}
+  #{(c/make-error-descriptor :label "absolutely nothing")}
   "The error descriptors that `<nothing>` uses.")
 
 (c/defrule <nothing>
@@ -102,7 +116,7 @@
   [message]
   {:pre #{(string? message)}}
   (make-rule with-error-rule [state]
-    (make-failed-reply state #{(c/make-parse-error :message message)})))
+    (make-failed-reply state #{(c/make-error-descriptor :message message)})))
 
 (c/defmaker when
   "Creates a maybe-failing rule—
@@ -359,9 +373,11 @@
               (Reply. true
                 (delay
                   (c/make-success (if pred-product? f-result first-token)
-                    (assoc state :remainder (next remainder)
-                                 :position (inc position))
-                    (c/make-parse-error position #{}))))
+                    (assoc state
+                      :remainder (next remainder), :position (inc position),
+                      :location (((:alter-location state) first-token)
+                                 (:location state)))
+                    (c/make-parse-error position (:location state) #{}))))
               (make-failed-reply state first-token #{})))
           (make-failed-reply state ::c/end-of-input #{}))))))
 
@@ -870,23 +886,69 @@
   (make-rule fetch-context-rule [state]
     (c/apply (prod (:context state)) state)))
 
-(defn alter-context
-  "A rule that alters the curent context."
-  {:success "Always."
-   :product "The current context."
-   :consumes "Zero tokens."
-   :no-memoize? true}
+(c/defmaker alter-context
+  "A rule that alters the current context."
+  {:success "Always.", :product "The new context."
+   :consumes "Zero tokens."}
   [f & args]
   {:pre #{(ifn? f)}}
   (make-rule context-altering-rule [state]
     (let [altered-state (apply update-in state [:context] f args)]
       (c/apply <fetch-context> altered-state))))
 
+(c/defrule <fetch-location>
+  "A rule that fetches the current state's location."
+  {:success "Always.", :product "The current location.",
+   :consumes "Zero tokens."}
+  (make-rule fetch-location-rule [state]
+    (c/apply (prod (:location state)) state)))
+
+(c/defmaker alter-location
+  "A rule that alters the current location."
+  {:success "Always.", :product "The new location.",
+   :consumes "Zero tokens."}
+  [f & args]
+  {:pre #{(ifn? f)}}
+  (make-rule location-altering-rule [state]
+    (let [altered-state (apply update-in state [:location] f args)]
+      (c/apply <fetch-location> altered-state))))
+
+(c/defrule <fetch-warnings>
+  "A rule that fetches the current state's warnings."
+  {:success "Always.", :product "The current warnings.",
+   :consumes "Zero tokens."}
+  (make-rule fetch-warnings-rule [state]
+    (c/apply (prod (:warnings state)) state)))
+
+(c/defmaker add-warning
+  "A rule that adds a new warning with the given message."
+  {:success "Always.", :product "`nil`.",
+   :consumes "Zero tokens."}
+  [message]
+  (make-rule warnings-altering-rule [state]
+    (c/apply <emptiness>
+      (update-in state [:warnings] conj (c/make-warning state message)))))
+
+(c/defrule <inc-column>
+  "A literal rule that also increments
+  the column of a state's location. The `:location`
+  of any state that this rule receives must extend
+  the `edu.arizona.fnparse.core.ALineAndColumnLocation` protocol."
+  (alter-location c/location-inc-column))
+
+(c/defrule <inc-line>
+  "A literal rule that also increments
+  the line of a state's StandardLocation and resets its
+  column to zero. The `:location`
+  of any state that this rule receives must extend
+  the `edu.arizona.fnparse.core.ALineAndColumnLocation` protocol."
+  (alter-location c/location-inc-line))
+
 (def ascii-digits "0123456789")
 (def lowercase-ascii-alphabet "abcdefghijklmnopqrstuvwxyz")
 (def uppercase-ascii-alphabet "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
-(defn radix-label
+(c/defmaker radix-label
   "The function used by radix-digit to smartly
   create digit labels for the given `core`."
   [core]

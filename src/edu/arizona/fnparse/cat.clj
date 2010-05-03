@@ -7,6 +7,11 @@
   (:refer-clojure :rename {peek vec-peek, when if-when}
                   :exclude #{for + mapcat find}))
 
+(d/defalias match c/match)
+(d/defalias find c/find)
+(d/defalias substitute c/substitute)
+(d/defalias substitute-1 c/substitute-1)
+
 (defprotocol ABankable
   (get-bank [o])
   (set-bank [o new-bank]))
@@ -14,13 +19,17 @@
 (defn- vary-bank [bankable f & args]
   (set-bank bankable (apply f (get-bank bankable) args)))
 
-(defrecord State [tokens position context]
+(defrecord State [tokens position location warnings context alter-location]
   c/AState
     (get-position [this] position)
     (get-remainder [this] (drop position tokens))
     (next-state [this]
       (when-let [token (get tokens position)]
-        (assoc this :position (inc position))))
+        (assoc this
+          :position (inc position))
+          :location ((alter-location (nth position tokens)) location)))
+    (state-location [this] location)
+    (state-warnings [this] warnings)
   ABankable
     (get-bank [this] (meta this))
     (set-bank [this new-bank] (with-meta this new-bank)))
@@ -43,16 +52,20 @@
 
 (defrecord Head [involved-rules rules-to-be-evaluated])
 
-(extend Success ABankable
-  {:get-bank (comp get-bank :state)
-   :set-bank #(update-in %1 [:state] set-bank %2)})
+(extend-protocol ABankable
+  Success
+    (get-bank [success] (get-bank (:state success)))
+    (set-bank [success bank] (update-in success [:state] set-bank bank))
+  Failure
+    (get-bank [failure] (meta failure))
+    (set-bank [failure bank] (with-meta failure bank)))
 
-(extend Failure ABankable
-  {:get-bank meta
-   :set-bank with-meta})
-
-(defn- make-state [context input]
-  (State. input 0 context (Bank. {} [] {}) nil))
+(defn make-state
+  [input & {:keys #{location context alter-location}
+            :or {location (c/make-standard-location 0 0)
+                 alter-location c/standard-alter-location}}]
+  {:pre #{(or (nil? location) (c/location? location)) (ifn? alter-location)}}
+  (State. input 0 location #{} context alter-location (Bank. {} [] {}) nil))
 
 (defn state?
   "Tests if the given object is a Hound State."
@@ -62,15 +75,16 @@
 (defn rule?
   "Tests if the given object is a Hound Rule."
   [obj]
-  (or (-> obj meta :make-state (= make-state)) (var? obj)))
+  (or (var? obj) (-> obj type (isa? ::Rule))))
 
 (defmacro make-rule [rule-symbol [state-symbol :as args] & body]
   {:pre #{(symbol? rule-symbol) (symbol? state-symbol) (empty? (rest args))}}
- `(with-meta (fn [~state-symbol] ~@body) (c/make-rule-meta make-state)))
+ `(with-meta (fn [~state-symbol] ~@body) (c/make-rule-meta ::Rule)))
 
 (defn- make-failure [state descriptors]
   (set-bank
-    (c/make-failure (c/make-parse-error (:position state) descriptors))
+    (c/make-failure
+      (c/make-parse-error (:position state) (:location state) descriptors))
     (get-bank state)))
 
 (c/defmaker prod
@@ -88,7 +102,7 @@
   [product]
   (make-rule product-rule [state]
     (c/make-success product state
-      (c/make-parse-error (:position state) #{}))))
+      (c/make-parse-error (:position state) (:location state) #{}))))
 
 (defmacro defrm [& forms]
   `(d/defn-memo ~@forms))
@@ -445,8 +459,10 @@
         (if (not= token ::nothing)
           (if-let [f-result (f token)]
             (c/make-success (if pred-product? f-result token)
-              (assoc state :position (inc position))
-              (c/make-parse-error position #{}))
+              (assoc state :position (inc position)
+                           :location (((:alter-location state) token)
+                                      (:location state)))
+              (c/make-parse-error position (:location state) #{}))
             (make-failure state #{}))
           (make-failure state #{}))))))
 
@@ -785,6 +801,39 @@
     (make-rule error-annotation-rule [state]
       (let [reply (c/apply rule state)]
         (update-in reply [:error] annotate)))))
+
+(c/defrule <fetch-location>
+  "A rule that fetches the current state's location."
+  {:success "Always.", :product "The current location.",
+   :consumes "Zero tokens."}
+  (make-rule fetch-location-rule [state]
+    (c/apply (prod (:location state)) state)))
+
+(c/defmaker alter-location
+  "A rule that alters the current location."
+  {:success "Always.", :product "The new location.",
+   :consumes "Zero tokens."}
+  [f & args]
+  {:pre #{(ifn? f)}}
+  (make-rule location-altering-rule [state]
+    (let [altered-state (apply update-in state [:location] f args)]
+      (c/apply <fetch-location> altered-state))))
+
+(c/defrule <fetch-warnings>
+  "A rule that fetches the current state's warnings."
+  {:success "Always.", :product "The current warnings.",
+   :consumes "Zero tokens."}
+  (make-rule fetch-warnings-rule [state]
+    (c/apply (prod (:warnings state)) state)))
+
+(c/defmaker add-warning
+  "A rule that adds a new warning with the given message."
+  {:success "Always.", :product "`nil`.",
+   :consumes "Zero tokens."}
+  [message]
+  (make-rule warnings-altering-rule [state]
+    (c/apply <emptiness>
+      (update-in state [:warnings] conj (c/make-warning state message)))))
 
 (def ascii-digits "0123456789")
 (def lowercase-ascii-alphabet "abcdefghijklmnopqrstuvwxyz")
