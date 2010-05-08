@@ -461,5 +461,5 @@
       <form>
       :success-fn (fn [product position] product)
       :failure-fn (fn [error]
-                    (except/throwf "FnParse parsing error: %s"
+                    (except/throwf "Clojure parsing error: %s"
                       (c/format-parse-error error))))))
