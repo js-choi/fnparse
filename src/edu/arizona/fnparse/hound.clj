@@ -499,7 +499,7 @@
   {:pre #{(cljcore/seqable? tokens)}}
   (term label-str (set tokens)))
 
-(c/defmaker antiset-lit
+(c/defmaker antiset-term
   "Creates a terminal rule with an antiset.
   A shortcut for `(antiterm label-str (set tokens))`."
   [label-str tokens]
