@@ -16,6 +16,7 @@
 (d/defalias defmaker c/defmaker)
 (d/defalias defmaker- c/defmaker-)
 (d/defalias defmaker-macro c/defmaker-macro)
+(d/defalias title? c/title?)
 
 (defprotocol ABankable
   (get-bank [o])
@@ -375,21 +376,46 @@
   You don't have to understand the details, but...
   If `rule` consumed *no* tokens, then all error labels
   from `rule`'s result are overrided with the
-  given `label-str`. Otherwise, the old labels are
+  given `title`. Otherwise, the old labels are
   untouched, as they contain information from
   further down the input."
   {:success "If `rule` succeeds."
    :product "`rule`'s product."
    :consumes "Whatever `rule` consumes."
    :error "Smartly determines the appropriate error message."}
-  [label-str rule]
-  {:pre #{(string? label-str)}}
+  [title rule]
+  {:pre #{(title? title)}}
   (make-rule labelled-rule [state]
     (let [result (c/apply rule state), initial-position (:position state)]
       (if (-> result :error :position (<= initial-position))
         (update-in result [:error :descriptors]
-          k/assoc-label-in-descriptors label-str)
+          k/assoc-label-in-descriptors title)
         result))))
+
+(c/defmaker annotate-error
+  "Creates an error-annotating rule. Whenever
+  the given `rule` fails, the error is passed
+  into the `message-fn` function. This can be
+  useful to add a message with more info to an
+  error when certain conditions are met.
+  
+  `message-fn` must return a string when given
+  the original `ParseError`, which will be added
+  to the `ParseError`, or `nil` for no message.
+  (`ParseError`s are maps of type
+  `:edu.arizona.fnparse.c/ParseError`.
+  See its documentation for more information.)"
+  [message-fn rule]
+  {:pre #{(ifn? message-fn) (rule? rule)}}
+  (letfn [(annotate [error]
+            (let [new-message (message-fn error)]
+              (if new-message
+                (update-in error [:descriptors]
+                  conj (c/make-error-descriptor :message new-message))
+                error)))]
+    (make-rule error-annotation-rule [state]
+      (let [reply (c/apply rule state)]
+        (update-in reply [:error] annotate)))))
 
 (c/defmaker-macro for
   "Creates a rule comprehension, very much like
@@ -402,7 +428,7 @@
   
   Arguments
   =========
-  *   `label-str`: An optional label string. See the
+  *   `title`: An optional label string. See the
       `label` function for more info.
   *   `steps`: A binding vector containing *binding-form/
       rule pairs* optionally followed by *modifiers*.
@@ -424,8 +450,8 @@
    :consumes "All tokens that each step consecutively consumes."
    :error "Whatever error the failed rule returns."
    :no-memoize? true}
-  ([label-str steps product-expr]
-   `(->> (for ~steps ~product-expr) (label ~label-str)))
+  ([title steps product-expr]
+   `(->> (for ~steps ~product-expr) (label ~title)))
   ([steps product-expr]
   `(m/domonad parser-m ~steps ~product-expr)))
 
@@ -456,8 +482,8 @@
 (defn term-
   "All terminal Cat rules, including `term` and
   `term*`, are based on this function."
-  [pred-product? label-str f]
-  (label label-str
+  [pred-product? title f]
+  (label title
     (make-rule terminal-rule [state]
       (let [{:keys #{tokens position}} state
             token (nth tokens position ::nothing)]
@@ -475,7 +501,7 @@
   "Creates a terminal rule.
   
   The new rule either consumes one token or fails.
-  It must have a `label-str` that describes it
+  It must have a `title` that describes it
   and a `predicate` to test if the token it consumes is
   valid.
   
@@ -502,26 +528,26 @@
    :error "When `(term \"number\" num?)` fails,
            its error is \"Expected number.\""
    :no-memoize? true}
-  [label-str predicate]
-  (term- false label-str predicate))
+  [title predicate]
+  (term- false title predicate))
 
 (c/defmaker term*
   "Exactly like `term`, only its product is the result of
   `(f token)` rather than `token`."
   {:no-memoize? true}
-  [label-str f]
-  (term- true label-str f))
+  [title f]
+  (term- true title f))
 
-(defn antiterm [label-str pred]
-  (term label-str (complement pred)))
+(defn antiterm [title pred]
+  (term title (complement pred)))
 
 (c/defmaker antiterm
   "Exactly like term, only uses the complement of the
   given predicate instead."
   {:no-memoize? true}
-  [label-str pred]
+  [title pred]
   {:pre #{(ifn? pred)}}
-  (term label-str (complement pred)))
+  (term title (complement pred)))
 
 (c/defrule <anything>
   "The generic terminal rule that matches any one token."
@@ -582,16 +608,16 @@
 
 (c/defmaker set-term
   "Creates a terminal rule with a set.
-  A shortcut for `(term label-str (set tokens))`."
-  [label-str tokens]
+  A shortcut for `(term title (set tokens))`."
+  [title tokens]
   {:pre #{(cljcore/seqable? tokens)}}
-  (term label-str (set tokens)))
+  (term title (set tokens)))
 
 (c/defmaker antiset-term
   "Creates a terminal rule with an antiset.
-  A shortcut for `(antiterm label-str (set tokens))`."
-  [label-str tokens]
-  (antiterm label-str (set tokens)))
+  A shortcut for `(antiterm title (set tokens))`."
+  [title tokens]
+  (antiterm title (set tokens)))
 
 (c/defmaker cat
   "Creates a concatenated rule out of many given `rules`."
@@ -634,7 +660,7 @@
 (c/defmaker antipeek
   "Creates a negative lookahead rule. Checks if
   the given `rule` fails, but doesn't actually
-  consume any tokens. You must provide a `label-str`
+  consume any tokens. You must provide a `title`
   describing this rule.
   
   `message-fn`, if given, creates a detailed error
@@ -643,11 +669,11 @@
   product, and returns a string (or `nil`,for no message)."
   {:success "If `rule` succeeds."
    :product "Always `true`."}
-  ([label-str <r>] (antipeek label-str nil <r>))
-  ([label-str message-fn rule]
-   {:pre #{(string? label-str) (rule? rule)
+  ([title <r>] (antipeek title nil <r>))
+  ([title message-fn rule]
+   {:pre #{(title? title) (rule? rule)
            (or (ifn? message-fn) (nil? message-fn))}}
-   (label label-str
+   (label title
      (make-rule antipeek-rule [state]
        (let [result (c/apply rule state)]
          (if (c/failure? result)
@@ -761,7 +787,7 @@
   "Creates a subtracted rule. Matches using
   the given minuend rule, but only when the
   subtrahend rule does not also match. You
-  must provide a custom `label-str`.
+  must provide a custom `title`.
 
   `message-fn`, if given, creates a detailed error
   message when the `subtrahend` succeeds. `message-fn`
@@ -770,42 +796,17 @@
   {:success "If `minuend` succeeds and `subtrahend` fails."
    :product "`minuend`'s product."
    :consumes "Whatever `minuend` consumes."
-   :error "Uses the `label-str` you provide."}
-  ([label-str minuend subtrahend]
+   :error "Uses the `title` you provide."}
+  ([title minuend subtrahend]
    {:pre #{(rule? minuend) (rule? subtrahend)}}
-   (for [_ (antipeek label-str subtrahend)
-         product (label label-str minuend)]
+   (for [_ (antipeek title subtrahend)
+         product (label title minuend)]
      product))
-  ([label-str message-fn minuend subtrahend]
+  ([title message-fn minuend subtrahend]
    {:pre #{(ifn? message-fn) (rule? minuend) (rule? subtrahend)}}
-   (for [_ (antipeek label-str message-fn subtrahend)
-         product (label label-str minuend)]
+   (for [_ (antipeek title message-fn subtrahend)
+         product (label title minuend)]
      product)))
-
-(c/defmaker annotate-error
-  "Creates an error-annotating rule. Whenever
-  the given `rule` fails, the error is passed
-  into the `message-fn` function. This can be
-  useful to add a message with more info to an
-  error when certain conditions are met.
-  
-  `message-fn` must return a string when given
-  the original `ParseError`, which will be added
-  to the `ParseError`, or `nil` for no message.
-  (`ParseError`s are maps of type
-  `:edu.arizona.fnparse.c/ParseError`.
-  See its documentation for more information.)"
-  [message-fn rule]
-  {:pre #{(ifn? message-fn) (rule? rule)}}
-  (letfn [(annotate [error]
-            (let [new-message (message-fn error)]
-              (if new-message
-                (update-in error [:descriptors]
-                  conj (c/make-error-descriptor :message new-message))
-                error)))]
-    (make-rule error-annotation-rule [state]
-      (let [reply (c/apply rule state)]
-        (update-in reply [:error] annotate)))))
 
 (c/defrule <fetch-location>
   "A rule that fetches the current state's location."

@@ -112,6 +112,15 @@
   (if (standard-break-chars character)
     location-inc-line location-inc-column))
 
+(defprotocol ATitle
+  (title-string [t]))
+
+(extend-protocol ATitle
+  String (title-string [s] s))
+
+(defn title? [object]
+  (extends? ATitle (type object)))
+
 (defn format-warning [warning]
   (format "[%s] %s" (location-code (or (:location warning) (:position warning)))
                     (:message warning)))
@@ -220,20 +229,20 @@
       (->> subinput (apply-seq str) (format "'%s'"))
       subinput)))
 
-(defn- join-labels [labels]
-  {:pre (seq? labels)}
-  (when-let [labels (sort labels)]
-    (if-not (= (count labels) 1)
-      (str (->> labels drop-last (str/join ", ")) ", or " (last labels))
-      (first labels))))
+(defn- join-titles [titles]
+  {:pre (seq? titles)}
+  (when-let [titles (->> titles (map title-string))]
+    (if-not (= (count titles) 1)
+      (str (->> titles drop-last (str/join ", ")) ", or " (last titles))
+      (first titles))))
 
 (defn- format-parse-error-data
   "Returns a formatted string with the given error data.
   The descriptor map should be returned from group-descriptors."
   [position location descriptor-map]
-  (let [{labels :label, messages :message} descriptor-map
-        expectation-text (when-let [labels (seq labels)]
-                           (->> labels join-labels (str "expected ") list))
+  (let [{titles :label, messages :message} descriptor-map
+        expectation-text (when-let [titles (seq titles)]
+                           (->> titles join-titles (str "expected ") list))
         message-text (->> expectation-text (concat messages)
                           (str/join "; "))]
     (format "[%s] %s."
@@ -242,7 +251,7 @@
 
 (defn- group-descriptors
   "From the given set of descriptors, returns a map with
-  messages and labels respectively grouped together.
+  messages and titles respectively grouped together.
   If there are no descriptors of a certain descriptor kind,
   then the map's val for that kind is the empty set."
   [descriptors]
