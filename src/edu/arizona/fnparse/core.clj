@@ -28,8 +28,8 @@
         generic message. :label means that it's
         the label of a rule that was expected at a
         certain position but was not found.
-  text: A string. The text of the descriptor."}
-  ErrorDescriptor [kind text])
+  content: A string. The text of the descriptor."}
+  ErrorDescriptor [kind content])
 
 (defn make-error-descriptor [kind text]
   (ErrorDescriptor. kind text))
@@ -112,14 +112,14 @@
   (if (standard-break-chars character)
     location-inc-line location-inc-column))
 
-(defprotocol ALabel
+(defprotocol ADescriptorContent
   (label-string [t]))
 
-(extend-protocol ALabel
+(extend-protocol ADescriptorContent
   String (label-string [s] s))
 
-(defn label? [object]
-  (extends? ALabel (type object)))
+(defn descriptor-content? [object]
+  (extends? ADescriptorContent (type object)))
 
 (defn format-warning [warning]
   (format "[%s] %s" (location-code (or (:location warning) (:position warning)))
@@ -256,7 +256,7 @@
   then the map's val for that kind is the empty set."
   [descriptors]
   (->> descriptors (group-by :kind)
-       (map #(vector (key %) (set (map :text (val %)))))
+       (map #(vector (key %) (set (map :content (val %)))))
        (filter #(seq (get % 1)))
        (into {:message #{}, :label #{}})))
 

@@ -16,7 +16,7 @@
 (d/defalias defmaker c/defmaker)
 (d/defalias defmaker- c/defmaker-)
 (d/defalias defmaker-macro c/defmaker-macro)
-(d/defalias label? c/label?)
+(d/defalias descriptor-content? c/descriptor-content?)
 
 (defprotocol ABankable
   (get-bank [o])
@@ -384,7 +384,7 @@
    :consumes "Whatever `rule` consumes."
    :error "Smartly determines the appropriate error message."}
   [l rule]
-  {:pre #{(label? l)}}
+  {:pre #{(descriptor-content? l)}}
   (make-rule labelled-rule [state]
     (let [result (c/apply rule state), initial-position (:position state)]
       (if (-> result :error :position (<= initial-position))
@@ -671,7 +671,7 @@
    :product "Always `true`."}
   ([l <r>] (antipeek l nil <r>))
   ([l message-fn rule]
-   {:pre #{(label? l) (rule? rule)
+   {:pre #{(descriptor-content? l) (rule? rule)
            (or (ifn? message-fn) (nil? message-fn))}}
    (label l
      (make-rule antipeek-rule [state]

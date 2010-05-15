@@ -17,7 +17,7 @@
 (d/defalias defmaker c/defmaker)
 (d/defalias defmaker- c/defmaker-)
 (d/defalias defmaker-macro c/defmaker-macro)
-(d/defalias label? c/label?)
+(d/defalias descriptor-content? c/descriptor-content?)
 
 (defrecord State
   [remainder position location warnings context alter-location]
@@ -293,7 +293,7 @@
    :consumes "Whatever `rule` consumes."
    :error "Smartly determines the appropriate error message."}
   [l rule]
-  {:pre #{(label? l) (rule? rule)}}
+  {:pre #{(descriptor-content? l) (rule? rule)}}
   (make-rule labelled-rule [state]
     (let [initial-position (:position state)
           reply (c/apply rule state)]
@@ -369,7 +369,7 @@
   "All terminal Hound rules, including `term` and
   `term*`, are based on this function."
   [pred-product? l f]
-  {:pre #{(label? l) (ifn? f)}}
+  {:pre #{(descriptor-content? l) (ifn? f)}}
   (label l
     (make-rule terminal-rule [state]
       (let [position (:position state)]
@@ -605,7 +605,7 @@
    :product "Always `true`."}
   ([l <r>] (antipeek l nil <r>))
   ([l message-fn rule]
-   {:pre #{(label? l) (rule? rule)
+   {:pre #{(descriptor-content? l) (rule? rule)
            (or (ifn? message-fn) (nil? message-fn))}}
    (label l
      (make-rule antipeek-rule [state]
