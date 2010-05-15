@@ -17,7 +17,7 @@
 (d/defalias defmaker c/defmaker)
 (d/defalias defmaker- c/defmaker-)
 (d/defalias defmaker-macro c/defmaker-macro)
-(d/defalias title? c/title?)
+(d/defalias label? c/label?)
 
 (defrecord State
   [remainder position location warnings context alter-location]
@@ -261,13 +261,13 @@
    m-bind combine
    m-plus +])
 
-(defn- assoc-label-in-result [result title initial-position]
+(defn- assoc-label-in-result [result l initial-position]
   ; TODO Move to common
   (let [result (force result)
         error (:error result)]
     (if (-> error :position (<= initial-position))
       (assoc result :error
-        (update-in error [:descriptors] k/assoc-label-in-descriptors title))
+        (update-in error [:descriptors] k/assoc-label-in-descriptors l))
       result)))
 
 (c/defmaker label
@@ -285,21 +285,21 @@
   You don't have to understand the details, but...
   If `rule` consumed *no* tokens, then all error labels
   from `rule`'s result are overrided with the
-  given `title`. Otherwise, the old labels are
+  given `l`. Otherwise, the old labels are
   untouched, as they contain information from
   further down the input."
   {:success "If `rule` succeeds."
    :product "`rule`'s product."
    :consumes "Whatever `rule` consumes."
    :error "Smartly determines the appropriate error message."}
-  [title rule]
-  {:pre #{(title? title) (rule? rule)}}
+  [l rule]
+  {:pre #{(label? l) (rule? rule)}}
   (make-rule labelled-rule [state]
     (let [initial-position (:position state)
           reply (c/apply rule state)]
       (if-not (:tokens-consumed? reply)
         (update-in reply [:result] assoc-label-in-result
-          title initial-position)
+          l initial-position)
         reply))))
 
 (c/defmaker-macro for
@@ -313,7 +313,7 @@
   
   Arguments
   =========
-  *   `title`: An optional label string. See the
+  *   `l`: An optional label string. See the
       `label` function for more info.
   *   `steps`: A binding vector containing *binding-form/
       rule pairs* optionally followed by *modifiers*.
@@ -335,8 +335,8 @@
    :consumes "All tokens that each step consecutively consumes."
    :error "Whatever error the failed rule returns."
    :no-memoize? true} ; TODO decide if this right
-  ([title steps product-expr]
-   `(->> (for ~steps ~product-expr) (label ~title)))
+  ([l steps product-expr]
+   `(->> (for ~steps ~product-expr) (label ~l)))
   ([steps product-expr]
    {:pre #{(vector? steps) (even? (count steps))}}
   `(m/domonad parser-m ~steps ~product-expr)))
@@ -368,9 +368,9 @@
 (defn- term-
   "All terminal Hound rules, including `term` and
   `term*`, are based on this function."
-  [pred-product? title f]
-  {:pre #{(title? title) (ifn? f)}}
-  (label title
+  [pred-product? l f]
+  {:pre #{(label? l) (ifn? f)}}
+  (label l
     (make-rule terminal-rule [state]
       (let [position (:position state)]
         (if-let [remainder (-> state :remainder seq)]
@@ -391,7 +391,7 @@
   "Creates a terminal rule.
   
   The new rule either consumes one token or fails.
-  It must have a `title` that describes it
+  It must have a `l` that describes it
   and a `predicate` to test if the token it consumes is
   valid.
   
@@ -418,23 +418,23 @@
    :error "When `(term \"number\" num?)` fails,
            its error is \"Expected number.\""
    :no-memoize? true}
-  [title predicate]
-  (term- false title predicate))
+  [l predicate]
+  (term- false l predicate))
 
 (c/defmaker term*
   "Exactly like `term`, only its product is the result of
   `(f token)` rather than `token`."
   {:no-memoize? true}
-  [title f]
-  (term- true title f))
+  [l f]
+  (term- true l f))
 
 (c/defmaker antiterm
   "Exactly like term, only uses the complement of the
   given predicate instead."
   {:no-memoize? true}
-  [title pred]
+  [l pred]
   {:pre #{(ifn? pred)}}
-  (term title (complement pred)))
+  (term l (complement pred)))
 
 (c/defrule <anything>
   "The generic terminal rule that matches any one token."
@@ -495,16 +495,16 @@
 
 (c/defmaker set-term
   "Creates a terminal rule with a set.
-  A shortcut for `(term title (set tokens))`."
-  [title tokens]
+  A shortcut for `(term l (set tokens))`."
+  [l tokens]
   {:pre #{(cljcore/seqable? tokens)}}
-  (term title (set tokens)))
+  (term l (set tokens)))
 
 (c/defmaker antiset-term
   "Creates a terminal rule with an antiset.
-  A shortcut for `(antiterm title (set tokens))`."
-  [title tokens]
-  (antiterm title (set tokens)))
+  A shortcut for `(antiterm l (set tokens))`."
+  [l tokens]
+  (antiterm l (set tokens)))
 
 (c/defmaker cat
   "Creates a concatenated rule out of many given `rules`."
@@ -594,7 +594,7 @@
 (c/defmaker antipeek
   "Creates a negative lookahead rule. Checks if
   the given `rule` fails, but doesn't actually
-  consume any tokens. You must provide a `title`
+  consume any tokens. You must provide a `l`
   describing this rule.
   
   `message-fn`, if given, creates a detailed error
@@ -603,11 +603,11 @@
   product, and returns a string (or `nil`, for no message)."
   {:success "If `rule` succeeds."
    :product "Always `true`."}
-  ([title <r>] (antipeek title nil <r>))
-  ([title message-fn rule]
-   {:pre #{(title? title) (rule? rule)
+  ([l <r>] (antipeek l nil <r>))
+  ([l message-fn rule]
+   {:pre #{(label? l) (rule? rule)
            (or (ifn? message-fn) (nil? message-fn))}}
-   (label title
+   (label l
      (make-rule antipeek-rule [state]
        (let [result (-> rule (c/apply state) :result force)]
          (if (c/failure? result)
@@ -830,7 +830,7 @@
   "Creates a subtracted rule. Matches using
   the given minuend rule, but only when the
   subtrahend rule does not also match. You
-  must provide a custom `title`.
+  must provide a custom `l`.
 
   `message-fn`, if given, creates a detailed error
   message when the `subtrahend` succeeds. `message-fn`
@@ -839,16 +839,16 @@
   {:success "If `minuend` succeeds and `subtrahend` fails."
    :product "`minuend`'s product."
    :consumes "Whatever `minuend` consumes."
-   :error "Uses the `title` you provide."}
-  ([title minuend subtrahend]
+   :error "Uses the `l` you provide."}
+  ([l minuend subtrahend]
    {:pre #{(rule? minuend) (rule? subtrahend)}}
-   (for [_ (antipeek title subtrahend)
-         product (label title minuend)]
+   (for [_ (antipeek l subtrahend)
+         product (label l minuend)]
      product))
-  ([title message-fn minuend subtrahend]
+  ([l message-fn minuend subtrahend]
    {:pre #{(ifn? message-fn) (rule? minuend) (rule? subtrahend)}}
-   (for [_ (antipeek title message-fn subtrahend)
-         product (label title minuend)]
+   (for [_ (antipeek l message-fn subtrahend)
+         product (label l minuend)]
      product)))
 
 (c/defmaker annotate-error
