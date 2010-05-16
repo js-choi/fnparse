@@ -120,7 +120,7 @@
   {:succeeds "Never."
    :error "An error with the given `message`."}
   [message]
-  {:pre #{(string? message)}}
+  {:pre #{(descriptor-content? message)}}
   (make-rule with-error-rule [state]
     (make-failed-reply state #{(c/make-error-descriptor :message message)})))
 
@@ -294,13 +294,15 @@
    :error "Smartly determines the appropriate error message."}
   [l rule]
   {:pre #{(descriptor-content? l) (rule? rule)}}
-  (make-rule labelled-rule [state]
-    (let [initial-position (:position state)
-          reply (c/apply rule state)]
-      (if-not (:tokens-consumed? reply)
-        (update-in reply [:result] assoc-label-in-result
-          l initial-position)
-        reply))))
+  (vary-meta
+    (make-rule labelled-rule [state]
+      (let [initial-position (:position state)
+            reply (c/apply rule state)]
+        (if-not (:tokens-consumed? reply)
+          (update-in reply [:result] assoc-label-in-result
+            l initial-position)
+          reply)))
+    assoc :label l, :unlabelled-rule rule))
 
 (c/defmaker-macro for
   "Creates a rule comprehension, very much like
@@ -603,21 +605,15 @@
   product, and returns a string (or `nil`, for no message)."
   {:success "If `rule` succeeds."
    :product "Always `true`."}
-  ([l <r>] (antipeek l nil <r>))
-  ([l message-fn rule]
-   {:pre #{(descriptor-content? l) (rule? rule)
-           (or (ifn? message-fn) (nil? message-fn))}}
+  ([l rule]
+   {:pre #{(descriptor-content? l) (rule? rule)}}
    (label l
      (make-rule antipeek-rule [state]
        (let [result (-> rule (c/apply state) :result force)]
          (if (c/failure? result)
            (Reply. false (c/make-success true state (:error result)))
-           (c/apply
-             (if-let [message (if-when message-fn
-                                (message-fn (:product result)))]
-               (with-error (message-fn (:product result)))
-               <nothing>)
-             state)))))))
+           #_(make-failed-reply state #{(c/make-error-descriptor :antilabel "SOMETHING")})
+           (c/apply <nothing> state)))))))
 
 (defn- apply-reply-and-rule [f prev-reply next-rule]
   (c/apply

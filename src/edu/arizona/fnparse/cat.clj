@@ -385,12 +385,14 @@
    :error "Smartly determines the appropriate error message."}
   [l rule]
   {:pre #{(descriptor-content? l)}}
-  (make-rule labelled-rule [state]
-    (let [result (c/apply rule state), initial-position (:position state)]
-      (if (-> result :error :position (<= initial-position))
-        (update-in result [:error :descriptors]
-          k/assoc-label-in-descriptors l)
-        result))))
+  (vary-meta
+    (make-rule labelled-rule [state]
+      (let [result (c/apply rule state), initial-position (:position state)]
+        (if (-> result :error :position (<= initial-position))
+          (update-in result [:error :descriptors]
+            k/assoc-label-in-descriptors l)
+          result)))
+    assoc :label l, :unlabelled-rule rule))
 
 (c/defmaker annotate-error
   "Creates an error-annotating rule. Whenever

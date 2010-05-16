@@ -59,7 +59,7 @@
   No control characters allowed."
   {:product "A character."}
   (h/except "a normal string character"
-    (fn [subtrahend-prod]
+    #_(fn [subtrahend-prod]
       (when (= subtrahend-prod ::control-char)
         "an illegal, invisible ASCII control character was found in a string"))
     h/<anything>

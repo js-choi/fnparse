@@ -240,14 +240,18 @@
   "Returns a formatted string with the given error data.
   The descriptor map should be returned from group-descriptors."
   [position location descriptor-map]
-  (let [{labels :label, messages :message} descriptor-map
-        expectation-text (when-let [labels (seq labels)]
-                           (->> labels join-labels (str "expected ") list))
-        message-text (->> expectation-text (concat messages)
-                          (str/join "; "))]
+  (let [{:keys [label message antilabel]} descriptor-map
+        labels-text
+          (when-let [labels (seq label)]
+            (->> labels join-labels (str "expected ")))
+        antilabels-text
+          (when-let [antilabels (seq antilabel)]
+            (-> antilabels join-labels (str " did not expect")))
+        messages-text
+          (str/join "; " (concat message [antilabels-text labels-text]))]
     (format "[%s] %s."
       (location-code (or location position))
-      message-text)))
+      messages-text)))
 
 (defn- group-descriptors
   "From the given set of descriptors, returns a map with
