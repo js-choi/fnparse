@@ -9,8 +9,8 @@
   (k/hook #(Integer/parseInt (str %))
     (k/term "a decimal digit" #(Character/isDigit (char %)))))
 
-(def <ws-char> (k/set-term "whitespace" " \n\t"))
-(def <ws> (k/+ (k/cat #'<ws> <ws-char>) <ws-char>))
+(def <ws-char> (k/set-term "a whitespace character" " \n\t"))
+(def <ws> (k/label "whitespace" (k/+ (k/cat #'<ws> <ws-char>) <ws-char>)))
 (def <ws?> (k/opt <ws>))
 
 (template/do-template [rule-name token]

@@ -346,13 +346,14 @@
             (-> next-rule
               (c/apply (set-bank state (get-bank prev-result)))
               (update-in [:error] (partial merge-result-errors prev-result))))]
-    (remember
-      (make-rule summed-rule [state]
-        (let [apply-next-rule (partial apply-next-rule state)
-              initial-result (c/apply <emptiness> state)
-              results (rest (reductions apply-next-rule
-                              initial-result rules))]
-          (or (seq/find-first c/success? results) (last results)))))))
+    (c/self-label-rule-meta rules
+      (remember
+        (make-rule summed-rule [state]
+          (let [apply-next-rule (partial apply-next-rule state)
+                initial-result (c/apply <emptiness> state)
+                results (rest (reductions apply-next-rule
+                                initial-result rules))]
+            (or (seq/find-first c/success? results) (last results))))))))
 
 (m/defmonad parser-m
   "The monad that FnParse Cat uses."
@@ -660,6 +661,15 @@
         ((prod (:product result)) state)
         result))))
 
+(defn- antipeek- [rule]
+  (let [labels (c/rule-labels rule)
+        descriptors (set (map #(c/make-error-descriptor :antilabel %) labels))]
+    (make-rule antipeek-rule [state]
+      (let [result (c/apply rule state)]
+        (if (c/failure? result)
+          (c/make-success true state (:error result))
+          (make-failure state descriptors))))))
+
 (c/defmaker antipeek
   "Creates a negative lookahead rule. Checks if
   the given `rule` fails, but doesn't actually
@@ -672,21 +682,9 @@
   product, and returns a string (or `nil`,for no message)."
   {:success "If `rule` succeeds."
    :product "Always `true`."}
-  ([l <r>] (antipeek l nil <r>))
-  ([l message-fn rule]
-   {:pre #{(descriptor-content? l) (rule? rule)
-           (or (ifn? message-fn) (nil? message-fn))}}
-   (label l
-     (make-rule antipeek-rule [state]
-       (let [result (c/apply rule state)]
-         (if (c/failure? result)
-           (c/make-success true state (:error result))
-           (c/apply
-             (if-let [message (if-when message-fn
-                                (message-fn (:product result)))]
-               (with-error (message-fn (:product result)))
-               <nothing>)
-             state)))))))
+  [& rules]
+  {:pre [(every? rule? rules) (every? c/rule-labels rules)]}
+  (apply cat (map antipeek- rules)))
 
 (c/defmaker mapcat
   "Creates a rule that is the result of
@@ -720,7 +718,7 @@
   {:succeeds "If there are no tokens left."
    :product "`true`."
    :consumes "No tokens."}
-  (antipeek "the end of input" <anything>))
+  (label "the end of input" (antipeek <anything>)))
 
 (c/defmaker prefix
   "Creates a prefixed rule. Use when you want to
@@ -800,16 +798,10 @@
    :product "`minuend`'s product."
    :consumes "Whatever `minuend` consumes."
    :error "Uses the `l` you provide."}
-  ([l minuend subtrahend]
-   {:pre #{(rule? minuend) (rule? subtrahend)}}
-   (for [_ (antipeek l subtrahend)
-         product (label l minuend)]
-     product))
-  ([l message-fn minuend subtrahend]
-   {:pre #{(ifn? message-fn) (rule? minuend) (rule? subtrahend)}}
-   (for [_ (antipeek l message-fn subtrahend)
-         product (label l minuend)]
-     product)))
+  [l minuend subtrahend]
+  {:pre #{(rule? minuend) (rule? subtrahend)}}
+  (for l [_ (antipeek subtrahend), product minuend]
+    product))
 
 (c/defrule <fetch-location>
   "A rule that fetches the current state's location."
