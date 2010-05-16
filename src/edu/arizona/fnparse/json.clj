@@ -29,7 +29,7 @@
 (do-template [rule-name token]
   (c/defrule rule-name
     "Padded on the front with optional whitespace."
-    (h/prefix <ws?> (h/lit token)))
+    (h/lit token))
   <escape-char-start> \\
   <str-delimiter>   \"
   <value-separator> \,
@@ -59,11 +59,7 @@
   No control characters allowed."
   {:product "A character."}
   (h/except "a normal string character"
-    #_(fn [subtrahend-prod]
-      (when (= subtrahend-prod ::control-char)
-        "an illegal, invisible ASCII control character was found in a string"))
-    h/<anything>
-    (h/+ <str-delimiter> <control-char>)))
+    h/<anything> <str-delimiter> <control-char>))
 
 (def normal-escape-sequences
   {\" \", \\ \\, \/ \/, \b \backspace, \f \formfeed, \n \newline,

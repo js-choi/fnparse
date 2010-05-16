@@ -385,14 +385,13 @@
    :error "Smartly determines the appropriate error message."}
   [l rule]
   {:pre #{(descriptor-content? l)}}
-  (vary-meta
+  (c/label-rule-meta #{l} rule
     (make-rule labelled-rule [state]
       (let [result (c/apply rule state), initial-position (:position state)]
         (if (-> result :error :position (<= initial-position))
           (update-in result [:error :descriptors]
             k/assoc-label-in-descriptors l)
-          result)))
-    assoc :label l, :unlabelled-rule rule))
+          result)))))
 
 (c/defmaker annotate-error
   "Creates an error-annotating rule. Whenever
@@ -569,7 +568,8 @@
    :consumes "Whatever `rule` consumes."}
   [semantic-hook rule]
   {:pre #{(ifn? semantic-hook) (rule? rule)}}
-  (for [product rule] (semantic-hook product)))
+  (c/self-label-rule-meta [rule]
+    (for [product rule] (semantic-hook product))))
 
 (defn chook
   "Creates a rule with a constant semantic hook.
@@ -583,7 +583,8 @@
    :consumes "Whatever `rule` consumes."}
   [product rule]
   {:pre #{(rule? rule)}}
-  (for [_ rule] product))
+  (c/self-label-rule-meta [rule]
+    (for [_ rule] product)))
 
 (c/defmaker lit
   "Creates a rule of a literal. A shortcut for

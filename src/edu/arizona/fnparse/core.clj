@@ -15,10 +15,16 @@
   (state-warnings [state])
   (state-location [state]))
 
-(defrecord RuleMeta [type label unlabelled-rule])
+(defrecord RuleMeta [type labels unlabelled-rule])
 
 (defn make-rule-meta [type]
   (RuleMeta. type nil nil))
+
+(defn rule-labels [<r>]
+  (-> <r> meta :labels))
+
+(defn rule-unlabelled-base [<r>]
+  (-> <r> meta :unlabelled-rule))
 
 (defrecord
   #^{:doc "Represents descriptors representing a single
@@ -120,6 +126,15 @@
 
 (defn descriptor-content? [object]
   (extends? ADescriptorContent (type object)))
+
+(defn label-rule-meta [ls <old> <r>]
+  (vary-meta <r> assoc :labels ls, :unlabelled-rule <old>))
+
+(defn self-label-rule-meta [subrules <r>]
+  (let [subrule-labels (mapcat rule-labels subrules)]
+    (if-not (some nil? subrule-labels)
+      (label-rule-meta (set subrule-labels) nil <r>)
+      <r>)))
 
 (defn format-warning [warning]
   (format "[%s] %s" (location-code (or (:location warning) (:position warning)))
@@ -246,7 +261,7 @@
             (->> labels join-labels (str "expected ")))
         antilabels-text
           (when-let [antilabels (seq antilabel)]
-            (-> antilabels join-labels (str " did not expect")))
+            (->> antilabels join-labels (str "did not expect ")))
         messages-text
           (str/join "; " (concat message [antilabels-text labels-text]))]
     (format "[%s] %s."

@@ -240,19 +240,20 @@
                 from all the failed sub-rules."}
   [& rules]
   {:pre #{(every? rule? rules)}}
-  (make-rule summed-rule [state]
-    (let [[consuming-replies empty-replies]
-            (->> rules
-              (map #(c/apply % state))
-              (seq/separate :tokens-consumed?))]
-      (if (empty? consuming-replies)
-        (if (empty? empty-replies)
-          (c/apply <nothing> state)
-          (let [empty-replies (reductions merge-replies empty-replies)]
-            (or (first (drop-while #(-> % :result force c/failure?)
-                         empty-replies))
-                (last empty-replies))))
-        (first consuming-replies)))))
+  (c/self-label-rule-meta rules
+    (make-rule summed-rule [state]
+      (let [[consuming-replies empty-replies]
+              (->> rules
+                (map #(c/apply % state))
+                (seq/separate :tokens-consumed?))]
+        (if (empty? consuming-replies)
+          (if (empty? empty-replies)
+            (c/apply <nothing> state)
+            (let [empty-replies (reductions merge-replies empty-replies)]
+              (or (first (drop-while #(-> % :result force c/failure?)
+                           empty-replies))
+                  (last empty-replies))))
+          (first consuming-replies))))))
 
 (m/defmonad parser-m
   "The monad that FnParse Hound uses."
@@ -294,15 +295,14 @@
    :error "Smartly determines the appropriate error message."}
   [l rule]
   {:pre #{(descriptor-content? l) (rule? rule)}}
-  (vary-meta
+  (c/label-rule-meta #{l} rule
     (make-rule labelled-rule [state]
       (let [initial-position (:position state)
             reply (c/apply rule state)]
         (if-not (:tokens-consumed? reply)
           (update-in reply [:result] assoc-label-in-result
             l initial-position)
-          reply)))
-    assoc :label l, :unlabelled-rule rule))
+          reply)))))
 
 (c/defmaker-macro for
   "Creates a rule comprehension, very much like
@@ -456,7 +456,8 @@
    :consumes "Whatever `rule` consumes."}
   [semantic-hook rule]
   {:pre #{(ifn? semantic-hook) (rule? rule)}}
-  (for [product rule] (semantic-hook product)))
+  (c/self-label-rule-meta [rule]
+    (for [product rule] (semantic-hook product))))
 
 (defn chook
   "Creates a rule with a constant semantic hook.
@@ -470,7 +471,8 @@
    :consumes "Whatever `rule` consumes."}
   [product rule]
   {:pre #{(rule? rule)}}
-  (for [_ rule] product))
+  (c/self-label-rule-meta [rule]
+    (for [_ rule] product)))
 
 (c/defmaker lit
   "Creates a rule of a literal. A shortcut for
@@ -593,6 +595,16 @@
         (Reply. false result)
         ((prod (:product result)) state)))))
 
+(defn- antipeek- [rule]
+  {:pre [(rule? rule) (seq (c/rule-labels rule))]}
+  (let [labels (c/rule-labels rule)
+        descriptors (set (map #(c/make-error-descriptor :antilabel %) labels))]
+    (make-rule antipeek-rule [state]
+      (let [result (-> rule (c/apply state) :result force)]
+        (if (c/failure? result)
+          (Reply. false (c/make-success true state (:error result)))
+          (make-failed-reply state descriptors))))))
+
 (c/defmaker antipeek
   "Creates a negative lookahead rule. Checks if
   the given `rule` fails, but doesn't actually
@@ -605,15 +617,9 @@
   product, and returns a string (or `nil`, for no message)."
   {:success "If `rule` succeeds."
    :product "Always `true`."}
-  ([l rule]
-   {:pre #{(descriptor-content? l) (rule? rule)}}
-   (label l
-     (make-rule antipeek-rule [state]
-       (let [result (-> rule (c/apply state) :result force)]
-         (if (c/failure? result)
-           (Reply. false (c/make-success true state (:error result)))
-           #_(make-failed-reply state #{(c/make-error-descriptor :antilabel "SOMETHING")})
-           (c/apply <nothing> state)))))))
+  [& rules]
+  {:pre [(every? rule? rules) (every? c/rule-labels rules)]}
+  (apply cat (map antipeek- rules)))
 
 (defn- apply-reply-and-rule [f prev-reply next-rule]
   (c/apply
@@ -738,7 +744,7 @@
   {:succeeds "If there are no tokens left."
    :product "`true`."
    :consumes "No tokens."}
-  (antipeek "the end of input" <anything>))
+  (label "the end of input" (antipeek <anything>)))
 
 (c/defmaker prefix
   "Creates a prefixed rule. Use when you want to
@@ -836,16 +842,12 @@
    :product "`minuend`'s product."
    :consumes "Whatever `minuend` consumes."
    :error "Uses the `l` you provide."}
-  ([l minuend subtrahend]
-   {:pre #{(rule? minuend) (rule? subtrahend)}}
-   (for [_ (antipeek l subtrahend)
-         product (label l minuend)]
-     product))
-  ([l message-fn minuend subtrahend]
-   {:pre #{(ifn? message-fn) (rule? minuend) (rule? subtrahend)}}
-   (for [_ (antipeek l message-fn subtrahend)
-         product (label l minuend)]
-     product)))
+  [l minuend & subtrahends]
+  {:pre #{(descriptor-content? l) (rule? minuend) (every? rule? subtrahends)}}
+  (label l
+    (for [_ (apply antipeek subtrahends)
+          product minuend]
+      product)))
 
 (c/defmaker annotate-error
   "Creates an error-annotating rule. Whenever
