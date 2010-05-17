@@ -295,14 +295,15 @@
    :error "Smartly determines the appropriate error message."}
   [l rule]
   {:pre #{(descriptor-content? l) (rule? rule)}}
-  (c/label-rule-meta #{l} rule
-    (make-rule labelled-rule [state]
-      (let [initial-position (:position state)
-            reply (c/apply rule state)]
-        (if-not (:tokens-consumed? reply)
-          (update-in reply [:result] assoc-label-in-result
-            l initial-position)
-          reply)))))
+  (let [rule (or (c/rule-unlabelled-base rule) rule)]
+    (c/label-rule-meta #{l} rule
+      (make-rule labelled-rule [state]
+        (let [initial-position (:position state)
+              reply (c/apply rule state)]
+          (if-not (:tokens-consumed? reply)
+            (update-in reply [:result] assoc-label-in-result
+              l initial-position)
+            reply))))))
 
 (c/defmaker-macro for
   "Creates a rule comprehension, very much like
