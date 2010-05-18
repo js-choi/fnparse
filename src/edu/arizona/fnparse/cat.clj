@@ -1,6 +1,6 @@
 (ns edu.arizona.fnparse.cat
   (:require [edu.arizona.fnparse [core :as c] [common :as k]]
-            [clojure.contrib [monads :as m] [def :as d]
+            [clojure.contrib [monads :as m] [def :as d] [except :as except]
                              [seq :as seq] [core :as cljcore]]
             [clojure.template :as template])
   (:import [edu.arizona.fnparse.core Success Failure])
@@ -11,12 +11,86 @@
 (d/defalias find c/find)
 (d/defalias substitute c/substitute)
 (d/defalias substitute-1 c/substitute-1)
-(d/defalias defrule c/defrule)
-(d/defalias defrule- c/defrule-)
-(d/defalias defmaker c/defmaker)
-(d/defalias defmaker- c/defmaker-)
-(d/defalias defmaker-macro c/defmaker-macro)
-(d/defalias descriptor-content? c/descriptor-content?)
+
+(defmacro defrule
+  "Defines a rule var. You should use this instead of `def`
+  whenever you define rules, because it gives you cool
+  shortcuts to write rule-related documentation.
+  
+  Metadata documentation options
+  ==============================
+  The `meta-opts` parameter expects a map argument,
+  and makes it the new var's metadata. Giving certain
+  options in the metadata also does appends certain
+  things to the rule's `doc-string`.
+  
+  *  `:succeeds` expects a short description on when
+     the rule succeeds.
+  *  `:product` expects a short description on what
+     products the rule gives when it succeeds.
+  *  `:consumes` expects a short description on how
+     many and what kinds of tokens the rule consumes
+     when it succeeds.
+  *  `:error` expects a short description on the
+     error that the rule gives when it fails."
+  ([rule-name form] `(defrule ~rule-name nil ~form))
+  ([rule-name doc-string form] `(defrule ~rule-name ~doc-string nil ~form))
+  ([rule-name doc-string meta-opts form]
+  `(cp/general-defrule ~rule-name ~doc-string ~meta-opts (fn [] (~form)))))
+
+(defmacro defrule-
+  "Like `defrule`, but also makes the var private."
+  [fn-name & forms]
+  (list* `defrule (vary-meta fn-name assoc :private true) forms))
+
+(defmacro defmaker
+  "Creates a rule-making function. Use this instead of
+  `clojure.core/defn` whenever you make a rule-making
+  function. (It does other stuff like memoization and
+  and stuff.) Also see `defmaker-` and `defmaker-macro`.
+  
+  Arguments
+  =========
+  `defmaker` requires exactly the same arguments as
+  `clojure.core/defn`. Particularly important is being
+  able to give metadata easily.
+  
+  Metadata options
+  ================
+  `defmaker` accepts all special metadata options that
+  `defrule` does; see `defrule` for more information.
+  There is also a `:no-memoize?` option
+  that does something special, detailed below.
+  
+  Memoization
+  ===========
+  `defmaker` rule-makers *memoize by default*. This means
+  that they save the arguments they receive and their
+  corresponding results in a cache, and search the cache
+  every time they are called for equal arguments. See
+  `clojure.k/memoize` for more information.
+  
+  95% of the time, you won't have to worry about the warning below.
+  
+  A warning: memoization uses *Clojure equality*. This
+  means that giving vector arguments must always return the
+  same rule as giving list arguments, because vectors can
+  be equal to lists. If your function must return a different
+  rule when given `[1 2 3]` versus `'(1 2 3)`, then you should
+  give `{:no-memoize? true}` in your metadata."
+  [fn-name & forms]
+  (list* `cp/general-defmaker `defn fn-name forms))
+
+(defmacro defmaker-
+  "Like `defmaker`, but also makes the var private."
+  [fn-name & forms]
+  (list* `defmaker (vary-meta fn-name assoc :private true) forms))
+
+(defmacro defmaker-macro
+  "Like `defmaker`, but makes a macro rule-maker
+  instead of a function rule-maker."
+  [fn-name & forms]
+  (list* `cp/general-defmaker `defmacro fn-name forms))
 
 (defprotocol ABankable
   (get-bank [o])
@@ -85,7 +159,9 @@
 
 (defmacro make-rule [rule-symbol [state-symbol :as args] & body]
   {:pre #{(symbol? rule-symbol) (symbol? state-symbol) (empty? (rest args))}}
- `(with-meta (fn [~state-symbol] ~@body) (c/make-rule-meta ::Rule)))
+ `(fn []
+    (with-meta (fn [~state-symbol] ~@body)
+    (c/make-rule-meta ::Rule))))
 
 (defn- make-failure [state descriptors]
   (set-bank
@@ -143,7 +219,7 @@
    :error "An error with the given `message`."}
   [message]
   (make-rule with-error-rule [state]
-    (make-failure state #{(c/make-error-descriptor :message message)})))
+    (make-failure state #{(c/make-message-descriptor message)})))
 
 (c/defmaker when
   "Creates a maybe-failing rule—
@@ -414,7 +490,7 @@
             (let [new-message (message-fn error)]
               (if new-message
                 (update-in error [:descriptors]
-                  conj (c/make-error-descriptor :message new-message))
+                  conj (c/make-message-descriptor new-message))
                 error)))]
     (make-rule error-annotation-rule [state]
       (let [reply (c/apply rule state)]
@@ -662,31 +738,6 @@
         ((prod (:product result)) state)
         result))))
 
-(defn- antipeek- [rule]
-  (let [labels (c/rule-labels rule)
-        descriptors (set (map #(c/make-error-descriptor :antilabel %) labels))]
-    (make-rule antipeek-rule [state]
-      (let [result (c/apply rule state)]
-        (if (c/failure? result)
-          (c/make-success true state (:error result))
-          (make-failure state descriptors))))))
-
-(c/defmaker antipeek
-  "Creates a negative lookahead rule. Checks if
-  the given `rule` fails, but doesn't actually
-  consume any tokens. You must provide a `l`
-  describing this rule.
-  
-  `message-fn`, if given, creates a detailed error
-  message when the sub-rule succeeds. `message-fn`
-  should be a function that takes one argument: `rule`'s
-  product, and returns a string (or `nil`,for no message)."
-  {:success "If `rule` succeeds."
-   :product "Always `true`."}
-  [& rules]
-  {:pre [(every? rule? rules) (every? c/rule-labels rules)]}
-  (apply cat (map antipeek- rules)))
-
 (c/defmaker mapcat
   "Creates a rule that is the result of
   applying `cat` to the result of applying map
@@ -713,13 +764,6 @@
   (Actually, it's just `(mapcat lit tokens)`.)"
   [tokens]
   (mapcat lit tokens))
-
-(c/defrule <end-of-input>
-  "The standard end-of-input rule."
-  {:succeeds "If there are no tokens left."
-   :product "`true`."
-   :consumes "No tokens."}
-  (label "the end of input" (antipeek <anything>)))
 
 (c/defmaker prefix
   "Creates a prefixed rule. Use when you want to
@@ -750,6 +794,23 @@
   [prefix-rule body-rule suffix-rule]
   {:pre #{(rule? prefix-rule) (rule? body-rule) (rule? suffix-rule)}}
   (prefix prefix-rule (suffix body-rule suffix-rule)))
+
+(defn- not-followed- [base-lbls <following>]
+  {:pre [(set? base-lbls) (rule? <following>)], :post [(rule? %)]}
+  (let [following-lbls (c/require-rule-labels <following>)
+        descriptors #{(c/make-following-descriptor base-lbls following-lbls)}]
+    (make-rule following-rule [s]
+      (let [following-result (-> s <following>)]
+        (if (c/failure? following-result)
+          (<emptiness> s)
+          (make-failure s descriptors))))))
+
+(c/defmaker not-followed
+  "See also `except`."
+  [<base> & following-rules]
+  (suffix <base>
+    (mapcat (partial not-followed- (c/rule-labels <base>))
+      following-rules)))
 
 (c/defmaker-macro template-sum
   "Creates a summed rule using a template.
@@ -785,6 +846,15 @@
   (make-rule effects-rule [state]
     (c/apply <emptiness> state)))
 
+(defn- except- [<subtrahend>]
+  (let [subtrahend-lbls (c/rule-labels <subtrahend>)
+        descriptors #{(c/make-exception-descriptor nil subtrahend-lbls)}]
+    (make-rule exception-rule [s]
+      (let [subtrahend-result (c/apply <subtrahend> s)]
+        (if (c/success? subtrahend-result)
+          (make-failure s descriptors)
+          (c/apply <emptiness> s))))))
+
 (c/defmaker except
   "Creates a subtracted rule. Matches using
   the given minuend rule, but only when the
@@ -799,10 +869,16 @@
    :product "`minuend`'s product."
    :consumes "Whatever `minuend` consumes."
    :error "Uses the `l` you provide."}
-  [l minuend subtrahend]
-  {:pre #{(rule? minuend) (rule? subtrahend)}}
-  (for l [_ (antipeek subtrahend), product minuend]
-    product))
+  [<minuend> & subtrahends]
+  {:pre #{(rule? <minuend>) (every? rule? subtrahends)}}
+  (prefix (mapcat except- subtrahends) <minuend>))
+
+(c/defrule <end-of-input>
+  "The standard end-of-input rule."
+  {:succeeds "If there are no tokens left."
+   :product "`true`."
+   :consumes "No tokens."}
+  (label "the end of input" (except <emptiness> <anything>)))
 
 (c/defrule <fetch-location>
   "A rule that fetches the current state's location."

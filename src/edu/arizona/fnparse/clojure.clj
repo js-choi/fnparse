@@ -68,58 +68,58 @@
 
 ;; Whitespace.
 
-(c/defrule <comment-indicator>
+(h/defrule <comment-indicator>
   "There are two line comment indicators, `;` and `#!`.
   This rule consumes either of them."
   (h/+ (h/lit \;) (h/lex (h/phrase "#!"))))
 
-(c/defrule <comment-char>
+(h/defrule <comment-char>
   "Consumes a character inside a line comment, i.e. any non-break character."
   (h/antilit \newline))
 
-(c/defrule <comment>
+(h/defrule <comment>
   "Consumes a line comment."
   (h/cat <comment-indicator> (h/rep* <comment-char>)))
 
-(c/defrule <discarded>
+(h/defrule <discarded>
   "Consumes a discarded form (prefixed by `#_`), which counts as whitespace."
-  (h/prefix (h/lex (h/phrase "#_")) #'<form>))
+  (h/prefix (h/lex (h/phrase "#_")) <form>))
 
-(c/defrule <normal-ws-char>
+(h/defrule <normal-ws-char>
   "Consumes a normal whitespace character such as space or newline."
   (h/term "a whitespace character" ws-set))
 
-(c/defrule <ws>
+(h/defrule <ws>
   "The general whitespace rule: spaces, line comments, and discarded forms."
   (h/label "whitespace"
     (h/rep (h/+ <normal-ws-char> <comment> <discarded>))))
 
-(c/defrule <ws?>
+(h/defrule <ws?>
   "Consumes optional whitespace."
   (h/opt <ws>))
 
 ;; Indicators and form separators.
 
-(c/defrule <indicator>
+(h/defrule <indicator>
   "Consumes a Clojure indicator character."
   (h/term "an indicator" indicator-set))
 
-(c/defrule <separator>
+(h/defrule <separator>
   "Consumes a separator of Clojure forms: whitespace or an indicator."
   (h/+ <ws> <indicator>))
 
-(c/defrule <form-end>
+(h/defrule <form-end>
   "Peeks and checks for a separator or the end of input."
   {:consumes "No characters."}
   (h/+ (h/peek <separator>) h/<end-of-input>))
 
 ;; Symbols.
 
-(c/defrule <ns-separator>
+(h/defrule <ns-separator>
   "Consumes a forward slash: the separator of namespaces."
   (h/lit \/))
 
-(c/defrule <non-alphanumeric-symbol-char>
+(h/defrule <non-alphanumeric-symbol-char>
   "Consumes a non-alphanumeric character allowed in Clojure symbols."
   (h/set-term "a non-alphanumeric symbol character" "*+!---?."))
 
@@ -169,22 +169,22 @@
 
 (def <peek-ns-separator> (h/peek <ns-separator>))
 
-(c/defmaker fetch-referred-namespace [context namespace-alias]
+(h/defmaker fetch-referred-namespace [context namespace-alias]
   (h/when (get-in context [:ns-aliases namespace-alias])
     (format "no namespace with alias '%s'" namespace-alias)))
 
-(c/defmaker ns-qualified-keyword-end-with-slash [pre-slash]
+(h/defmaker ns-qualified-keyword-end-with-slash [pre-slash]
   (h/for [_ <peek-ns-separator>
           context h/<fetch-context>
           prefix (fetch-referred-namespace context pre-slash)
           suffix <symbol-suffix>]
     [prefix suffix]))
 
-(c/defmaker ns-qualified-keyword-empty-end [pre-slash]
+(h/defmaker ns-qualified-keyword-empty-end [pre-slash]
   (h/for [context h/<fetch-context>]
     [(:ns-name context) pre-slash]))
 
-(c/defmaker ns-resolved-keyword-end [pre-slash]
+(h/defmaker ns-resolved-keyword-end [pre-slash]
   (h/+ (ns-qualified-keyword-end-with-slash pre-slash)
        (ns-qualified-keyword-empty-end pre-slash)))
 
@@ -201,7 +201,7 @@
 
 ;; Numbers.
 
-(c/defmaker radix-natural-number [core]
+(h/defmaker radix-natural-number [core]
   (h/hooked-rep #(+ (* core %1) %2) 0 (h/radix-digit core)))
 
 (def <decimal-natural-number>
@@ -249,13 +249,13 @@
       (h/antivalidate zero? "a fraction's denominator cannot be zero"
         <decimal-natural-number>))))
 
-(c/defmaker radix-coefficient-tail [core]
+(h/defmaker radix-coefficient-tail [core]
   (h/hook constantly
     (h/prefix
       (h/case-insensitive-lit \r)
       (radix-natural-number core))))
 
-(c/defmaker number-tail [core]
+(h/defmaker number-tail [core]
   (h/+ <imprecise-number-tail> <fraction-denominator-tail>
        (radix-coefficient-tail core) <empty-number-tail>))
 
@@ -306,7 +306,7 @@
 
 ;; Circumflex compound forms: lists, vectors, maps, and sets.
 
-(def <form-series> (h/suffix (h/rep* #'<form>) <ws?>))
+(h/defrule <form-series> (h/suffix (h/rep* <form>) <ws?>))
 
 (t/do-template [<rule> start-token end-token product-fn]
   (def <rule>
@@ -321,13 +321,13 @@
 
 ;; Simple prefix forms: syntax-quote, deref, etc.
 
-(c/defmaker padded-lit [token]
+(h/defmaker padded-lit [token]
   (h/suffix (h/lit token) <ws?>))
 
 (t/do-template [<rule> prefix product-fn-symbol]
-  (def <rule>
+  (h/defrule <rule>
     (h/hook (prefix-list-fn product-fn-symbol)
-      (h/prefix (h/cat (padded-lit prefix) <ws?>) #'<form>)))
+      (h/prefix (h/cat (padded-lit prefix) <ws?>) <form>)))
   <quoted> \' `quote
   <syntax-quoted> \` `syntax-quote
   <unquoted> \~ `unquote
@@ -335,9 +335,9 @@
   <var-inner> \' `var
   <deprecated-meta> \^ `meta)
 
-(def <unquote-spliced>
+(h/defrule <unquote-spliced>
   (h/hook (prefix-list-fn `unquote-splicing)
-    (h/prefix (h/cat (h/lex (h/phrase "~@")) <ws?>) #'<form>)))
+    (h/prefix (h/cat (h/lex (h/phrase "~@")) <ws?>) <form>)))
 
 (def <deprecated-meta>
   (h/prefix
@@ -354,9 +354,9 @@
 (def <metadata>
   (h/+ <map> <tag>))
 
-(def <with-meta-inner>
+(h/defrule <with-meta-inner>
   (h/prefix (padded-lit \^)
-    (h/for [metadata <metadata>, _ <ws?>, content #'<form>]
+    (h/for [metadata <metadata>, _ <ws?>, content <form>]
       (list `with-meta content metadata))))
 
 ;; Anonymous functions.
@@ -455,11 +455,11 @@
                 Defaults to *read-eval*."
   [input & opts]
   (let [{:keys #{ns-name ns-aliases reader-eval?}} (apply hash-map opts)]
-    (c/match
+    (h/match
       (h/make-state input
         :context (ClojureContext. ns-name ns-aliases nil reader-eval?))
       <form>
       :success-fn (fn [product position] product)
       :failure-fn (fn [error]
                     (except/throwf "Clojure parsing error: %s"
-                      (c/format-parse-error error))))))
+                      (h/format-parse-error error))))))

@@ -31,7 +31,8 @@
            (+ (* 10 first-digits) next-digit))
          <digit>)))
 
-(def <symbol-char> (k/except "a symbol character" k/<anything> <separator>))
+(def <symbol-char>
+  (k/label "a symbol character" (k/except k/<anything> <separator>)))
 
 (def <symbol-content>
   (k/+ (k/for [first-char <symbol-char>, next-chars #'<symbol-content>]
