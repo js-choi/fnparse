@@ -3,7 +3,8 @@
 
 (set! *warn-on-reflection* true)
 
-(declare <expr> <ws>)
+(declare <expr> <ws> <number> <symbol-content>
+         <multiplication-level> <addition-level>)
 
 (def <digit>
   (k/hook #(Integer/parseInt (str %))
@@ -14,10 +15,11 @@
   (k/label "whitespace" (k/+ (k/cat <ws> <ws-char>) <ws-char>)))
 (def <ws?> (k/opt <ws>))
 
-(comment
+(k/defmaker ws-suffix [<r>]
+  (k/suffix <r> <ws?>))
 
 (template/do-template [rule-name token]
-  (def rule-name (k/suffix (k/lit token) <ws?>))
+  (def rule-name (ws-suffix (k/lit token)))
   <plus-sign> \+, <minus-sign> \-, <multiplication-sign> \*, <division-sign> \/,
   <opening-parenthesis> \(, <closing-parenthesis> \))
 
@@ -30,12 +32,14 @@
 
 (k/defrule <number>
   (k/label "a number"
-    (k/+ (k/for [first-digits <number>, next-digit <digit>]
-           (+ (* 10 first-digits) next-digit))
-         <digit>)))
+    (ws-suffix
+      (k/+ (k/for [first-digits <number>, next-digit <digit>]
+             (+ (* 10 first-digits) next-digit))
+           <digit>))))
 
 (def <symbol-char>
-  (k/label "a symbol character" (k/except k/<anything> <separator>)))
+  (k/label "a symbol character"
+    (ws-suffix (k/except k/<anything> <separator>))))
 
 (k/defrule <symbol-content>
   (k/+ (k/for [first-char <symbol-char>, next-chars <symbol-content>]
@@ -78,5 +82,3 @@
        <multiplication-level>))
 
 (def <expr> (k/prefix <ws?> <addition-level>))
-
-)

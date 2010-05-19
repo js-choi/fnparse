@@ -33,13 +33,16 @@
 
 (defmacro make-rule-wrapper [type rule-symbol inner-fn-body]
   {:pre [(keyword? type) (symbol? rule-symbol)]}
- `(with-meta (memoize (fn [] ~inner-fn-body)) (c/make-rule-meta ~type)))
+ `(with-meta
+   (let [inner-body-delay# (delay ~inner-fn-body)]
+     (fn [] (force inner-body-delay#)))
+   (c/make-rule-meta ~type)))
 
 (defmacro make-rule [type rule-symbol state-symbol & body]
  `(make-rule-wrapper ~type rule-symbol (fn [~state-symbol] ~@body)))
 
 (defmacro general-defrule [rule-sym description doc-string meta-opts type form]
- `(let [rule# (make-rule-wrapper ~type generic-rule (~form))
+ `(let [rule# (make-rule-wrapper ~type generic-rule (force (~form)))
         rule-var# (d/defvar ~rule-sym rule# ~doc-string)]
     (alter-meta! rule-var# update-in [:doc]
       rule-doc-str ~meta-opts ~description)

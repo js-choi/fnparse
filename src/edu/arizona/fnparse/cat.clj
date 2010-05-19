@@ -346,7 +346,6 @@
 (defn- recall [bank subrule state]
   (let [position (:position state)
         memory (get-memory bank subrule position)
-        _ (println "...\n>>" memory)
         node-index (-> bank :position-heads (get position))
         lr-node (get-lr-node bank node-index)]
     (if (nil? lr-node)
@@ -366,11 +365,8 @@
 (defn- remember [subrule]
   (make-rule remembering-rule [state]
     (let [bank (get-bank state)
-          _ (println "---\n>" bank)
-          _ (println "...\n>R" subrule (subrule))
           state-position (:position state)
-          found-memory-val (recall bank subrule state)
-          _ (println "...\n>>>" found-memory-val)]
+          found-memory-val (recall bank subrule state)]
       (if found-memory-val
         (if (integer? found-memory-val)
           (let [bank (update-in bank [:lr-stack]
