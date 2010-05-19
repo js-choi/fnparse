@@ -12,10 +12,17 @@
 (d/defalias substitute c/substitute)
 (d/defalias substitute-1 c/substitute-1)
 
+(defn rule?
+  "Tests if the given object is a Hound Rule, or a var containing a Hound Rule."
+  [obj]
+  (-> obj type (= ::Rule)))
+
 (defmacro defrule
-  "Defines a rule var. You should use this instead of `def`
-  whenever you define rules, because it gives you cool
-  shortcuts to write rule-related documentation.
+  "Defines a rule var. You really should use this instead of `def`
+  whenever you define rules, because:
+  1. It gives you cool shortcuts to write rule-related documentation.
+  2. It allows you to use not-yet defined rules in mutually
+     recursive rules.
   
   Metadata documentation options
   ==============================
@@ -36,7 +43,8 @@
   ([rule-name form] `(defrule ~rule-name nil ~form))
   ([rule-name doc-string form] `(defrule ~rule-name ~doc-string nil ~form))
   ([rule-name doc-string meta-opts form]
-  `(cp/general-defrule ~rule-name ~doc-string ~meta-opts (fn [] (~form)))))
+  `(k/general-defrule ~rule-name "FnParse Hound rule" ~doc-string ~meta-opts
+     ::Rule ~form)))
 
 (defmacro defrule-
   "Like `defrule`, but also makes the var private."
@@ -79,7 +87,7 @@
   rule when given `[1 2 3]` versus `'(1 2 3)`, then you should
   give `{:no-memoize? true}` in your metadata."
   [fn-name & forms]
-  (list* `cp/general-defmaker `defn fn-name forms))
+  (list* `k/general-defmaker `defn "FnParse Hound rule-maker" fn-name forms))
 
 (defmacro defmaker-
   "Like `defmaker`, but also makes the var private."
@@ -90,7 +98,8 @@
   "Like `defmaker`, but makes a macro rule-maker
   instead of a function rule-maker."
   [fn-name & forms]
-  (list* `cp/general-defmaker `defmacro fn-name forms))
+  (list* `k/general-defmaker `defmacro "FnParse Hound macro rule-maker"
+    fn-name forms))
 
 (defprotocol ABankable
   (get-bank [o])
@@ -152,16 +161,9 @@
   [obj]
   (isa? (type obj) ::State))
 
-(defn rule?
-  "Tests if the given object is a Hound Rule."
-  [obj]
-  (or (var? obj) (-> obj type (isa? ::Rule))))
-
 (defmacro make-rule [rule-symbol [state-symbol :as args] & body]
   {:pre #{(symbol? rule-symbol) (symbol? state-symbol) (empty? (rest args))}}
- `(fn []
-    (with-meta (fn [~state-symbol] ~@body)
-    (c/make-rule-meta ::Rule))))
+ `(k/make-rule ::Rule ~rule-symbol ~state-symbol ~@body))
 
 (defn- make-failure [state descriptors]
   (set-bank
@@ -169,7 +171,7 @@
       (c/make-parse-error (:position state) (:location state) descriptors))
     (get-bank state)))
 
-(c/defmaker prod
+(defmaker prod
   "Creates a rule that always returns the given `product`.
   
   Use the `:let` modifier in preference to this function
@@ -192,14 +194,14 @@
 (defmacro defrm- [& forms]
   `(defrm ~@forms))
 
-(c/defrule <emptiness>
+(defrule <emptiness>
   "The general emptiness rule. (Actually just `(prod nil)`)."
   {:succeeds "Always."
    :product "`nil`."
    :consumes "No tokens."}
   (prod nil))
 
-(c/defrule <nothing>
+(defrule <nothing>
   "The general failing rule.
   
   Use `with-error` or `when` in preference to `<nothing>`,
@@ -212,7 +214,7 @@
   (make-rule nothing-rule [state]
     (make-failure state #{})))
 
-(c/defmaker with-error
+(defmaker with-error
   "Creates an always-failing rule with the given
   message. Use this in preference to `<nothing>`."
   {:succeeds "Never."
@@ -221,7 +223,7 @@
   (make-rule with-error-rule [state]
     (make-failure state #{(c/make-message-descriptor message)})))
 
-(c/defmaker when
+(defmaker when
   "Creates a maybe-failing rule—
   an either succeeding or a failing rule—
   depending on if `valid?` is logical true. If
@@ -249,7 +251,7 @@
   [valid? message]
   (if-not valid? (with-error message) (prod valid?)))
 
-(c/defmaker combine
+(defmaker combine
   "Creates a rule combining the given `rule` into the
   `product-fn`.
   
@@ -344,6 +346,7 @@
 (defn- recall [bank subrule state]
   (let [position (:position state)
         memory (get-memory bank subrule position)
+        _ (println "...\n>>" memory)
         node-index (-> bank :position-heads (get position))
         lr-node (get-lr-node bank node-index)]
     (if (nil? lr-node)
@@ -352,7 +355,7 @@
         (if-not (or memory
                     (-> lr-node :rule (= subrule))
                     (-> head :involved-rules (contains? subrule)))
-          (set-bank (<nothing> state) bank)
+          (set-bank (c/apply <nothing> state) bank)
           (if (-> head :rules-to-be-evaluated (contains? subrule))
             (let [bank (update-in [:lr-stack node-index :rules-to-be-evalated]
                          disj subrule)
@@ -363,13 +366,16 @@
 (defn- remember [subrule]
   (make-rule remembering-rule [state]
     (let [bank (get-bank state)
+          _ (println "---\n>" bank)
+          _ (println "...\n>R" subrule (subrule))
           state-position (:position state)
-          found-memory-val (recall bank subrule state)]
+          found-memory-val (recall bank subrule state)
+          _ (println "...\n>>>" found-memory-val)]
       (if found-memory-val
         (if (integer? found-memory-val)
           (let [bank (update-in bank [:lr-stack]
                        setup-lr found-memory-val)
-                new-failure (set-bank (<nothing> state) bank)]
+                new-failure (set-bank (c/apply <nothing> state) bank)]
             new-failure)
           (set-bank found-memory-val bank))
         (let [bank (store-memory bank subrule state-position
@@ -391,7 +397,7 @@
               result (vary-bank result update-in [:lr-stack] pop)]
           result)))))
 
-(c/defmaker +
+(defmaker +
   "Creates a summed rule.
   
   Adds the given sub-rules together, forming a new rule.
@@ -438,7 +444,7 @@
    m-bind combine
    m-plus +])
 
-(c/defmaker label
+(defmaker label
   "Creates a labelled rule.
   
   Labels the given rule with the given string, returning
@@ -461,7 +467,7 @@
    :consumes "Whatever `rule` consumes."
    :error "Smartly determines the appropriate error message."}
   [l rule]
-  {:pre #{(descriptor-content? l)}}
+  {:pre #{(c/descriptor-content? l)}}
   (let [rule (or (c/rule-unlabelled-base rule) rule)]
     (c/label-rule-meta #{l} rule
       (make-rule labelled-rule [state]
@@ -471,7 +477,7 @@
               k/assoc-label-in-descriptors l)
             result))))))
 
-(c/defmaker annotate-error
+(defmaker annotate-error
   "Creates an error-annotating rule. Whenever
   the given `rule` fails, the error is passed
   into the `message-fn` function. This can be
@@ -496,7 +502,7 @@
       (let [reply (c/apply rule state)]
         (update-in reply [:error] annotate)))))
 
-(c/defmaker-macro for
+(defmaker-macro for
   "Creates a rule comprehension, very much like
   `clojure.core/for`. If it succeeds or fails and
   also how many tokens it consumes is similar to `cat`.
@@ -534,7 +540,7 @@
   ([steps product-expr]
   `(m/domonad parser-m ~steps ~product-expr)))
 
-(c/defmaker validate
+(defmaker validate
   "Creates a validating rule.
   
   A convenience function. Returns a new rule that
@@ -550,7 +556,7 @@
   (for [product rule, _ (when (pred product) message)]
     product))
 
-(c/defmaker antivalidate
+(defmaker antivalidate
   "Exactly like the `validate` function, except that
   it uses the complement of `pred` instead."
   {:no-memoize? true}
@@ -576,7 +582,7 @@
             (make-failure state #{}))
           (make-failure state #{}))))))
 
-(c/defmaker term
+(defmaker term
   "Creates a terminal rule.
   
   The new rule either consumes one token or fails.
@@ -610,7 +616,7 @@
   [l predicate]
   (term- false l predicate))
 
-(c/defmaker term*
+(defmaker term*
   "Exactly like `term`, only its product is the result of
   `(f token)` rather than `token`."
   {:no-memoize? true}
@@ -620,7 +626,7 @@
 (defn antiterm [l pred]
   (term l (complement pred)))
 
-(c/defmaker antiterm
+(defmaker antiterm
   "Exactly like term, only uses the complement of the
   given predicate instead."
   {:no-memoize? true}
@@ -628,7 +634,7 @@
   {:pre #{(ifn? pred)}}
   (term l (complement pred)))
 
-(c/defrule <anything>
+(defrule <anything>
   "The generic terminal rule that matches any one token."
   {:succeeds "If there are any tokens left, i.e.
    not at the end of input."
@@ -637,7 +643,7 @@
    :error "\"Expected anything.\""}
   (term "anything" (constantly true)))
 
-(c/defmaker hook
+(defmaker hook
   "Creates a rule with a semantic hook.
   A shortcut for the `for` macro."
   {:no-memoize? true
@@ -664,7 +670,7 @@
   (c/self-label-rule-meta [rule]
     (for [_ rule] product)))
 
-(c/defmaker lit
+(defmaker lit
   "Creates a rule of a literal. A shortcut for
   `(term (partial = token))`. It automatically adds an
   appropriate label."
@@ -675,7 +681,7 @@
   [token]
   (term (format "'%s'" token) (partial = token)))
 
-(c/defmaker antilit
+(defmaker antilit
   "Creates a rule of an antiliteral.
   A shortcut for `term`.
   It automatically adds an appropriate label."
@@ -687,20 +693,20 @@
   [token]
   (term (format "anything except '%s'" token) #(not= token %)))
 
-(c/defmaker set-term
+(defmaker set-term
   "Creates a terminal rule with a set.
   A shortcut for `(term l (set tokens))`."
   [l tokens]
   {:pre #{(cljcore/seqable? tokens)}}
   (term l (set tokens)))
 
-(c/defmaker antiset-term
+(defmaker antiset-term
   "Creates a terminal rule with an antiset.
   A shortcut for `(antiterm l (set tokens))`."
   [l tokens]
   (antiterm l (set tokens)))
 
-(c/defmaker cat
+(defmaker cat
   "Creates a concatenated rule out of many given `rules`."
   {:success "All given `rules` succeed, one after another."
    :product "The sequence (not lazy) of all the `rules`'s respective products."
@@ -711,12 +717,12 @@
   (m/with-monad parser-m
     (m/m-seq rules)))
 
-(c/defmaker vcat
+(defmaker vcat
   "Exactly like cat, only applies `vec` to its product."
   [& subrules]
   (hook vec (apply cat subrules)))
 
-(c/defmaker opt
+(defmaker opt
   "Creates an optional rule. It is equivalent to `(+ rule emptiness)`."
   {:success "Always."
    :product "Either `rule`'s product (if it succeeds) or `nil` if it fails."
@@ -725,7 +731,7 @@
   {:pre #{(rule? rule)}}
   (+ rule <emptiness>))
 
-(c/defmaker peek
+(defmaker peek
   "Creates a lookahead rule. Checks if the given
   `rule` succeeds, but doesn't actually consume
   any tokens."
@@ -738,7 +744,7 @@
         ((prod (:product result)) state)
         result))))
 
-(c/defmaker mapcat
+(defmaker mapcat
   "Creates a rule that is the result of
   applying `cat` to the result of applying map
   to `f` and `token-colls`.
@@ -748,7 +754,7 @@
   {:pre #{(ifn? f) (every? cljcore/seqable? token-colls)}}
   (->> token-colls (apply map f) (apply cat)))
 
-(c/defmaker mapsum
+(defmaker mapsum
   "Creates a rule that is the result of applying `+` to the
   result of applying map to `f` and `token-colls`.
   Use the `set-term` function instead of this
@@ -757,7 +763,7 @@
   {:pre #{(ifn? f) (every? cljcore/seqable? token-colls)}}
   (->> token-colls (apply map f) (apply +)))
 
-(c/defmaker phrase
+(defmaker phrase
   "Creates a phrase rule, which succeeds
   only when the next few tokens all
   consecutively match the given tokens.
@@ -765,7 +771,7 @@
   [tokens]
   (mapcat lit tokens))
 
-(c/defmaker prefix
+(defmaker prefix
   "Creates a prefixed rule. Use when you want to
   concatenate two rules, but you don't care about
   the first rule's product.
@@ -775,7 +781,7 @@
   {:pre #{(rule? prefix-rule) (rule? body-rule)}}
   (for [_ prefix-rule, content body-rule] content))
 
-(c/defmaker suffix
+(defmaker suffix
   "Creates a suffixed rule. Use when you want to
   concatenate two rules, but you don't care about
   the second rule's product.
@@ -785,7 +791,7 @@
   {:pre #{(rule? suffix-rule) (rule? body-rule)}}
   (for [content body-rule, _ suffix-rule] content))
 
-(c/defmaker circumfix
+(defmaker circumfix
   "Creates a circumfixed rule. Use when you want to
   concatenate three rules, but you don't care about
   the first and third rules' products.
@@ -802,17 +808,17 @@
     (make-rule following-rule [s]
       (let [following-result (-> s <following>)]
         (if (c/failure? following-result)
-          (<emptiness> s)
+          (c/apply <emptiness> s)
           (make-failure s descriptors))))))
 
-(c/defmaker not-followed
+(defmaker not-followed
   "See also `except`."
   [<base> & following-rules]
   (suffix <base>
     (mapcat (partial not-followed- (c/rule-labels <base>))
       following-rules)))
 
-(c/defmaker-macro template-sum
+(defmaker-macro template-sum
   "Creates a summed rule using a template.
   Acts very similarly to `clojure.template/do-template`,
   but instead sums each rule together."
@@ -822,7 +828,7 @@
    `(+ ~@(map (fn [a] (template/apply-template argv expr a))
            (partition c values)))))
 
-(c/defmaker case-insensitive-lit
+(defmaker case-insensitive-lit
   "Creates a case-insensitive rule using Java's
   `Character/toLowerCase` and `Character/toUpperCase`
   methods. Only works with `Character`-type tokens."
@@ -834,7 +840,7 @@
   (+ (lit (Character/toLowerCase token))
      (lit (Character/toUpperCase token))))
 
-(c/defmaker effects
+(defmaker effects
   "Creates a side-effect rule. Applies the given
   arguments to the given function. You may prefer `prod`."
   {:succeeds "Always."
@@ -855,7 +861,7 @@
           (make-failure s descriptors)
           (c/apply <emptiness> s))))))
 
-(c/defmaker except
+(defmaker except
   "Creates a subtracted rule. Matches using
   the given minuend rule, but only when the
   subtrahend rule does not also match. You
@@ -873,21 +879,21 @@
   {:pre #{(rule? <minuend>) (every? rule? subtrahends)}}
   (prefix (mapcat except- subtrahends) <minuend>))
 
-(c/defrule <end-of-input>
+(defrule <end-of-input>
   "The standard end-of-input rule."
   {:succeeds "If there are no tokens left."
    :product "`true`."
    :consumes "No tokens."}
   (label "the end of input" (except <emptiness> <anything>)))
 
-(c/defrule <fetch-location>
+(defrule <fetch-location>
   "A rule that fetches the current state's location."
   {:success "Always.", :product "The current location.",
    :consumes "Zero tokens."}
   (make-rule fetch-location-rule [state]
     (c/apply (prod (:location state)) state)))
 
-(c/defmaker alter-location
+(defmaker alter-location
   "A rule that alters the current location."
   {:success "Always.", :product "The new location.",
    :consumes "Zero tokens."}
@@ -897,14 +903,14 @@
     (let [altered-state (apply update-in state [:location] f args)]
       (c/apply <fetch-location> altered-state))))
 
-(c/defrule <fetch-warnings>
+(defrule <fetch-warnings>
   "A rule that fetches the current state's warnings."
   {:success "Always.", :product "The current warnings.",
    :consumes "Zero tokens."}
   (make-rule fetch-warnings-rule [state]
     (c/apply (prod (:warnings state)) state)))
 
-(c/defmaker add-warning
+(defmaker add-warning
   "A rule that adds a new warning with the given message."
   {:success "Always.", :product "`nil`.",
    :consumes "Zero tokens."}
@@ -928,7 +934,7 @@
     2 "a binary digit"
     (format "a core-%s digit" core)))
 
-(c/defmaker radix-digit
+(defmaker radix-digit
   "Returns a rule that accepts one digit character
   token in the number system with the given `core`.
   For instance, `(radix-digit 12)` is a rule
@@ -953,40 +959,40 @@
       (if-when (not= product -1)
         product))))
 
-(c/defrule <decimal-digit>
+(defrule <decimal-digit>
   "A rule matching a single core-10 digit
   character token (i.e. \\0 through \\9)."
   {:product "The matching digit's corresponding Integer object, 0 through 9."
    :consumes "One character."}
   (radix-digit 10))
 
-(c/defrule <hexadecimal-digit>
+(defrule <hexadecimal-digit>
   "A rule matching a single core-16 digit
   character token (i.e. \\0 through \\F)."
   {:product "The matching digit's corresponding Integer object, 0 through 15."
    :consumes "One character."}
   (radix-digit 16))
 
-(c/defrule <uppercase-ascii-letter>
+(defrule <uppercase-ascii-letter>
   "A rule matching a single uppercase ASCII letter."
   {:product "The matching character itself."
    :consumes "One character."}
   (set-term "an uppercase ASCII letter" uppercase-ascii-alphabet))
 
-(c/defrule <lowercase-ascii-letter>
+(defrule <lowercase-ascii-letter>
   "A rule matching a single lowercase ASCII letter."
   {:product "The matching character itself."
    :consumes "One character."}
   (set-term "a lowercase ASCII letter" lowercase-ascii-alphabet))
 
-(c/defrule <ascii-letter>
+(defrule <ascii-letter>
   "A rule matching a single uppercase or lowercase ASCII letter."
   {:product "The matching character itself."
    :consumes "One character."}
   (label "an ASCII letter"
     (+ <uppercase-ascii-letter> <lowercase-ascii-letter>)))
 
-(c/defrule <ascii-digit>
+(defrule <ascii-digit>
   "A rule matching a single ASCII numeric digit. You may
   want to use instead `decimal-digit`, which automatically
   converts digits to Integer objects."
@@ -994,14 +1000,14 @@
    :consumes "One character."}
   (set-term "an ASCII digit" ascii-digits))
 
-(c/defrule <ascii-alphanumeric>
+(defrule <ascii-alphanumeric>
   "A rule matching a single alphanumeric ASCII letter."
   {:product "The matching character itself."
    :consumes "One character."}
   (label "an alphanumeric ASCII character"
     (+ <ascii-letter> <ascii-digit>)))
 
-(c/defrule <ascii-control>
+(defrule <ascii-control>
   "A rule matching a single ASCII control character,
   i.e. a character within Unicode points 0000 and 001F."
   {:product "The matching character itself."

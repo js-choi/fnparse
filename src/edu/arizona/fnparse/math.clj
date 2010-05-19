@@ -10,8 +10,11 @@
     (k/term "a decimal digit" #(Character/isDigit (char %)))))
 
 (def <ws-char> (k/set-term "a whitespace character" " \n\t"))
-(def <ws> (k/label "whitespace" (k/+ (k/cat #'<ws> <ws-char>) <ws-char>)))
+(k/defrule <ws>
+  (k/label "whitespace" (k/+ (k/cat <ws> <ws-char>) <ws-char>)))
 (def <ws?> (k/opt <ws>))
+
+(comment
 
 (template/do-template [rule-name token]
   (def rule-name (k/suffix (k/lit token) <ws?>))
@@ -25,17 +28,17 @@
 
 (def <separator> (k/+ <ws> <indicator>))
 
-(def <number>
+(k/defrule <number>
   (k/label "a number"
-    (k/+ (k/for [first-digits #'<number>, next-digit <digit>]
+    (k/+ (k/for [first-digits <number>, next-digit <digit>]
            (+ (* 10 first-digits) next-digit))
          <digit>)))
 
 (def <symbol-char>
   (k/label "a symbol character" (k/except k/<anything> <separator>)))
 
-(def <symbol-content>
-  (k/+ (k/for [first-char <symbol-char>, next-chars #'<symbol-content>]
+(k/defrule <symbol-content>
+  (k/+ (k/for [first-char <symbol-char>, next-chars <symbol-content>]
          (cons first-char next-chars))
        (k/hook list <symbol-char>)))
 
@@ -45,8 +48,8 @@
 (def <terminal-level>
   (k/+ <number> <symbol>))
 
-(def <parenthesized>
-  (k/circumfix <opening-parenthesis> #'<expr> <closing-parenthesis>))
+(k/defrule <parenthesized>
+  (k/circumfix <opening-parenthesis> <expr> <closing-parenthesis>))
 
 (def <function> (k/vcat <symbol> <parenthesized>))
 
@@ -60,18 +63,20 @@
   (k/+ (k/vcat (k/+ <plus-sign> <minus-sign>) <function-level>)
        <function-level>))
 
-(def <multiplication-level>
+(k/defrule <multiplication-level>
   (k/+ (k/vcat
-         #'<multiplication-level>
+         <multiplication-level>
          (k/+ <multiplication-sign> <division-sign>)
          <pos-neg-level>)
        <pos-neg-level>))
 
-(def <addition-level>
+(k/defrule <addition-level>
   (k/+ (k/vcat
-         #'<addition-level>
+         <addition-level>
          (k/+ <plus-sign> <minus-sign>)
          <multiplication-level>)
        <multiplication-level>))
 
 (def <expr> (k/prefix <ws?> <addition-level>))
+
+)

@@ -16,12 +16,14 @@
   {:succeeds "Success"
    :product "Product"
    :consumes "Consumes"
-   :error "Error"})
+   :error "Error"
+   :description "Description"})
 
-(defn rule-doc-str [doc-str meta-opts]
+(defn rule-doc-str [doc-str meta-opts description]
   (let [doc-str (or doc-str "No description available.")
         doc-opts (select-keys meta-opts (keys rule-doc-info))
-        opt-seq (seq doc-opts)]
+        opt-seq (seq doc-opts)
+        doc-opts (assoc doc-opts :description description)]
     (if opt-seq
       (->> doc-opts sort
         (map #(format "  * %s: %s" (rule-doc-info (key %)) (val %)))
@@ -29,16 +31,26 @@
         (apply str doc-str rule-doc-summary-header "\n"))
       doc-str)))
 
-(defmacro general-defrule [rule-name doc-string meta-opts form]
- `(let [rule-var# (d/defvar ~rule-name ~form ~doc-string)]
-    (alter-meta! rule-var# update-in [:doc] rule-doc-str ~meta-opts)
+(defmacro make-rule-wrapper [type rule-symbol inner-fn-body]
+  {:pre [(keyword? type) (symbol? rule-symbol)]}
+ `(with-meta (memoize (fn [] ~inner-fn-body)) (c/make-rule-meta ~type)))
+
+(defmacro make-rule [type rule-symbol state-symbol & body]
+ `(make-rule-wrapper ~type rule-symbol (fn [~state-symbol] ~@body)))
+
+(defmacro general-defrule [rule-sym description doc-string meta-opts type form]
+ `(let [rule# (make-rule-wrapper ~type generic-rule (~form))
+        rule-var# (d/defvar ~rule-sym rule# ~doc-string)]
+    (alter-meta! rule-var# update-in [:doc]
+      rule-doc-str ~meta-opts ~description)
     rule-var#))
 
-(defmacro general-defmaker [def-form fn-name & forms]
+(defmacro general-defmaker [def-form description fn-name & forms]
  `(let [maker-var# (~def-form ~fn-name ~@forms)]
     (alter-var-root maker-var# identity)
     ; Add extended documentation.
-    (alter-meta! maker-var# update-in [:doc] rule-doc-str (meta maker-var#))
+    (alter-meta! maker-var# update-in [:doc]
+      rule-doc-str (meta maker-var#) ~description)
     ; Memoize unless the :no-memoize meta flag is true.
     (when-not (:no-memoize? (meta maker-var#))
       (alter-var-root maker-var# memoize))

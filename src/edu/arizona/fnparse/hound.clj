@@ -14,6 +14,11 @@
 (d/defalias substitute-1 c/substitute-1)
 (d/defalias format-parse-error c/format-parse-error)
 
+(defn rule?
+  "Tests if the given object is a Hound Rule, or a var containing a Hound Rule."
+  [obj]
+  (-> obj type (= ::Rule)))
+
 (defmacro defrule
   "Defines a rule var. You really should use this instead of `def`
   whenever you define rules, because:
@@ -40,8 +45,8 @@
   ([rule-name form] `(defrule ~rule-name nil ~form))
   ([rule-name doc-string form] `(defrule ~rule-name ~doc-string nil ~form))
   ([rule-name doc-string meta-opts form]
-  `(k/general-defrule ~rule-name ~doc-string ~meta-opts
-     (with-meta (fn [] (~form)) {:type ::Rule}))))
+  `(k/general-defrule ~rule-name "FnParse Hound rule" ~doc-string ~meta-opts
+     ::Rule ~form)))
 
 (defmacro defrule-
   "Like `defrule`, but also makes the var private."
@@ -84,7 +89,7 @@
   rule when given `[1 2 3]` versus `'(1 2 3)`, then you should
   give `{:no-memoize? true}` in your metadata."
   [fn-name & forms]
-  (list* `k/general-defmaker `defn fn-name forms))
+  (list* `k/general-defmaker `defn "FnParse Hound rule-maker" fn-name forms))
 
 (defmacro defmaker-
   "Like `defmaker`, but also makes the var private."
@@ -95,7 +100,8 @@
   "Like `defmaker`, but makes a macro rule-maker
   instead of a function rule-maker."
   [fn-name & forms]
-  (list* `k/general-defmaker `defmacro fn-name forms))
+  (list* `k/general-defmaker `defmacro "FnParse Hound macro rule-maker"
+    fn-name forms))
 
 (defrecord State
   [remainder position location warnings context alter-location]
@@ -123,17 +129,12 @@
 
 (defmacro make-rule [rule-symbol [state-symbol :as args] & body]
   {:pre #{(symbol? rule-symbol) (symbol? state-symbol) (empty? (rest args))}}
- `(with-meta (fn [] (fn [~state-symbol] ~@body)) (c/make-rule-meta ::Rule)))
+ `(k/make-rule ::Rule ~rule-symbol ~state-symbol ~@body))
 
 (defn state?
   "Tests if the given object is a Hound State."
   [obj]
   (isa? (type obj) State))
-
-(defn rule?
-  "Tests if the given object is a Hound Rule, or a var containing a Hound Rule."
-  [obj]
-  (-> obj type (= ::Rule)))
 
 (defn merge-replies [mergee merger]
   (assoc merger :result
