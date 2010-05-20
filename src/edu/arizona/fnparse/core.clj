@@ -2,7 +2,7 @@
   {:author "Joshua Choi"}
   (:require [clojure.contrib [string :as str] [def :as d]
                              [core :as cljcore] [except :as except]]
-            [clojure.template :as temp]
+            [clojure [template :as temp] [set :as set]]
             [edu.arizona.fnparse.core-private :as cp])
   (:refer-clojure :rename {apply apply-seq}, :exclude #{find}))
 
@@ -17,13 +17,26 @@
   (state-warnings [state])
   (state-location [state]))
 
-(defrecord RuleMeta [type labels unlabelled-rule])
+(defprotocol RuleMeta
+  (rule-meta-info [m]))
 
-(defn make-rule-meta [type]
-  (RuleMeta. type nil nil))
+(defn rule-meta? [obj]
+  (extends? RuleMeta (type obj)))
+
+(defrecord NormalRuleMeta [type labels unlabelled-rule]
+  RuleMeta (rule-meta-info [m] m))
+
+(defn make-normal-rule-meta [type]
+  (NormalRuleMeta. type nil nil))
+
+(defrecord NamedRuleMeta [type info-delay]
+  RuleMeta (rule-meta-info [m] (rule-meta-info (force info-delay))))
+
+(defn make-named-rule-meta [type meta-delay]
+  (NamedRuleMeta. type meta-delay))
 
 (defn rule-labels [<r>]
-  (-> <r> meta :labels))
+  (-> <r> meta rule-meta-info :labels))
 
 (defn require-rule-labels [<r>]
   (or (rule-labels <r>) (except/throw-arg "rule must be labelled")))
@@ -31,21 +44,29 @@
 (defn rule-unlabelled-base [<r>]
   (-> <r> meta :unlabelled-rule))
 
-(defrecord
-  #^{:doc "Represents descriptors representing a single
-   potential cause of a FnParse error.
-  kind: Either of the keywords :message or :label.
-        :message means that the descriptor is a
-        generic message. :label means that it's
-        the label of a rule that was expected at a
-        certain position but was not found.
-  content: A string. The text of the descriptor."}
-  ErrorDescriptor [kind content])
+(defprotocol ADescriptorContent
+  (label-string [t]))
 
-(defn make-error-descriptor [kind text]
-  (ErrorDescriptor. kind text))
+(extend-protocol ADescriptorContent
+  String (label-string [s] s))
 
-(defrecord LabelDescriptor [lbl])
+(defn descriptor-content? [object]
+  (extends? ADescriptorContent (type object)))
+
+(defn- join-labels [labels]
+  {:pre (seq? labels)}
+  (when-let [label-strs (->> labels (map label-string) sort)]
+    (if-not (= (count label-strs) 1)
+      (str (->> label-strs drop-last (str/join ", ")) ", or " (last label-strs))
+      (first labels))))
+
+(defprotocol ErrorDescriptor
+  (descriptor-message [first-d rest-ds]))
+
+(defrecord LabelDescriptor [lbl]
+  ErrorDescriptor
+  (descriptor-message [first-d rest-ds]
+    (->> rest-ds (cons first-d) (map :lbl) join-labels (str "expected "))))
 
 (defn make-label-descriptor [lbl]
   (LabelDescriptor. lbl))
@@ -53,12 +74,24 @@
 (defn label-descriptor? [obj]
   (= (class obj) LabelDescriptor))
 
-(defrecord MessageDescriptor [text])
+(defrecord MessageDescriptor [text]
+  ErrorDescriptor
+  (descriptor-message [first-d rest-ds]
+    (->> rest-ds (cons first-d) (str/join "; "))))
 
 (defn make-message-descriptor [text]
   (MessageDescriptor. text))
 
-(defrecord ExceptionDescriptor [main-lbl subtrahend-lbls])
+(defn- exception-descriptor-message [d]
+  (format "%s is not allowed where %s should be"
+    (join-labels (:subtrahend-lbls d))
+    (:main-lbl d)))
+
+(defrecord ExceptionDescriptor [main-lbl subtrahend-lbls]
+  ErrorDescriptor
+  (descriptor-message [first-d rest-ds]
+    (->> rest-ds (cons first-d) (map exception-descriptor-message)
+                 (str/join "; "))))
 
 (defn make-exception-descriptor [main-lbl subtrahend-lbls]
   (ExceptionDescriptor. main-lbl subtrahend-lbls))
@@ -66,7 +99,16 @@
 (defn exception-descriptor? [obj]
   (= (class obj) ExceptionDescriptor))
 
-(defrecord FollowingDescriptor [base-lbls following-lbl])
+(defn- following-descriptor-message [d]
+  (format "%s cannot be followed by %s"
+    (join-labels (:base-lbls d))
+    (join-labels (:following-lbls d))))
+
+(defrecord FollowingDescriptor [base-lbls following-lbls]
+  ErrorDescriptor
+  (descriptor-message [first-d rest-ds]
+    (->> rest-ds (cons first-d) (map following-descriptor-message)
+                 (str/join "; "))))
 
 (defn make-following-descriptor [base-lbls subtrahend-lbls]
   {:pre [(set? base-lbls) (set? subtrahend-lbls)]}
@@ -150,23 +192,21 @@
   (if (standard-break-chars character)
     location-inc-line location-inc-column))
 
-(defprotocol ADescriptorContent
-  (label-string [t]))
-
-(extend-protocol ADescriptorContent
-  String (label-string [s] s))
-
-(defn descriptor-content? [object]
-  (extends? ADescriptorContent (type object)))
-
 (defn label-rule-meta [ls <old> <r>]
+  {:pre [(rule-meta? (meta <r>))
+         (or (nil? <old>) (rule-meta? (meta <old>)))
+         (set? ls)]}
   (vary-meta <r> assoc :labels ls, :unlabelled-rule <old>))
 
 (defn self-label-rule-meta [subrules <r>]
-  (let [subrule-labels (mapcat rule-labels subrules)]
-    (if-not (some nil? subrule-labels)
-      (label-rule-meta (set subrule-labels) nil <r>)
-      <r>)))
+  (let [original-meta (meta <r>)]
+    (with-meta <r>
+      (NamedRuleMeta. (:type original-meta)
+        (delay
+          (let [subrule-labels (reduce set/union (map rule-labels subrules))]
+            (if-not (some nil? subrule-labels)
+              (assoc original-meta :labels subrule-labels)
+              original-meta)))))))
 
 (defn format-warning [warning]
   (format "[%s] %s" (location-code (or (:location warning) (:position warning)))
@@ -196,30 +236,19 @@
       (->> subinput (apply-seq str) (format "'%s'"))
       subinput)))
 
-(defn- join-labels [labels]
-  {:pre (seq? labels)}
-  (when-let [label-strs (->> labels (map label-string) sort)]
-    (if-not (= (count label-strs) 1)
-      (str (->> label-strs drop-last (str/join ", ")) ", or " (last label-strs))
-      (first labels))))
+(defn- xxx [obj] (prn obj) obj)
 
 (defn- format-parse-error-data
   "Returns a formatted string with the given error data.
   The descriptor map should be returned from group-descriptors."
-  [position location descriptor-map]
-  (let [{:keys [label message antilabel]} descriptor-map
-        labels-text
-          (when-let [labels (seq label)]
-            (->> labels join-labels (str "expected ")))
-        antilabels-text
-          (when-let [antilabels (seq antilabel)]
-            (->> antilabels join-labels (str "did not expect ")))
-        all-messages (concat message [antilabels-text labels-text])
-        all-messages (remove nil? all-messages)
-        messages-text (str/join "; " all-messages)]
-    (format "[%s] %s."
-      (location-code (or location position))
-      messages-text)))
+  [position location grouped-descriptors]
+  (prn grouped-descriptors)
+  (format "[%s] %s."
+    (location-code (or location position))
+    (->> grouped-descriptors
+      (map #(descriptor-message (first %) (next %)))
+      xxx
+      (str/join "; "))))
 
 (defn- group-descriptors
   "From the given set of descriptors, returns a map with
@@ -227,7 +256,8 @@
   If there are no descriptors of a certain descriptor kind,
   then the map's val for that kind is the empty set."
   [descriptors]
-  (->> descriptors (group-by :kind)
+  (vals (group-by class descriptors))
+  #_(->> descriptors (group-by :kind)
        (map #(vector (key %) (set (map :content (val %)))))
        (filter #(seq (get % 1)))
        (into {:message #{}, :label #{}})))
@@ -235,8 +265,7 @@
 (defn format-parse-error
   "Returns a formatted string from the given error."
   [error]
-  (prn-str error)
-  #_(let [{:keys #{position location descriptors}} error]
+  (let [{:keys #{position location descriptors}} error]
     (format-parse-error-data position location
       (group-descriptors descriptors))))
 

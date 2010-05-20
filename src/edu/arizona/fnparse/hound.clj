@@ -17,7 +17,7 @@
 (defn rule?
   "Tests if the given object is a Hound Rule, or a var containing a Hound Rule."
   [obj]
-  (-> obj type (= ::Rule)))
+  (and (-> obj type (= ::Rule)) (c/rule-meta? (meta obj))))
 
 (defmacro defrule
   "Defines a rule var. You really should use this instead of `def`
@@ -893,7 +893,7 @@
     (c/apply <emptiness> state)))
 
 (defn- except- [<subtrahend>]
-  (let [subtrahend-lbls (c/rule-labels <subtrahend>)
+  (let [subtrahend-lbls (c/require-rule-labels <subtrahend>)
         descriptors #{(c/make-exception-descriptor nil subtrahend-lbls)}]
     (make-rule exception-rule [s]
       (let [subtrahend-result (->> s (c/apply <subtrahend>) :result force)]

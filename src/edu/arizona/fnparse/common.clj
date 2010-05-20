@@ -31,18 +31,25 @@
         (apply str doc-str rule-doc-summary-header "\n"))
       doc-str)))
 
-(defmacro make-rule-wrapper [type rule-symbol inner-fn-body]
+(defmacro make-normal-rule-wrapper [type rule-symbol inner-fn-body]
   {:pre [(keyword? type) (symbol? rule-symbol)]}
- `(with-meta
-   (let [inner-body-delay# (delay ~inner-fn-body)]
-     (fn [] (force inner-body-delay#)))
-   (c/make-rule-meta ~type)))
+ `(let [inner-body-delay# (delay ~inner-fn-body)]
+    (with-meta
+      (fn [] (force inner-body-delay#))
+      (c/make-normal-rule-meta ~type))))
+
+(defmacro make-named-rule-wrapper [type rule-form]
+  {:pre [(keyword? type)]}
+ `(let [rule-delay# (delay ~rule-form)]
+    (with-meta (fn named-rule [] (force ((force rule-delay#))))
+      (c/make-named-rule-meta ~type (delay (meta (force rule-delay#)))))))
 
 (defmacro make-rule [type rule-symbol state-symbol & body]
- `(make-rule-wrapper ~type rule-symbol (fn [~state-symbol] ~@body)))
+ `(make-normal-rule-wrapper ~type rule-symbol (fn [~state-symbol] ~@body)))
 
-(defmacro general-defrule [rule-sym description doc-string meta-opts type form]
- `(let [rule# (make-rule-wrapper ~type generic-rule (force (~form)))
+(defmacro general-defrule
+  [rule-sym description doc-string meta-opts type form]
+ `(let [rule# (make-named-rule-wrapper ~type ~form)
         rule-var# (d/defvar ~rule-sym rule# ~doc-string)]
     (alter-meta! rule-var# update-in [:doc]
       rule-doc-str ~meta-opts ~description)
