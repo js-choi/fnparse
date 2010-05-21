@@ -54,11 +54,15 @@
   (extends? ADescriptorContent (type object)))
 
 (defn- join-labels [labels]
-  {:pre (seq? labels)}
-  (when-let [label-strs (->> labels (map label-string) sort)]
-    (if-not (= (count label-strs) 1)
-      (str (->> label-strs drop-last (str/join ", ")) ", or " (last label-strs))
-      (first labels))))
+  {:pre [(or (seq labels) (empty? labels))]}
+  (if-let [labels (seq labels)]
+    (when-let [label-strs (->> labels (map label-string) sort)]
+      (if-not (= (count label-strs) 1)
+        (format "%s, or %s"
+          (->> label-strs drop-last (str/join ", "))
+          (last label-strs))
+        (first labels)))
+    "UNLABELED RULE"))
 
 (defprotocol ErrorDescriptor
   (descriptor-message [first-d rest-ds]))
@@ -239,18 +243,14 @@
       (->> subinput (apply-seq str) (format "'%s'"))
       subinput)))
 
-(defn- xxx [obj] (prn obj) obj)
-
 (defn- format-parse-error-data
   "Returns a formatted string with the given error data.
   The descriptor map should be returned from group-descriptors."
   [position location grouped-descriptors]
-  (prn grouped-descriptors)
   (format "[%s] %s."
     (location-code (or location position))
     (->> grouped-descriptors
       (map #(descriptor-message (first %) (next %)))
-      xxx
       (str/join "; "))))
 
 (defn- group-descriptors
