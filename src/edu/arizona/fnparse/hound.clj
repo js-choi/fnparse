@@ -823,22 +823,6 @@
   {:pre #{(rule? prefix-rule) (rule? body-rule) (rule? suffix-rule)}}
   (prefix prefix-rule (suffix body-rule suffix-rule)))
 
-(defn- not-followed- [<following>]
-  {:pre [(rule? <following>)], :post [(rule? %)]}
-  (make-rule following-rule [s]
-    (let [following-lbls (c/require-rule-labels <following>)
-          descriptors #{(c/make-following-descriptor following-lbls)}]
-      (let [following-result (->> s (c/apply <following>) :result force)]
-        (if (c/failure? following-result)
-          (c/apply <emptiness> s)
-          (make-failed-reply s descriptors))))))
-
-(defmaker not-followed
-  "See also `except`."
-  [<base> & following-rules]
-  {:pre [(rule? <base>) (every? rule? following-rules)]}
-  (suffix <base> (mapcat not-followed- following-rules)))
-
 (defmaker separated-rep
   "Creates a greedy repetition rule with a separator.
   The `separator` is a rule that must succeed between
@@ -891,10 +875,26 @@
   (make-rule effects-rule [state]
     (c/apply <emptiness> state)))
 
-(defn- except- [<subtrahend>]
+(defn- not-followed- [base-lbl <following>]
+  {:pre [(rule? <following>)], :post [(rule? %)]}
+  (make-rule following-rule [s]
+    (let [following-lbls (c/require-rule-labels <following>)
+          descriptors #{(c/make-following-descriptor base-lbl following-lbls)}]
+      (let [following-result (->> s (c/apply <following>) :result force)]
+        (if (c/failure? following-result)
+          (c/apply <emptiness> s)
+          (make-failed-reply s descriptors))))))
+
+(defmaker not-followed
+  "See also `except`."
+  [l <base> & following-rules]
+  {:pre [(c/descriptor-content? l) (rule? <base>) (every? rule? following-rules)]}
+  (label l (suffix <base> (mapcat (partial not-followed- l) following-rules))))
+
+(defn- except- [base-lbl <subtrahend>]
   (make-rule exception-rule [s]
-    (let [subtrahend-lbls (c/require-rule-labels <subtrahend>)
-          descriptors #{(c/make-exception-descriptor nil subtrahend-lbls)}]
+    (let [subtrahend-lbls (c/rule-labels <subtrahend>)
+          descriptors #{(c/make-exception-descriptor base-lbl subtrahend-lbls)}]
       (let [subtrahend-result (->> s (c/apply <subtrahend>) :result force)]
         (if (c/success? subtrahend-result)
           (make-failed-reply s descriptors)
@@ -914,9 +914,9 @@
    :product "`minuend`'s product."
    :consumes "Whatever `minuend` consumes."
    :error "Uses the `l` you provide."}
-  [<minuend> & subtrahends]
-  {:pre [(rule? <minuend>) (every? rule? subtrahends)]}
-  (prefix (mapcat except- subtrahends) <minuend>))
+  [l <minuend> & subtrahends]
+  {:pre [(c/descriptor-content? l) (rule? <minuend>) (every? rule? subtrahends)]}
+  (label l (prefix (mapcat (partial except- l) subtrahends) <minuend>)))
 
 (defrule <end-of-input>
   "The standard end-of-input rule."

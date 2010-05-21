@@ -33,10 +33,10 @@
 
 (defmacro make-normal-rule-wrapper [type rule-symbol inner-fn-body]
   {:pre [(keyword? type) (symbol? rule-symbol)]}
- `(let [inner-body-delay# (delay ~inner-fn-body)]
-    (with-meta
-      (fn [] (force inner-body-delay#))
-      (c/make-normal-rule-meta ~type))))
+  (let [rule-kw (keyword rule-symbol)]
+   `(let [inner-body-delay# (delay ~inner-fn-body)]
+      (with-meta (fn [] (force inner-body-delay#))
+        (c/make-normal-rule-meta ~type ~rule-kw)))))
 
 (defmacro make-named-rule-wrapper [type rule-form]
   {:pre [(keyword? type)]}
@@ -45,7 +45,8 @@
       (c/make-named-rule-meta ~type (delay (meta (force rule-delay#)))))))
 
 (defmacro make-rule [type rule-symbol state-symbol & body]
- `(make-normal-rule-wrapper ~type rule-symbol (fn [~state-symbol] ~@body)))
+ `(make-normal-rule-wrapper ~type ~rule-symbol
+    (fn ~rule-symbol [~state-symbol] ~@body)))
 
 (defmacro general-defrule
   [rule-sym description doc-string meta-opts type form]
@@ -80,18 +81,12 @@
       true (assoc error-a :descriptors
              (set/union descriptors-a descriptors-b)))))
 
-(defn label-exception-descriptor [descriptor lbl]
-  (if (c/exception-descriptor? descriptor)
-    (assoc descriptor :main-lbl lbl)
-    descriptor))
-
 (defn assoc-label-in-descriptors
   "Removes all labels from the given `descriptors` set, then adds the
   given `label-str`."
   [descriptors lbl]
   {:pre #{(set? descriptors)}, #_:post #_ [(set? %)]}
   (let [descriptors (set/select (complement c/label-descriptor?) descriptors)
-        descriptors (set (map #(label-exception-descriptor % lbl) descriptors))
         new-label-descriptor (c/make-label-descriptor lbl)
         descriptors (conj descriptors new-label-descriptor)]
     descriptors))

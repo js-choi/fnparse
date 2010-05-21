@@ -38,8 +38,7 @@
            <digit>))))
 
 (def <symbol-char>
-  (k/label "a symbol character"
-    (ws-suffix (k/except k/<anything> <separator>))))
+  (k/except "a symbol character" k/<anything> <separator>))
 
 (k/defrule <symbol-content>
   (k/+ (k/for [first-char <symbol-char>, next-chars <symbol-content>]
@@ -47,7 +46,7 @@
        (k/hook list <symbol-char>)))
 
 (def <symbol>
-  (k/label "a symbol" (k/hook #(apply str %) <symbol-content>)))
+  (k/label "a symbol" (ws-suffix (k/hook #(apply str %) <symbol-content>))))
 
 (def <terminal-level>
   (k/+ <number> <symbol>))

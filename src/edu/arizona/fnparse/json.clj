@@ -60,8 +60,8 @@
   "Consumes normal, non-espaced string character.
   No control characters allowed."
   {:product "A character."}
-  (h/label "a normal string character"
-    (h/except h/<anything> <str-delimiter> <control-char>)))
+  (h/except "a normal string character"
+    h/<anything> <str-delimiter> <control-char>))
 
 (def normal-escape-sequences
   {\" \", \\ \\, \/ \/, \b \backspace, \f \formfeed, \n \newline,

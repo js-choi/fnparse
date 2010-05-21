@@ -23,11 +23,11 @@
 (defn rule-meta? [obj]
   (extends? RuleMeta (type obj)))
 
-(defrecord NormalRuleMeta [type labels unlabelled-rule]
+(defrecord NormalRuleMeta [type rule-kw labels unlabelled-rule]
   RuleMeta (rule-meta-info [m] m))
 
-(defn make-normal-rule-meta [type]
-  (NormalRuleMeta. type nil nil))
+(defn make-normal-rule-meta [type rule-kw]
+  (NormalRuleMeta. type rule-kw nil nil))
 
 (defrecord NamedRuleMeta [type info-delay]
   RuleMeta (rule-meta-info [m] (rule-meta-info (force info-delay))))
@@ -51,7 +51,7 @@
   String (label-string [s] s))
 
 (defn descriptor-content? [object]
-  (extends? ADescriptorContent (type object)))
+  (extends? ADescriptorContent (class object)))
 
 (defn- join-labels [labels]
   {:pre [(or (seq labels) (empty? labels))]}
@@ -105,18 +105,18 @@
 
 (defn- following-descriptor-message [d]
   (format "%s cannot be followed by %s"
-    (join-labels (:base-lbls d))
+    (:base-lbl d)
     (join-labels (:following-lbls d))))
 
-(defrecord FollowingDescriptor [base-lbls following-lbls]
+(defrecord FollowingDescriptor [base-lbl following-lbls]
   ErrorDescriptor
   (descriptor-message [first-d rest-ds]
     (->> rest-ds (cons first-d) (map following-descriptor-message)
                  (str/join "; "))))
 
-(defn make-following-descriptor [subtrahend-lbls]
+(defn make-following-descriptor [base-lbl subtrahend-lbls]
   {:pre [(set? subtrahend-lbls)]}
-  (FollowingDescriptor. nil subtrahend-lbls))
+  (FollowingDescriptor. base-lbl subtrahend-lbls))
 
 (defrecord
   #^{:doc "Represents FnParse errors.
@@ -208,9 +208,12 @@
     (with-meta <r>
       (make-named-rule-meta (:type original-meta)
         (delay
+          (println "\n[1" (rule-meta-info (rule-meta-info original-meta)) "]")
           (let [original-info (rule-meta-info original-meta)
                 subrule-labels (map rule-labels subrules)
+                _ (println "\n[2" subrule-labels "]")
                 subrule-labels (apply-seq set/union subrule-labels)]
+            (println "\n[Z" (rule-meta-info (rule-meta-info original-meta)) "]")
             (if-not (some nil? subrule-labels)
               (assoc original-info :labels subrule-labels)
               original-info)))))))
