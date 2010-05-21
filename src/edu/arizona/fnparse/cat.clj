@@ -797,12 +797,12 @@
   {:pre #{(rule? prefix-rule) (rule? body-rule) (rule? suffix-rule)}}
   (prefix prefix-rule (suffix body-rule suffix-rule)))
 
-(defn- not-followed- [base-lbls <following>]
-  {:pre [(set? base-lbls) (rule? <following>)], :post [(rule? %)]}
-  (let [following-lbls (c/require-rule-labels <following>)
-        descriptors #{(c/make-following-descriptor base-lbls following-lbls)}]
-    (make-rule following-rule [s]
-      (let [following-result (-> s <following>)]
+(defn- not-followed- [<following>]
+  {:pre [(rule? <following>)], :post [(rule? %)]}
+  (make-rule following-rule [s]
+    (let [following-lbls (c/require-rule-labels <following>)
+          descriptors #{(c/make-following-descriptor following-lbls)}]
+      (let [following-result (c/apply <following> s)]
         (if (c/failure? following-result)
           (c/apply <emptiness> s)
           (make-failure s descriptors))))))
@@ -810,9 +810,8 @@
 (defmaker not-followed
   "See also `except`."
   [<base> & following-rules]
-  (suffix <base>
-    (mapcat (partial not-followed- (c/rule-labels <base>))
-      following-rules)))
+  {:pre [(rule? <base>) (every? rule? following-rules)]}
+  (suffix <base> (mapcat not-followed- following-rules)))
 
 (defmaker-macro template-sum
   "Creates a summed rule using a template.
@@ -849,9 +848,9 @@
     (c/apply <emptiness> state)))
 
 (defn- except- [<subtrahend>]
-  (let [subtrahend-lbls (c/rule-labels <subtrahend>)
-        descriptors #{(c/make-exception-descriptor nil subtrahend-lbls)}]
-    (make-rule exception-rule [s]
+  (make-rule exception-rule [s]
+    (let [subtrahend-lbls (c/rule-labels <subtrahend>)
+          descriptors #{(c/make-exception-descriptor nil subtrahend-lbls)}]
       (let [subtrahend-result (c/apply <subtrahend> s)]
         (if (c/success? subtrahend-result)
           (make-failure s descriptors)

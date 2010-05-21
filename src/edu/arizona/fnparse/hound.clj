@@ -823,11 +823,11 @@
   {:pre #{(rule? prefix-rule) (rule? body-rule) (rule? suffix-rule)}}
   (prefix prefix-rule (suffix body-rule suffix-rule)))
 
-(defn- not-followed- [base-lbls <following>]
-  {:pre [(set? base-lbls) (rule? <following>)], :post [(rule? %)]}
-  (let [following-lbls (c/rule-labels <following>)
-        descriptors #{(c/make-following-descriptor base-lbls following-lbls)}]
-    (make-rule following-rule [s]
+(defn- not-followed- [<following>]
+  {:pre [(rule? <following>)], :post [(rule? %)]}
+  (make-rule following-rule [s]
+    (let [following-lbls (c/require-rule-labels <following>)
+          descriptors #{(c/make-following-descriptor following-lbls)}]
       (let [following-result (->> s (c/apply <following>) :result force)]
         (if (c/failure? following-result)
           (c/apply <emptiness> s)
@@ -836,9 +836,8 @@
 (defmaker not-followed
   "See also `except`."
   [<base> & following-rules]
-  (suffix <base>
-    (mapcat (partial not-followed- (c/rule-labels <base>))
-      following-rules)))
+  {:pre [(rule? <base>) (every? rule? following-rules)]}
+  (suffix <base> (mapcat not-followed- following-rules)))
 
 (defmaker separated-rep
   "Creates a greedy repetition rule with a separator.
@@ -893,9 +892,9 @@
     (c/apply <emptiness> state)))
 
 (defn- except- [<subtrahend>]
-  (let [subtrahend-lbls (c/require-rule-labels <subtrahend>)
-        descriptors #{(c/make-exception-descriptor nil subtrahend-lbls)}]
-    (make-rule exception-rule [s]
+  (make-rule exception-rule [s]
+    (let [subtrahend-lbls (c/require-rule-labels <subtrahend>)
+          descriptors #{(c/make-exception-descriptor nil subtrahend-lbls)}]
       (let [subtrahend-result (->> s (c/apply <subtrahend>) :result force)]
         (if (c/success? subtrahend-result)
           (make-failed-reply s descriptors)

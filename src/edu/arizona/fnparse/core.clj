@@ -110,9 +110,9 @@
     (->> rest-ds (cons first-d) (map following-descriptor-message)
                  (str/join "; "))))
 
-(defn make-following-descriptor [base-lbls subtrahend-lbls]
-  {:pre [(set? base-lbls) (set? subtrahend-lbls)]}
-  (FollowingDescriptor. base-lbls subtrahend-lbls))
+(defn make-following-descriptor [subtrahend-lbls]
+  {:pre [(set? subtrahend-lbls)]}
+  (FollowingDescriptor. nil subtrahend-lbls))
 
 (defrecord
   #^{:doc "Represents FnParse errors.
@@ -199,14 +199,17 @@
   (vary-meta <r> assoc :labels ls, :unlabelled-rule <old>))
 
 (defn self-label-rule-meta [subrules <r>]
+  {:pre [(rule-meta? (meta <r>))]}
   (let [original-meta (meta <r>)]
     (with-meta <r>
-      (NamedRuleMeta. (:type original-meta)
+      (make-named-rule-meta (:type original-meta)
         (delay
-          (let [subrule-labels (reduce set/union (map rule-labels subrules))]
+          (let [original-info (rule-meta-info original-meta)
+                subrule-labels (map rule-labels subrules)
+                subrule-labels (apply-seq set/union subrule-labels)]
             (if-not (some nil? subrule-labels)
-              (assoc original-meta :labels subrule-labels)
-              original-meta)))))))
+              (assoc original-info :labels subrule-labels)
+              original-info)))))))
 
 (defn format-warning [warning]
   (format "[%s] %s" (location-code (or (:location warning) (:position warning)))
@@ -256,11 +259,7 @@
   If there are no descriptors of a certain descriptor kind,
   then the map's val for that kind is the empty set."
   [descriptors]
-  (vals (group-by class descriptors))
-  #_(->> descriptors (group-by :kind)
-       (map #(vector (key %) (set (map :content (val %)))))
-       (filter #(seq (get % 1)))
-       (into {:message #{}, :label #{}})))
+  (vals (group-by class descriptors)))
 
 (defn format-parse-error
   "Returns a formatted string from the given error."
