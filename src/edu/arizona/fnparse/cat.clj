@@ -740,7 +740,7 @@
   (make-rule peeking-rule [state]
     (let [result (c/apply rule state)]
       (if (c/success? result)
-        ((prod (:product result)) state)
+        (c/apply (prod (:product result)) state)
         result))))
 
 (defmaker mapcat
@@ -833,6 +833,9 @@
   {:pre #{(ifn? f)}}
   (make-rule effects-rule [state]
     (c/apply <emptiness> state)))
+
+(defmaker suffix-peek [<main> <following>]
+  (c/suffix <main> (c/peek <following>)))
 
 (defn- not-followed- [base-lbl <following>]
   {:pre [(rule? <following>)], :post [(rule? %)]}
