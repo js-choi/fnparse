@@ -43,6 +43,8 @@
   ([rule-name form] `(defrule ~rule-name nil ~form))
   ([rule-name doc-string form] `(defrule ~rule-name ~doc-string nil ~form))
   ([rule-name doc-string meta-opts form]
+   {:pre [(or (string? doc-string) (nil? doc-string))
+          (or (map? meta-opts) (nil? meta-opts))]}
   `(k/general-defrule ~rule-name "FnParse Hound rule" ~doc-string ~meta-opts
      ::Rule ~form)))
 

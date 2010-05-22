@@ -45,11 +45,15 @@
       (c/make-named-rule-meta ~type (delay (meta (force rule-delay#)))))))
 
 (defmacro make-rule [type rule-symbol state-symbol & body]
+  {:pre [(symbol? rule-symbol) (keyword? type)]}
  `(make-normal-rule-wrapper ~type ~rule-symbol
     (fn ~rule-symbol [~state-symbol] ~@body)))
 
 (defmacro general-defrule
   [rule-sym description doc-string meta-opts type form]
+  {:pre [(string? description)
+         (or (string? doc-string) (nil? doc-string))
+         (or (map? meta-opts) (nil? meta-opts))]}
  `(let [rule# (make-named-rule-wrapper ~type ~form)
         rule-var# (d/defvar ~rule-sym rule# ~doc-string)]
     (alter-meta! rule-var# update-in [:doc]

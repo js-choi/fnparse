@@ -208,12 +208,9 @@
     (with-meta <r>
       (make-named-rule-meta (:type original-meta)
         (delay
-          (println "\n[1" (rule-meta-info (rule-meta-info original-meta)) "]")
           (let [original-info (rule-meta-info original-meta)
                 subrule-labels (map rule-labels subrules)
-                _ (println "\n[2" subrule-labels "]")
                 subrule-labels (apply-seq set/union subrule-labels)]
-            (println "\n[Z" (rule-meta-info (rule-meta-info original-meta)) "]")
             (if-not (some nil? subrule-labels)
               (assoc original-info :labels subrule-labels)
               original-info)))))))
