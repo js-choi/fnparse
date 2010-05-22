@@ -115,10 +115,12 @@
     (get-position [this] position)
     (get-remainder [this] (drop position tokens))
     (next-state [this]
+      (prn "0>" this)
+      (prn "33>" position tokens)
       (when-let [token (get tokens position)]
         (assoc this
           :position (inc position))
-          :location ((alter-location (nth position tokens)) location)))
+          :location ((alter-location (nth tokens position)) location)))
     (state-location [this] location)
     (state-warnings [this] warnings)
   ABankable
@@ -853,7 +855,7 @@
   {:pre [(c/descriptor-content? l) (rule? <base>) (every? rule? following-rules)]}
   (label l (suffix <base> (mapcat (partial not-followed- l) following-rules))))
 
-(defn- except- [base-lbl <subtrahend>]
+(defmaker- except- [base-lbl <subtrahend>]
   (make-rule exception-rule [s]
     (let [subtrahend-lbls (c/rule-labels <subtrahend>)
           descriptors #{(c/make-exception-descriptor base-lbl subtrahend-lbls)}]
