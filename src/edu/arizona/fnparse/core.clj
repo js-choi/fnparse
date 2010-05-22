@@ -354,24 +354,24 @@ Error: %s
 (defn- get-combining-fn [flatten?]
   (if flatten? concat cons))
 
-(defn- matches-seq* [rule failure-fn combining-fn state]
+(defn- matches-seq* [rule combining-fn state]
   (lazy-seq
     (when (seq (get-remainder state))
       (match* rule
         (fn find-success [product new-state]
           (combining-fn product
-            (matches-seq* rule failure-fn combining-fn new-state)))
-        failure-fn state))))
+            (matches-seq* rule combining-fn new-state)))
+        identity state))))
 
 (defn matches-seq
   "Finds all *consecutive* occurrences of a rule in a
   sequence of tokens.
   Returns a lazy sequence of the rule's products at each
-  occurence. The occurences must come one after another,
-  or else the `failure-fn` parameter is called (see `match`
-  for information on `failure-fn`). They also do not overlap."
-  [state rule & {:keys #{flatten? failure-fn}, :or {failure-fn print-failure}}]
-  (matches-seq* rule failure-fn (get-combining-fn flatten?) state))
+  occurence. The occurrences must come one after another,
+  or else the last element of the sequence will be a ParseError.
+  The occurrences also do not overlap."
+  [state rule & {:keys #{flatten?}}]
+  (matches-seq* rule (get-combining-fn flatten?) state))
 
 (defn- find* [rule combining-fn state]
   (lazy-seq
