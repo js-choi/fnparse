@@ -835,7 +835,7 @@
     (c/apply <emptiness> state)))
 
 (defmaker suffix-peek [<main> <following>]
-  (c/suffix <main> (c/peek <following>)))
+  (suffix <main> (peek <following>)))
 
 (defn- not-followed- [base-lbl <following>]
   {:pre [(rule? <following>)], :post [(rule? %)]}
