@@ -349,10 +349,29 @@ Error: %s
   ([state rule &
     {:keys #{success-fn failure-fn}
      :or {success-fn print-success, failure-fn print-failure}}]
-   (match* rule #(success-fn %1 %2) failure-fn state)))
+   (match* rule success-fn failure-fn state)))
 
 (defn- get-combining-fn [flatten?]
   (if flatten? concat cons))
+
+(defn- matches-seq* [rule failure-fn combining-fn state]
+  (lazy-seq
+    (when (seq (get-remainder state))
+      (match* rule
+        (fn find-success [product new-state]
+          (combining-fn product
+            (matches-seq* rule failure-fn combining-fn new-state)))
+        failure-fn state))))
+
+(defn matches-seq
+  "Finds all *consecutive* occurrences of a rule in a
+  sequence of tokens.
+  Returns a lazy sequence of the rule's products at each
+  occurence. The occurences must come one after another,
+  or else the `failure-fn` parameter is called (see `match`
+  for information on `failure-fn`). They also do not overlap."
+  [state rule & {:keys #{flatten? failure-fn}, :or {failure-fn print-failure}}]
+  (matches-seq* rule failure-fn (get-combining-fn flatten?) state))
 
 (defn- find* [rule combining-fn state]
   (lazy-seq

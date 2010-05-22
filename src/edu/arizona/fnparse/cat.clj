@@ -8,6 +8,7 @@
                   :exclude #{for + mapcat find}))
 
 (d/defalias match c/match)
+(d/defalias matches-seq c/matches-seq)
 (d/defalias find c/find)
 (d/defalias substitute c/substitute)
 (d/defalias substitute-1 c/substitute-1)
