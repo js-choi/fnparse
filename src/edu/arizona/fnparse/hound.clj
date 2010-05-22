@@ -923,7 +923,7 @@
   {:succeeds "If there are no tokens left."
    :product "`true`."
    :consumes "No tokens."}
-  (label "the end of input" (except <emptiness> <anything>)))
+  (except "the end of input" <emptiness> <anything>))
 
 (defmaker annotate-error
   "Creates an error-annotating rule. Whenever
