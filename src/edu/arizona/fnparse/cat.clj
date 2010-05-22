@@ -115,8 +115,6 @@
     (get-position [this] position)
     (get-remainder [this] (drop position tokens))
     (next-state [this]
-      (prn "0>" this)
-      (prn "33>" position tokens)
       (when-let [token (get tokens position)]
         (assoc this
           :position (inc position))
