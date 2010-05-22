@@ -117,8 +117,8 @@
     (next-state [this]
       (when-let [token (get tokens position)]
         (assoc this
-          :position (inc position))
-          :location ((alter-location (nth tokens position)) location)))
+          :position (inc position)
+          :location ((alter-location (nth tokens position)) location))))
     (state-location [this] location)
     (state-warnings [this] warnings)
   ABankable
