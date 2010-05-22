@@ -365,6 +365,7 @@
             memory))))))
 
 (defn- remember [subrule]
+  {:pre [(rule? subrule)], :post [(rule? %)]}
   (make-rule remembering-rule [state]
     (let [bank (get-bank state)
           state-position (:position state)
@@ -419,22 +420,27 @@
    :error "An intelligent combination of the errors
                 from all the failed sub-rules."
    :no-memoize? true}
-  [& rules]
-  {:pre [(every? rule? rules)]}
-  (letfn [(merge-result-errors [prev-result next-error]
-            (k/merge-parse-errors (:error prev-result) next-error))
-          (apply-next-rule [state prev-result next-rule]
-            (-> next-rule
-              (c/apply (set-bank state (get-bank prev-result)))
-              (update-in [:error] (partial merge-result-errors prev-result))))]
-    (c/self-label-rule-meta rules
-      (remember
-        (make-rule summed-rule [state]
-          (let [apply-next-rule (partial apply-next-rule state)
-                initial-result (c/apply <emptiness> state)
-                results (rest (reductions apply-next-rule
-                                initial-result rules))]
-            (or (seq/find-first c/success? results) (last results))))))))
+  ([] <emptiness>)
+  ([<first>]
+   {:pre [(rule? <first>)]}
+   <first>)
+  ([<first> <second> & rest-rules]
+   {:pre [(rule? <first>) (rule? <second>) (every? rule? rest-rules)]}
+   (letfn [(merge-result-errors [prev-result next-error]
+             (k/merge-parse-errors (:error prev-result) next-error))
+           (apply-next-rule [state prev-result next-rule]
+             (-> next-rule
+               (c/apply (set-bank state (get-bank prev-result)))
+               (update-in [:error] (partial merge-result-errors prev-result))))]
+     (let [rules (cons <first> (cons <second> rest-rules))]
+       (c/self-label-rule-meta rules
+         (remember
+           (make-rule summed-rule [state]
+             (let [apply-next-rule (partial apply-next-rule state)
+                   initial-result (c/apply <emptiness> state)
+                   results (rest (reductions apply-next-rule
+                                   initial-result rules))]
+               (or (seq/find-first c/success? results) (last results))))))))))
 
 (m/defmonad parser-m
   "The monad that FnParse Cat uses."
