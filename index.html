@@ -34,7 +34,7 @@ namespace.
     <a class="wiki_link" href="api-index.html">API Index</a><br />
     <a class="wiki_link" href="#">Namespaces:</a>
     <ul id="left-sidebar-list">
-      <li><a href="edu.arizona.fnparse-api.html" class="wiki_link">edu.arizona.fnparse</a></li>
+      <li><a href="edu.arizona.fnparse.cat-api.html" class="wiki_link">edu.arizona.fnparse.cat</a></li><li><a href="edu.arizona.fnparse.clojure-api.html" class="wiki_link">edu.arizona.fnparse.clojure</a></li><li><a href="edu.arizona.fnparse.core-api.html" class="wiki_link">edu.arizona.fnparse.core</a></li><li><a href="edu.arizona.fnparse.hound-api.html" class="wiki_link">edu.arizona.fnparse.hound</a></li><li><a href="edu.arizona.fnparse.json-api.html" class="wiki_link">edu.arizona.fnparse.json</a></li><li><a href="edu.arizona.fnparse.math-api.html" class="wiki_link">edu.arizona.fnparse.math</a></li>
     </ul>
   </div>
 </div>
@@ -46,7 +46,27 @@ namespace.
                 <div id="right-sidebar"><div id="toc">
   <h1 class="nopad">Table of Contents</h1>
   <div style="margin-left: 1em;" class="toc-section">
-    <a href="#edu.arizona.fnparse">edu.arizona.fnparse</a>
+    <a href="#edu.arizona.fnparse.cat">edu.arizona.fnparse.cat</a>
+    
+    <br />
+  </div><div style="margin-left: 1em;" class="toc-section">
+    <a href="#edu.arizona.fnparse.clojure">edu.arizona.fnparse.clojure</a>
+    
+    <br />
+  </div><div style="margin-left: 1em;" class="toc-section">
+    <a href="#edu.arizona.fnparse.core">edu.arizona.fnparse.core</a>
+    
+    <br />
+  </div><div style="margin-left: 1em;" class="toc-section">
+    <a href="#edu.arizona.fnparse.hound">edu.arizona.fnparse.hound</a>
+    
+    <br />
+  </div><div style="margin-left: 1em;" class="toc-section">
+    <a href="#edu.arizona.fnparse.json">edu.arizona.fnparse.json</a>
+    
+    <br />
+  </div><div style="margin-left: 1em;" class="toc-section">
+    <a href="#edu.arizona.fnparse.math">edu.arizona.fnparse.math</a>
     
     <br />
   </div>
@@ -59,637 +79,82 @@ namespace.
 <div id="namespace-entry">
   <br />
   <hr />
-  <h2 id="edu.arizona.fnparse">edu.arizona.fnparse</h2>
-  by <span id="author">Joshua Choi</span><br />
-  <a href="edu.arizona.fnparse-api.html" id="api-link">Detailed API documentation</a><br />
-  <pre id="namespace-docstr">[left-recur]: http://en.wikipedia.org/wiki/Left_recursion
-[ll-1]: http://en.wikipedia.org/wiki/LL(1)
-
-_FnParse 3_ is a *pair* of libraries that can create
-*unambiguous parsers*.
-
-Overview: Would FnParse be useful for you?
-==========================================
-_FnParse Hound_ and _FnParse Cat_ are two libraries that
-can both create *unambiguous parsers*, but of slightly
-different varieties.
-
-When does one need parsers? *Any time you need to turn
-text into information via a language.* Data is always
-stored in "text" of *some* kind, whether it be an English
-sentence, a DNA sequence, or an XML file.
-
-FnParse can write [PEGs](http://www.en.wikipedia.org/wiki/PEG),
-an easy way to write unambiguous grammars.
-This means that FnParse parsers can represent languages
-whose sentences always have one meaning. Examples of
-ambiguous languages include Clojure, XML, HTML5, YAML,
-JSON, Python, Markdown, and most other computer languages.
-FnParse can indeed parse data in all those languages above.
-I think. :)
-
-How to learn FnParse
-====================
-TODO
-
-Similarities between FnParse Hound and Cat
-==========================================
-FnParse Hound and Cat share very similar APIs. In fact, with
-a couple of exceptions listed in the next section, their APIs
-seem identical.
-
-Both FnParse Hound and Cat create _rules_. Rule are
-functions that eat tokens and turn them into data.
-
-*  A _token_ is a unit of text. Tokens are usually characters,
-   because that's easiest to do. (You might already have a
-   lexer, however, that turns characters into other tokens,
-   which FnParse parsers can use too. Just be consistent
-   on what kind of tokens a parser can accept.)
-*  A rule accepts a _state object_, which contains
-   a _sequence of tokens_ and a _context_, as an argument.
-*  A rule determines if the tokens are valid or not
-   according to its definition; it either _succeeds_ or
-   _fails_.
-*  When a rule succeeds, it _consumes_ some tokens (zero or more)
-   and calculates the data that those tokens represent. This
-   new data is called the _product_. The rule then
-   returns an object called an _answer_, which contains
-   both the product and the new state.
-*  When a rule fails, it creates an _error_ that contains
-   information on why the tokens were invalid for that rule.
-*  Rules consume tokens from the beginning of the sequence.
-
-(FnParse Cat rules and FnParse Hound rules are *not*
-the same and are *incompatible* with each other. The
-same goes for Cat and Hound states and answers.)
-
-FnParse Cat and Hound both use the same _error_ type: the
-`:edu.arizona.fnparse.core/ParseError` type.
-
-Differences between FnParse Hound and Cat
-=========================================
-Overview with fancy terms
--------------------------
-FnParse Hound creates [Parsec]
-(http://www.haskell.org/haskellwiki/Parsec)-like,
-[LL(1)][ll-1] or near-LL(1) parsers.
-FnParse Cat is a [packrat parser](<a href="http://en.wikipedia.org/Packrat">http://en.wikipedia.org/Packrat</a> parser).
-*All* other differences stem from these two fundamental ones.
-
-Overview with plainer language
-------------------------------
-FnParse Hound's parsers try to save as much memory as possible.
-In general, as soon as a Hound parser consumes a token, that
-token is discarded forever. This means that you can't backtrack
-through your tokens if a rule fails. For some languages, you
-want this kind of parser, because those languages are designed
-to be able to be interpreted by looking at only one token at
-a time: a lookahead of one.
-
-FnParse Cat's parsers take up a lot of memory, but they can
-quickly parse more complex parsers. In general, when a Cat parser
-consumes tokens, it saves the parse result from those tokens
-in a cache. This means that there's unlimited backtracking
-and lookahead. In addition, Cat parsers support [left
-recursion](left-recur), a very useful way of expressing rules.
-You want this kind of languages for relatively complex grammars
-that require a lot of backtracking.
-
-When should you use which FnParse
----------------------------------
-Many computer data languages are LL(1) or near-LL(1). You
-should use _FnParse Hound_ for those. Examples include:
-
-*  [Clojure](http://www.clojure.org)
-*  [XML](http://www.w3.org/XML)
-*  [JSON](http://json.org)
-*  [YAML](http://yaml.org)
-*  [CSV](http://en.wikipedia.org/wiki/Comma-separated_values)
-
-Many other, more complex computer programming languages
-are not LL(1). Some of them involve left recursion.
-
-*  Standard mathematical expressions (like in [Google
-   Calculator](http://www.google.com/calculator))
-*  [Python](http://www.python.org)
-*  [Java](http://www.java.com)
-*  Even [Lojban](http://en.wikipedia.org/wiki/Lojban)
-
-Detailed comparison between Hound and Cat
-=========================================
-You won't understand this chart until you've learned either Hound
-or Cat well.
-
-                   | Hound                  | Cat
------------------- | ---------------------- | -------------------
-Better for         | Potentially large data | More complex data
-Backtracking[^0]   | None by default[^1]    | Unlimited
-Caching of results | No[^2]                 | Yes
-Greedy repetition  | Yes[^3]                | No[^4]
-Right recursion    | Yes                    | Yes
-Left recursion     | No                     | Yes
-Context alteration | Yes[^5]                | No[^6]
-
-[^0]:
-    The differences in backtracking comes from the differences
-    between the `+` operator in Hound and Cat.
-[^1]:
-    Backtracking in Hound rules is possible using the `lex`
-    rule-maker, but it should be minimized.
-[^2]:
-    In fact, it does the opposite: it tries to prevent
-    *any* caching of results to reduce memory.
-[^3]:
-    Greedy repetition in Hound is done by the `rep` function
-    and its friends. Of course, it can be always rewritten to use
-    right-recursive rules instead.
-[^4]:
-    In Cat, you want to use left or right recursion instead.
-[^5]:
-    In Hound, contexts can be altered in-place using the
-    `alter-context` rule-maker, but you should usually
-    prefer using custom rule-makers with `defmaker` instead,
-    which is just as powerful.
-[^6]:
-    Use custom rule-makers with `defmaker` if your grammar
-    is context-sensitive. TODO: Python example
-*[XML]: eXtensible Markup Language
-*[YAML]: Yet Another Markup Language
-*[JSON]: Javascript Object Notation
-*[CSV]: Comma-Separated Values</pre>
+  <h2 id="edu.arizona.fnparse.cat">edu.arizona.fnparse.cat</h2>
+  by <span id="author">unknown author</span><br />
+  <a href="edu.arizona.fnparse.cat-api.html" id="api-link">Detailed API documentation</a><br />
+  <pre id="namespace-docstr"></pre>
   
   Public variables and functions:
+  <span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/+" id="var-tag">+</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/&lt;anything&gt;" id="var-tag">&lt;anything&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/&lt;ascii-alphanumeric&gt;" id="var-tag">&lt;ascii-alphanumeric&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/&lt;ascii-control&gt;" id="var-tag">&lt;ascii-control&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/&lt;ascii-digit&gt;" id="var-tag">&lt;ascii-digit&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/&lt;ascii-letter&gt;" id="var-tag">&lt;ascii-letter&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/&lt;decimal-digit&gt;" id="var-tag">&lt;decimal-digit&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/&lt;emptiness&gt;" id="var-tag">&lt;emptiness&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/&lt;end-of-input&gt;" id="var-tag">&lt;end-of-input&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/&lt;fetch-location&gt;" id="var-tag">&lt;fetch-location&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/&lt;fetch-warnings&gt;" id="var-tag">&lt;fetch-warnings&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/&lt;hexadecimal-digit&gt;" id="var-tag">&lt;hexadecimal-digit&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/&lt;lowercase-ascii-letter&gt;" id="var-tag">&lt;lowercase-ascii-letter&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/&lt;nothing&gt;" id="var-tag">&lt;nothing&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/&lt;uppercase-ascii-letter&gt;" id="var-tag">&lt;uppercase-ascii-letter&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/add-warning" id="var-tag">add-warning</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/alter-location" id="var-tag">alter-location</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/annotate-error" id="var-tag">annotate-error</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/antilit" id="var-tag">antilit</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/antiset-term" id="var-tag">antiset-term</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/antiterm" id="var-tag">antiterm</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/antivalidate" id="var-tag">antivalidate</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/case-insensitive-lit" id="var-tag">case-insensitive-lit</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/cat" id="var-tag">cat</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/chook" id="var-tag">chook</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/circumfix" id="var-tag">circumfix</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/combine" id="var-tag">combine</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/defmaker" id="var-tag">defmaker</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/defmaker-" id="var-tag">defmaker-</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/defmaker-macro" id="var-tag">defmaker-macro</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/defrule" id="var-tag">defrule</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/defrule-" id="var-tag">defrule-</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/effects" id="var-tag">effects</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/except" id="var-tag">except</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/find" id="var-tag">find</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/for" id="var-tag">for</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/hook" id="var-tag">hook</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/label" id="var-tag">label</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/lit" id="var-tag">lit</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/mapcat" id="var-tag">mapcat</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/mapsum" id="var-tag">mapsum</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/match" id="var-tag">match</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/matches-seq" id="var-tag">matches-seq</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/not-followed" id="var-tag">not-followed</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/opt" id="var-tag">opt</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/parser-m" id="var-tag">parser-m</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/peek" id="var-tag">peek</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/phrase" id="var-tag">phrase</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/prefix" id="var-tag">prefix</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/prod" id="var-tag">prod</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/radix-digit" id="var-tag">radix-digit</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/radix-label" id="var-tag">radix-label</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/rule?" id="var-tag">rule?</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/set-term" id="var-tag">set-term</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/state?" id="var-tag">state?</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/substitute" id="var-tag">substitute</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/substitute-1" id="var-tag">substitute-1</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/suffix" id="var-tag">suffix</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/suffix-peek" id="var-tag">suffix-peek</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/template-sum" id="var-tag">template-sum</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/term" id="var-tag">term</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/term*" id="var-tag">term*</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/term-" id="var-tag">term-</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/validate" id="var-tag">validate</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/vcat" id="var-tag">vcat</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/when" id="var-tag">when</a> </span><span id="var-link"><a href="edu.arizona.fnparse.cat-api.html#edu.arizona.fnparse.cat/with-error" id="var-tag">with-error</a> </span><br />
+  
+</div><div id="namespace-entry">
   <br />
-  <span id="subspace"><br />Variables and functions in
-    <span id="name">edu.arizona.fnparse.cat</span>:
-    <span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/+">+</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/&lt;anything&gt;">&lt;anything&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/&lt;ascii-alphanumeric&gt;">&lt;ascii-alphanumeric&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/&lt;ascii-control&gt;">&lt;ascii-control&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/&lt;ascii-digit&gt;">&lt;ascii-digit&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/&lt;ascii-letter&gt;">&lt;ascii-letter&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/&lt;decimal-digit&gt;">&lt;decimal-digit&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/&lt;emptiness&gt;">&lt;emptiness&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/&lt;end-of-input&gt;">&lt;end-of-input&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/&lt;fetch-location&gt;">&lt;fetch-location&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/&lt;fetch-warnings&gt;">&lt;fetch-warnings&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/&lt;hexadecimal-digit&gt;">&lt;hexadecimal-digit&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/&lt;lowercase-ascii-letter&gt;">&lt;lowercase-ascii-letter&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/&lt;nothing&gt;">&lt;nothing&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/&lt;uppercase-ascii-letter&gt;">&lt;uppercase-ascii-letter&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/add-warning">add-warning</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/alter-location">alter-location</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/annotate-error">annotate-error</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/antilit">antilit</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/antiset-term">antiset-term</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/antiterm">antiterm</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/antivalidate">antivalidate</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/case-insensitive-lit">case-insensitive-lit</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/cat">cat</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/chook">chook</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/circumfix">circumfix</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/combine">combine</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/defmaker">defmaker</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/defmaker-">defmaker-</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/defmaker-macro">defmaker-macro</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/defrule">defrule</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/defrule-">defrule-</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/effects">effects</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/except">except</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/find">find</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/for">for</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/hook">hook</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/label">label</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/lit">lit</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/mapcat">mapcat</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/mapsum">mapsum</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/match">match</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/matches-seq">matches-seq</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/not-followed">not-followed</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/opt">opt</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/parser-m">parser-m</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/peek">peek</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/phrase">phrase</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/prefix">prefix</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/prod">prod</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/radix-digit">radix-digit</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/radix-label">radix-label</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/rule?">rule?</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/set-term">set-term</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/state?">state?</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/substitute">substitute</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/substitute-1">substitute-1</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/suffix">suffix</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/suffix-peek">suffix-peek</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/template-sum">template-sum</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/term">term</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/term*">term*</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/term-">term-</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/validate">validate</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/vcat">vcat</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/when">when</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.cat/with-error">with-error</a>
-    </span>
-    <br />
-  </span><span id="subspace"><br />Variables and functions in
-    <span id="name">edu.arizona.fnparse.clojure</span>:
-    <span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.clojure/&lt;comment-char&gt;">&lt;comment-char&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.clojure/&lt;comment-indicator&gt;">&lt;comment-indicator&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.clojure/&lt;comment&gt;">&lt;comment&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.clojure/&lt;derefed&gt;">&lt;derefed&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.clojure/&lt;discarded&gt;">&lt;discarded&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.clojure/&lt;form-end&gt;">&lt;form-end&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.clojure/&lt;form-series&gt;">&lt;form-series&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.clojure/&lt;indicator&gt;">&lt;indicator&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.clojure/&lt;non-alphanumeric-symbol-char&gt;">&lt;non-alphanumeric-symbol-char&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.clojure/&lt;normal-ws-char&gt;">&lt;normal-ws-char&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.clojure/&lt;ns-separator&gt;">&lt;ns-separator&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.clojure/&lt;quoted&gt;">&lt;quoted&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.clojure/&lt;separator&gt;">&lt;separator&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.clojure/&lt;syntax-quoted&gt;">&lt;syntax-quoted&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.clojure/&lt;unquote-spliced&gt;">&lt;unquote-spliced&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.clojure/&lt;unquoted&gt;">&lt;unquoted&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.clojure/&lt;var-inner&gt;">&lt;var-inner&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.clojure/&lt;with-meta-inner&gt;">&lt;with-meta-inner&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.clojure/&lt;ws&gt;">&lt;ws&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.clojure/&lt;ws?&gt;">&lt;ws?&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.clojure/fetch-referred-namespace">fetch-referred-namespace</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.clojure/ns-qualified-keyword-empty-end">ns-qualified-keyword-empty-end</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.clojure/ns-qualified-keyword-end-with-slash">ns-qualified-keyword-end-with-slash</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.clojure/ns-resolved-keyword-end">ns-resolved-keyword-end</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.clojure/number-tail">number-tail</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.clojure/padded-lit">padded-lit</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.clojure/radix-coefficient-tail">radix-coefficient-tail</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.clojure/radix-natural-number">radix-natural-number</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.clojure/read-string">read-string</a>
-    </span>
-    <br />
-  </span><span id="subspace"><br />Variables and functions in
-    <span id="name">edu.arizona.fnparse.clojure-pure</span>:
-    <span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.clojure-pure/radix-label">radix-label</a>
-    </span>
-    <br />
-  </span><span id="subspace"><br />Variables and functions in
-    <span id="name">edu.arizona.fnparse.core</span>:
-    <span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.core/*format-remainder-limit*">*format-remainder-limit*</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.core/AParseAnswer">AParseAnswer</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.core/AState">AState</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.core/apply">apply</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.core/failure?">failure?</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.core/find">find</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.core/format-parse-error">format-parse-error</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.core/match">match</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.core/matches-seq">matches-seq</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.core/substitute">substitute</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.core/substitute-1">substitute-1</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.core/success?">success?</a>
-    </span>
-    <br />
-  </span><span id="subspace"><br />Variables and functions in
-    <span id="name">edu.arizona.fnparse.hound</span>:
-    <span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/+">+</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/&lt;anything&gt;">&lt;anything&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/&lt;ascii-alphanumeric&gt;">&lt;ascii-alphanumeric&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/&lt;ascii-control&gt;">&lt;ascii-control&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/&lt;ascii-digit&gt;">&lt;ascii-digit&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/&lt;ascii-letter&gt;">&lt;ascii-letter&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/&lt;decimal-digit&gt;">&lt;decimal-digit&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/&lt;emptiness&gt;">&lt;emptiness&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/&lt;end-of-input&gt;">&lt;end-of-input&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/&lt;fetch-context&gt;">&lt;fetch-context&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/&lt;fetch-location&gt;">&lt;fetch-location&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/&lt;fetch-warnings&gt;">&lt;fetch-warnings&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/&lt;hexadecimal-digit&gt;">&lt;hexadecimal-digit&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/&lt;inc-column&gt;">&lt;inc-column&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/&lt;inc-line&gt;">&lt;inc-line&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/&lt;lowercase-ascii-letter&gt;">&lt;lowercase-ascii-letter&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/&lt;nothing&gt;">&lt;nothing&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/&lt;uppercase-ascii-letter&gt;">&lt;uppercase-ascii-letter&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/add-warning">add-warning</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/alter-context">alter-context</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/alter-location">alter-location</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/annotate-error">annotate-error</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/antilit">antilit</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/antiset-term">antiset-term</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/antiterm">antiterm</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/antivalidate">antivalidate</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/case-insensitive-lit">case-insensitive-lit</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/cat">cat</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/chook">chook</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/circumfix">circumfix</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/combine">combine</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/defmaker">defmaker</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/defmaker-">defmaker-</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/defmaker-macro">defmaker-macro</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/defrule">defrule</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/defrule-">defrule-</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/effects">effects</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/except">except</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/factor=">factor=</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/find">find</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/for">for</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/format-parse-error">format-parse-error</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/hook">hook</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/hooked-rep">hooked-rep</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/label">label</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/lex">lex</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/lit">lit</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/make-state">make-state</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/mapcat">mapcat</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/mapsum">mapsum</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/match">match</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/not-followed">not-followed</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/nothing-descriptors">nothing-descriptors</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/opt">opt</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/parser-m">parser-m</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/peek">peek</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/phrase">phrase</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/prefix">prefix</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/prod">prod</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/radix-digit">radix-digit</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/radix-label">radix-label</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/rep">rep</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/rep*">rep*</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/rule?">rule?</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/separated-rep">separated-rep</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/separated-rep*">separated-rep*</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/set-term">set-term</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/state?">state?</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/substitute">substitute</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/substitute-1">substitute-1</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/suffix">suffix</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/template-sum">template-sum</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/term">term</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/term*">term*</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/validate">validate</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/vcat">vcat</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/when">when</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.hound/with-error">with-error</a>
-    </span>
-    <br />
-  </span><span id="subspace"><br />Variables and functions in
-    <span id="name">edu.arizona.fnparse.json</span>:
-    <span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.json/&lt;array-content&gt;">&lt;array-content&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.json/&lt;array-end&gt;">&lt;array-end&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.json/&lt;array-start&gt;">&lt;array-start&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.json/&lt;array&gt;">&lt;array&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.json/&lt;control-char&gt;">&lt;control-char&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.json/&lt;document&gt;">&lt;document&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.json/&lt;escape-char-start&gt;">&lt;escape-char-start&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.json/&lt;escaped-str-char&gt;">&lt;escaped-str-char&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.json/&lt;false&gt;">&lt;false&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.json/&lt;name-separator&gt;">&lt;name-separator&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.json/&lt;normal-str-char&gt;">&lt;normal-str-char&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.json/&lt;null&gt;">&lt;null&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.json/&lt;object-content&gt;">&lt;object-content&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.json/&lt;object-end&gt;">&lt;object-end&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.json/&lt;object-entry&gt;">&lt;object-entry&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.json/&lt;object-start&gt;">&lt;object-start&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.json/&lt;object&gt;">&lt;object&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.json/&lt;str-char&gt;">&lt;str-char&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.json/&lt;str-content&gt;">&lt;str-content&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.json/&lt;str-delimiter&gt;">&lt;str-delimiter&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.json/&lt;str&gt;">&lt;str&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.json/&lt;true&gt;">&lt;true&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.json/&lt;unicode-sequence&gt;">&lt;unicode-sequence&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.json/&lt;value-separator&gt;">&lt;value-separator&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.json/&lt;value&gt;">&lt;value&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.json/&lt;ws?&gt;">&lt;ws?&gt;</a>
-    </span>
-    <br />
-  </span><span id="subspace"><br />Variables and functions in
-    <span id="name">edu.arizona.fnparse.math</span>:
-    <span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.math/&lt;addition-level&gt;">&lt;addition-level&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.math/&lt;multiplication-level&gt;">&lt;multiplication-level&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.math/&lt;number&gt;">&lt;number&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.math/&lt;parenthesized&gt;">&lt;parenthesized&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.math/&lt;symbol-content&gt;">&lt;symbol-content&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.math/&lt;ws&gt;">&lt;ws&gt;</a>
-    </span><span id="sub-var-link">
-      <a href="edu.arizona.fnparse-api.html#edu.arizona.fnparse.math/ws-suffix">ws-suffix</a>
-    </span>
-    <br />
-  </span>
+  <hr />
+  <h2 id="edu.arizona.fnparse.clojure">edu.arizona.fnparse.clojure</h2>
+  by <span id="author">unknown author</span><br />
+  <a href="edu.arizona.fnparse.clojure-api.html" id="api-link">Detailed API documentation</a><br />
+  <pre id="namespace-docstr"></pre>
+  
+  Public variables and functions:
+  <span id="var-link"><a href="edu.arizona.fnparse.clojure-api.html#edu.arizona.fnparse.clojure/&lt;comment-char&gt;" id="var-tag">&lt;comment-char&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.clojure-api.html#edu.arizona.fnparse.clojure/&lt;comment-indicator&gt;" id="var-tag">&lt;comment-indicator&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.clojure-api.html#edu.arizona.fnparse.clojure/&lt;comment&gt;" id="var-tag">&lt;comment&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.clojure-api.html#edu.arizona.fnparse.clojure/&lt;derefed&gt;" id="var-tag">&lt;derefed&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.clojure-api.html#edu.arizona.fnparse.clojure/&lt;discarded&gt;" id="var-tag">&lt;discarded&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.clojure-api.html#edu.arizona.fnparse.clojure/&lt;form-end&gt;" id="var-tag">&lt;form-end&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.clojure-api.html#edu.arizona.fnparse.clojure/&lt;form-series&gt;" id="var-tag">&lt;form-series&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.clojure-api.html#edu.arizona.fnparse.clojure/&lt;indicator&gt;" id="var-tag">&lt;indicator&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.clojure-api.html#edu.arizona.fnparse.clojure/&lt;non-alphanumeric-symbol-char&gt;" id="var-tag">&lt;non-alphanumeric-symbol-char&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.clojure-api.html#edu.arizona.fnparse.clojure/&lt;normal-ws-char&gt;" id="var-tag">&lt;normal-ws-char&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.clojure-api.html#edu.arizona.fnparse.clojure/&lt;ns-separator&gt;" id="var-tag">&lt;ns-separator&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.clojure-api.html#edu.arizona.fnparse.clojure/&lt;quoted&gt;" id="var-tag">&lt;quoted&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.clojure-api.html#edu.arizona.fnparse.clojure/&lt;separator&gt;" id="var-tag">&lt;separator&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.clojure-api.html#edu.arizona.fnparse.clojure/&lt;syntax-quoted&gt;" id="var-tag">&lt;syntax-quoted&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.clojure-api.html#edu.arizona.fnparse.clojure/&lt;unquote-spliced&gt;" id="var-tag">&lt;unquote-spliced&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.clojure-api.html#edu.arizona.fnparse.clojure/&lt;unquoted&gt;" id="var-tag">&lt;unquoted&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.clojure-api.html#edu.arizona.fnparse.clojure/&lt;var-inner&gt;" id="var-tag">&lt;var-inner&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.clojure-api.html#edu.arizona.fnparse.clojure/&lt;with-meta-inner&gt;" id="var-tag">&lt;with-meta-inner&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.clojure-api.html#edu.arizona.fnparse.clojure/&lt;ws&gt;" id="var-tag">&lt;ws&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.clojure-api.html#edu.arizona.fnparse.clojure/&lt;ws?&gt;" id="var-tag">&lt;ws?&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.clojure-api.html#edu.arizona.fnparse.clojure/fetch-referred-namespace" id="var-tag">fetch-referred-namespace</a> </span><span id="var-link"><a href="edu.arizona.fnparse.clojure-api.html#edu.arizona.fnparse.clojure/ns-qualified-keyword-empty-end" id="var-tag">ns-qualified-keyword-empty-end</a> </span><span id="var-link"><a href="edu.arizona.fnparse.clojure-api.html#edu.arizona.fnparse.clojure/ns-qualified-keyword-end-with-slash" id="var-tag">ns-qualified-keyword-end-with-slash</a> </span><span id="var-link"><a href="edu.arizona.fnparse.clojure-api.html#edu.arizona.fnparse.clojure/ns-resolved-keyword-end" id="var-tag">ns-resolved-keyword-end</a> </span><span id="var-link"><a href="edu.arizona.fnparse.clojure-api.html#edu.arizona.fnparse.clojure/number-tail" id="var-tag">number-tail</a> </span><span id="var-link"><a href="edu.arizona.fnparse.clojure-api.html#edu.arizona.fnparse.clojure/padded-lit" id="var-tag">padded-lit</a> </span><span id="var-link"><a href="edu.arizona.fnparse.clojure-api.html#edu.arizona.fnparse.clojure/radix-coefficient-tail" id="var-tag">radix-coefficient-tail</a> </span><span id="var-link"><a href="edu.arizona.fnparse.clojure-api.html#edu.arizona.fnparse.clojure/radix-natural-number" id="var-tag">radix-natural-number</a> </span><span id="var-link"><a href="edu.arizona.fnparse.clojure-api.html#edu.arizona.fnparse.clojure/read-string" id="var-tag">read-string</a> </span><br />
+  
+</div><div id="namespace-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.core">edu.arizona.fnparse.core</h2>
+  by <span id="author">Joshua Choi</span><br />
+  <a href="edu.arizona.fnparse.core-api.html" id="api-link">Detailed API documentation</a><br />
+  <pre id="namespace-docstr"></pre>
+  
+  Public variables and functions:
+  <span id="var-link"><a href="edu.arizona.fnparse.core-api.html#edu.arizona.fnparse.core/*format-remainder-limit*" id="var-tag">*format-remainder-limit*</a> </span><span id="var-link"><a href="edu.arizona.fnparse.core-api.html#edu.arizona.fnparse.core/AParseAnswer" id="var-tag">AParseAnswer</a> </span><span id="var-link"><a href="edu.arizona.fnparse.core-api.html#edu.arizona.fnparse.core/AState" id="var-tag">AState</a> </span><span id="var-link"><a href="edu.arizona.fnparse.core-api.html#edu.arizona.fnparse.core/apply" id="var-tag">apply</a> </span><span id="var-link"><a href="edu.arizona.fnparse.core-api.html#edu.arizona.fnparse.core/failure?" id="var-tag">failure?</a> </span><span id="var-link"><a href="edu.arizona.fnparse.core-api.html#edu.arizona.fnparse.core/find" id="var-tag">find</a> </span><span id="var-link"><a href="edu.arizona.fnparse.core-api.html#edu.arizona.fnparse.core/format-parse-error" id="var-tag">format-parse-error</a> </span><span id="var-link"><a href="edu.arizona.fnparse.core-api.html#edu.arizona.fnparse.core/match" id="var-tag">match</a> </span><span id="var-link"><a href="edu.arizona.fnparse.core-api.html#edu.arizona.fnparse.core/matches-seq" id="var-tag">matches-seq</a> </span><span id="var-link"><a href="edu.arizona.fnparse.core-api.html#edu.arizona.fnparse.core/substitute" id="var-tag">substitute</a> </span><span id="var-link"><a href="edu.arizona.fnparse.core-api.html#edu.arizona.fnparse.core/substitute-1" id="var-tag">substitute-1</a> </span><span id="var-link"><a href="edu.arizona.fnparse.core-api.html#edu.arizona.fnparse.core/success?" id="var-tag">success?</a> </span><br />
+  
+</div><div id="namespace-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.hound">edu.arizona.fnparse.hound</h2>
+  by <span id="author">unknown author</span><br />
+  <a href="edu.arizona.fnparse.hound-api.html" id="api-link">Detailed API documentation</a><br />
+  <pre id="namespace-docstr">This is *FnParse Hound*, which can create unambiguous
+LL(1) or LL(n) parsers.</pre>
+  
+  Public variables and functions:
+  <span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/+" id="var-tag">+</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/&lt;anything&gt;" id="var-tag">&lt;anything&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/&lt;ascii-alphanumeric&gt;" id="var-tag">&lt;ascii-alphanumeric&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/&lt;ascii-control&gt;" id="var-tag">&lt;ascii-control&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/&lt;ascii-digit&gt;" id="var-tag">&lt;ascii-digit&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/&lt;ascii-letter&gt;" id="var-tag">&lt;ascii-letter&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/&lt;decimal-digit&gt;" id="var-tag">&lt;decimal-digit&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/&lt;emptiness&gt;" id="var-tag">&lt;emptiness&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/&lt;end-of-input&gt;" id="var-tag">&lt;end-of-input&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/&lt;fetch-context&gt;" id="var-tag">&lt;fetch-context&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/&lt;fetch-location&gt;" id="var-tag">&lt;fetch-location&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/&lt;fetch-warnings&gt;" id="var-tag">&lt;fetch-warnings&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/&lt;hexadecimal-digit&gt;" id="var-tag">&lt;hexadecimal-digit&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/&lt;inc-column&gt;" id="var-tag">&lt;inc-column&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/&lt;inc-line&gt;" id="var-tag">&lt;inc-line&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/&lt;lowercase-ascii-letter&gt;" id="var-tag">&lt;lowercase-ascii-letter&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/&lt;nothing&gt;" id="var-tag">&lt;nothing&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/&lt;uppercase-ascii-letter&gt;" id="var-tag">&lt;uppercase-ascii-letter&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/add-warning" id="var-tag">add-warning</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/alter-context" id="var-tag">alter-context</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/alter-location" id="var-tag">alter-location</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/annotate-error" id="var-tag">annotate-error</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/antilit" id="var-tag">antilit</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/antiset-term" id="var-tag">antiset-term</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/antiterm" id="var-tag">antiterm</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/antivalidate" id="var-tag">antivalidate</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/case-insensitive-lit" id="var-tag">case-insensitive-lit</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/cat" id="var-tag">cat</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/chook" id="var-tag">chook</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/circumfix" id="var-tag">circumfix</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/combine" id="var-tag">combine</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/defmaker" id="var-tag">defmaker</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/defmaker-" id="var-tag">defmaker-</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/defmaker-macro" id="var-tag">defmaker-macro</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/defrule" id="var-tag">defrule</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/defrule-" id="var-tag">defrule-</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/effects" id="var-tag">effects</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/except" id="var-tag">except</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/factor=" id="var-tag">factor=</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/find" id="var-tag">find</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/for" id="var-tag">for</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/format-parse-error" id="var-tag">format-parse-error</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/hook" id="var-tag">hook</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/hooked-rep" id="var-tag">hooked-rep</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/label" id="var-tag">label</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/lex" id="var-tag">lex</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/lit" id="var-tag">lit</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/make-state" id="var-tag">make-state</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/mapcat" id="var-tag">mapcat</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/mapsum" id="var-tag">mapsum</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/match" id="var-tag">match</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/not-followed" id="var-tag">not-followed</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/nothing-descriptors" id="var-tag">nothing-descriptors</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/opt" id="var-tag">opt</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/parser-m" id="var-tag">parser-m</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/peek" id="var-tag">peek</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/phrase" id="var-tag">phrase</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/prefix" id="var-tag">prefix</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/prod" id="var-tag">prod</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/radix-digit" id="var-tag">radix-digit</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/radix-label" id="var-tag">radix-label</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/rep" id="var-tag">rep</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/rep*" id="var-tag">rep*</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/rule?" id="var-tag">rule?</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/separated-rep" id="var-tag">separated-rep</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/separated-rep*" id="var-tag">separated-rep*</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/set-term" id="var-tag">set-term</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/state?" id="var-tag">state?</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/substitute" id="var-tag">substitute</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/substitute-1" id="var-tag">substitute-1</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/suffix" id="var-tag">suffix</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/template-sum" id="var-tag">template-sum</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/term" id="var-tag">term</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/term*" id="var-tag">term*</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/validate" id="var-tag">validate</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/vcat" id="var-tag">vcat</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/when" id="var-tag">when</a> </span><span id="var-link"><a href="edu.arizona.fnparse.hound-api.html#edu.arizona.fnparse.hound/with-error" id="var-tag">with-error</a> </span><br />
+  
+</div><div id="namespace-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.json">edu.arizona.fnparse.json</h2>
+  by <span id="author">unknown author</span><br />
+  <a href="edu.arizona.fnparse.json-api.html" id="api-link">Detailed API documentation</a><br />
+  <pre id="namespace-docstr">Contains a parser for [the JSON language][JSON], or
+JavaScript Object Notation. It is a simple language for
+storing simple data structures: numbers, strings,
+"arrays" (i.e. vectors), and "objects" (i.e. maps).
+
+The formal grammar can be seen in pictoral format
+at [JSON's homepage][JSON] or in textual format in
+[RFC 4627][RFC].
+
+TODO: Implement numbers!
+
+[JSON]: http://json.org
+[RFC]: <a href="http://www.ietf.org/rfc/rfc4627">http://www.ietf.org/rfc/rfc4627</a></pre>
+  
+  Public variables and functions:
+  <span id="var-link"><a href="edu.arizona.fnparse.json-api.html#edu.arizona.fnparse.json/&lt;array-content&gt;" id="var-tag">&lt;array-content&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.json-api.html#edu.arizona.fnparse.json/&lt;array-end&gt;" id="var-tag">&lt;array-end&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.json-api.html#edu.arizona.fnparse.json/&lt;array-start&gt;" id="var-tag">&lt;array-start&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.json-api.html#edu.arizona.fnparse.json/&lt;array&gt;" id="var-tag">&lt;array&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.json-api.html#edu.arizona.fnparse.json/&lt;control-char&gt;" id="var-tag">&lt;control-char&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.json-api.html#edu.arizona.fnparse.json/&lt;document&gt;" id="var-tag">&lt;document&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.json-api.html#edu.arizona.fnparse.json/&lt;escape-char-start&gt;" id="var-tag">&lt;escape-char-start&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.json-api.html#edu.arizona.fnparse.json/&lt;escaped-str-char&gt;" id="var-tag">&lt;escaped-str-char&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.json-api.html#edu.arizona.fnparse.json/&lt;false&gt;" id="var-tag">&lt;false&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.json-api.html#edu.arizona.fnparse.json/&lt;name-separator&gt;" id="var-tag">&lt;name-separator&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.json-api.html#edu.arizona.fnparse.json/&lt;normal-str-char&gt;" id="var-tag">&lt;normal-str-char&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.json-api.html#edu.arizona.fnparse.json/&lt;null&gt;" id="var-tag">&lt;null&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.json-api.html#edu.arizona.fnparse.json/&lt;object-content&gt;" id="var-tag">&lt;object-content&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.json-api.html#edu.arizona.fnparse.json/&lt;object-end&gt;" id="var-tag">&lt;object-end&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.json-api.html#edu.arizona.fnparse.json/&lt;object-entry&gt;" id="var-tag">&lt;object-entry&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.json-api.html#edu.arizona.fnparse.json/&lt;object-start&gt;" id="var-tag">&lt;object-start&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.json-api.html#edu.arizona.fnparse.json/&lt;object&gt;" id="var-tag">&lt;object&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.json-api.html#edu.arizona.fnparse.json/&lt;str-char&gt;" id="var-tag">&lt;str-char&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.json-api.html#edu.arizona.fnparse.json/&lt;str-content&gt;" id="var-tag">&lt;str-content&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.json-api.html#edu.arizona.fnparse.json/&lt;str-delimiter&gt;" id="var-tag">&lt;str-delimiter&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.json-api.html#edu.arizona.fnparse.json/&lt;str&gt;" id="var-tag">&lt;str&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.json-api.html#edu.arizona.fnparse.json/&lt;true&gt;" id="var-tag">&lt;true&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.json-api.html#edu.arizona.fnparse.json/&lt;unicode-sequence&gt;" id="var-tag">&lt;unicode-sequence&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.json-api.html#edu.arizona.fnparse.json/&lt;value-separator&gt;" id="var-tag">&lt;value-separator&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.json-api.html#edu.arizona.fnparse.json/&lt;value&gt;" id="var-tag">&lt;value&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.json-api.html#edu.arizona.fnparse.json/&lt;ws?&gt;" id="var-tag">&lt;ws?&gt;</a> </span><br />
+  
+</div><div id="namespace-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.math">edu.arizona.fnparse.math</h2>
+  by <span id="author">unknown author</span><br />
+  <a href="edu.arizona.fnparse.math-api.html" id="api-link">Detailed API documentation</a><br />
+  <pre id="namespace-docstr"></pre>
+  
+  Public variables and functions:
+  <span id="var-link"><a href="edu.arizona.fnparse.math-api.html#edu.arizona.fnparse.math/&lt;addition-level&gt;" id="var-tag">&lt;addition-level&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.math-api.html#edu.arizona.fnparse.math/&lt;multiplication-level&gt;" id="var-tag">&lt;multiplication-level&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.math-api.html#edu.arizona.fnparse.math/&lt;number&gt;" id="var-tag">&lt;number&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.math-api.html#edu.arizona.fnparse.math/&lt;parenthesized&gt;" id="var-tag">&lt;parenthesized&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.math-api.html#edu.arizona.fnparse.math/&lt;symbol-content&gt;" id="var-tag">&lt;symbol-content&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.math-api.html#edu.arizona.fnparse.math/&lt;ws&gt;" id="var-tag">&lt;ws&gt;</a> </span><span id="var-link"><a href="edu.arizona.fnparse.math-api.html#edu.arizona.fnparse.math/ws-suffix" id="var-tag">ws-suffix</a> </span><br />
+  
 </div>
 </div>
               </div>

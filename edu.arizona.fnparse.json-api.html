@@ -1,0 +1,421 @@
+<html>
+  <head>
+    <title>edu.arizona.fnparse.json API reference (fnparse)</title>
+    <link href="static/favicon.png" rel="icon" />
+    <link href="static/favicon.png" rel="shortcut icon" />
+    <link media="all" type="text/css" href="static/clojure.css" rel="stylesheet" />
+    <link media="all" type="text/css" href="static/wiki.css" rel="stylesheet" />
+    <link media="all" type="text/css" href="static/internal.css" rel="stylesheet" />
+    <!-- TODO: are we using these (from clojure.org)? If so, add the files -->
+    <script src="file/view/code_highlighter.js" type="text/javascript"></script>
+    <script src="file/view/clojure.js" type="text/javascript"></script>
+    <style>.menuWrapper{height: 36px;}</style>
+    <!--[if lte IE 6]>
+    <link rel="stylesheet" href="http://www.wikispaces.com/_/2009051601/s/internal_ie.css" type="text/css" />
+    <![endif]-->
+  </head>
+<!--
+This document was auto-generated from the source by the clojure autodoc system.
+To report errors or ask questions about the overall documentation structure, formatting,
+etc., contact Tom Faulhaber (google mail name: tomfaulhaber).
+For errors in the documentation of a particular namespace, contact the author of that
+namespace.
+-->
+  <body>
+    <div id="AllContentContainer">
+      <div id="Header">
+	<a id="Logo" href="index.html"><img alt="Clojure" height="100" width="100" src="static/clojure-icon.gif" /></a>
+	<h1><a title="page header title" id="page-header" href="index.html">fnparse</a></h1>
+      </div>
+      <div id="leftcolumn"><div style="text-align: center;"></div>
+<div class="menu">
+  <div class="WikiCustomNav WikiElement wiki">
+    <a class="wiki_link" href="index.html">Overview</a><br />
+    <a class="wiki_link" href="api-index.html">API Index</a><br />
+    <a class="wiki_link" href="#">Namespaces:</a>
+    <ul id="left-sidebar-list">
+      <li><a href="edu.arizona.fnparse.cat-api.html" class="wiki_link">edu.arizona.fnparse.cat</a></li><li><a href="edu.arizona.fnparse.clojure-api.html" class="wiki_link">edu.arizona.fnparse.clojure</a></li><li><a href="edu.arizona.fnparse.core-api.html" class="wiki_link">edu.arizona.fnparse.core</a></li><li><a href="edu.arizona.fnparse.hound-api.html" class="wiki_link">edu.arizona.fnparse.hound</a></li><li><a href="edu.arizona.fnparse.json-api.html" class="wiki_link">edu.arizona.fnparse.json</a></li><li><a href="edu.arizona.fnparse.math-api.html" class="wiki_link">edu.arizona.fnparse.math</a></li>
+    </ul>
+  </div>
+</div>
+</div>
+      <div id="rightcolumn">
+	<div id="Content">
+	  <div class="contentBox"><div class="innerContentBox">
+              <div id="content_view" class="wiki wikiPage">
+                <div id="right-sidebar"><div id="toc">
+  <h1 class="nopad">Table of Contents</h1>
+  <div style="margin-left: 1em;" class="toc-section">
+    <a href="#toc0">Overview</a>
+    <div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.json/&lt;array-content&gt;">&lt;array-content&gt;</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.json/&lt;array-end&gt;">&lt;array-end&gt;</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.json/&lt;array-start&gt;">&lt;array-start&gt;</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.json/&lt;array&gt;">&lt;array&gt;</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.json/&lt;control-char&gt;">&lt;control-char&gt;</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.json/&lt;document&gt;">&lt;document&gt;</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.json/&lt;escape-char-start&gt;">&lt;escape-char-start&gt;</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.json/&lt;escaped-str-char&gt;">&lt;escaped-str-char&gt;</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.json/&lt;false&gt;">&lt;false&gt;</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.json/&lt;name-separator&gt;">&lt;name-separator&gt;</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.json/&lt;normal-str-char&gt;">&lt;normal-str-char&gt;</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.json/&lt;null&gt;">&lt;null&gt;</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.json/&lt;object-content&gt;">&lt;object-content&gt;</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.json/&lt;object-end&gt;">&lt;object-end&gt;</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.json/&lt;object-entry&gt;">&lt;object-entry&gt;</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.json/&lt;object-start&gt;">&lt;object-start&gt;</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.json/&lt;object&gt;">&lt;object&gt;</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.json/&lt;str-char&gt;">&lt;str-char&gt;</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.json/&lt;str-content&gt;">&lt;str-content&gt;</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.json/&lt;str-delimiter&gt;">&lt;str-delimiter&gt;</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.json/&lt;str&gt;">&lt;str&gt;</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.json/&lt;true&gt;">&lt;true&gt;</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.json/&lt;unicode-sequence&gt;">&lt;unicode-sequence&gt;</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.json/&lt;value-separator&gt;">&lt;value-separator&gt;</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.json/&lt;value&gt;">&lt;value&gt;</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.json/&lt;ws?&gt;">&lt;ws?&gt;</a>
+    </div>
+    <br />
+  </div>
+</div>
+</div>
+                <div id="content-tag"><h1 id="overview">API for <span id="namespace-name">edu.arizona.fnparse.json</span></h1>
+by <span id="author">Unknown</span><br />
+<br />Usage:
+<pre>
+(ns your-namespace
+  (:require <span id="long-name">edu.arizona.fnparse.json</span>))
+</pre><pre>
+</pre><h2>Overview</h2>
+<pre id="namespace-docstr">Contains a parser for [the JSON language][JSON], or
+JavaScript Object Notation. It is a simple language for
+storing simple data structures: numbers, strings,
+"arrays" (i.e. vectors), and "objects" (i.e. maps).
+
+The formal grammar can be seen in pictoral format
+at [JSON's homepage][JSON] or in textual format in
+[RFC 4627][RFC].
+
+TODO: Implement numbers!
+
+[JSON]: http://json.org
+[RFC]: <a href="http://www.ietf.org/rfc/rfc4627">http://www.ietf.org/rfc/rfc4627</a></pre>
+<br />
+<h2>Public Variables and Functions</h2>
+<div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.json/&lt;array-content&gt;">&lt;array-content&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">Consumes a sequence of JSON values separated by commas, with optional
+whitespace padding on the front.
+
+Rule Summary
+============
+* Description: FnParse Hound rule
+* Product: A vector.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.json/&lt;array-end&gt;">&lt;array-end&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">Padded on the front with optional whitespace.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.json/&lt;array-start&gt;">&lt;array-start&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">Padded on the front with optional whitespace.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.json/&lt;array&gt;">&lt;array&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">Consumes a JSON array. Optionally padded on the front with whitespace.
+
+Rule Summary
+============
+* Description: FnParse Hound rule
+* Product: A vector.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.json/&lt;control-char&gt;">&lt;control-char&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">Consumes an ASCII control character, which is not allowed in strings.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.json/&lt;document&gt;">&lt;document&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">Consumes a general JSON document, optionally padded
+with whitespace on both sides.
+The root rule of the JSON grammar.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.json/&lt;escape-char-start&gt;">&lt;escape-char-start&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">Padded on the front with optional whitespace.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.json/&lt;escaped-str-char&gt;">&lt;escaped-str-char&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">Consumes an escaped character in a string: a backslash
+followed by an escape sequence.
+
+Rule Summary
+============
+* Description: FnParse Hound rule
+* Product: A character.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.json/&lt;false&gt;">&lt;false&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">Padded on the front with optional whitespace.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.json/&lt;name-separator&gt;">&lt;name-separator&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">Padded on the front with optional whitespace.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.json/&lt;normal-str-char&gt;">&lt;normal-str-char&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">Consumes normal, non-espaced string character.
+No control characters allowed.
+
+Rule Summary
+============
+* Description: FnParse Hound rule
+* Product: A character.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.json/&lt;null&gt;">&lt;null&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">Padded on the front with optional whitespace.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.json/&lt;object-content&gt;">&lt;object-content&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">Consumes a sequence of object entries separated by commas. Optionally
+padded with whitepace on the front.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.json/&lt;object-end&gt;">&lt;object-end&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">Padded on the front with optional whitespace.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.json/&lt;object-entry&gt;">&lt;object-entry&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">Consumes a string-value pair with a colon. They appear in objects.
+Optionally padded on the front with whitespace.
+
+Rule Summary
+============
+* Description: FnParse Hound rule
+* Product: A vector pair.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.json/&lt;object-start&gt;">&lt;object-start&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">Padded on the front with optional whitespace.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.json/&lt;object&gt;">&lt;object&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">Consumes a JSON object. Optionally padded on the front with whitespace.
+
+Rule Summary
+============
+* Description: FnParse Hound rule
+* Product: A map.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.json/&lt;str-char&gt;">&lt;str-char&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">Consumes a general string character.
+
+Rule Summary
+============
+* Consumes: One character.
+* Description: FnParse Hound rule
+* Product: A character or a sequence of characters.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.json/&lt;str-content&gt;">&lt;str-content&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">Consumes a sequence of string characters.
+
+Rule Summary
+============
+* Consumes: Zero or more characters.
+* Description: FnParse Hound rule
+* Product: A string.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.json/&lt;str-delimiter&gt;">&lt;str-delimiter&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">Padded on the front with optional whitespace.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.json/&lt;str&gt;">&lt;str&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">Consumes a JSON string.
+
+Rule Summary
+============
+* Description: FnParse Hound rule
+* Product: A string.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.json/&lt;true&gt;">&lt;true&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">Padded on the front with optional whitespace.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.json/&lt;unicode-sequence&gt;">&lt;unicode-sequence&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">Consumes a lowercase 'u' followed by hexadecimal digits.
+
+Rule Summary
+============
+* Description: FnParse Hound rule
+* Product: The character with the given digits' Unicode code.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.json/&lt;value-separator&gt;">&lt;value-separator&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">Padded on the front with optional whitespace.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.json/&lt;value&gt;">&lt;value&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">Consumes a general JSON value, optionally padded
+with whitespace on the front.
+
+Rule Summary
+============
+* Description: FnParse Hound rule
+* Product: A vector, map, number, true, false, or nil.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.json/&lt;ws?&gt;">&lt;ws?&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">Consumes optional, ignored JSON whitespace.</pre>
+  
+</div>
+
+
+</div>
+              </div>
+            </div>
+          </div>
+	</div>
+	<div id="foot">
+	  <div style="text-align: center;" id="copyright">No copyright info </div>
+	</div>
+      </div>
+      <div id="DesignedBy">Logo &amp; site design by <a title="Visit Tom Hickey's website." href="http://www.tomhickey.com">Tom Hickey</a>.<br />
+      Clojure auto-documentation system by Tom Faulhaber.</div>
+    </div>
+    <!-- /AllContentContainer -->
+  </body>
+
+</html>

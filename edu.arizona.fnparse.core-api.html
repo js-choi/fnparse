@@ -1,0 +1,254 @@
+<html>
+  <head>
+    <title>edu.arizona.fnparse.core API reference (fnparse)</title>
+    <link href="static/favicon.png" rel="icon" />
+    <link href="static/favicon.png" rel="shortcut icon" />
+    <link media="all" type="text/css" href="static/clojure.css" rel="stylesheet" />
+    <link media="all" type="text/css" href="static/wiki.css" rel="stylesheet" />
+    <link media="all" type="text/css" href="static/internal.css" rel="stylesheet" />
+    <!-- TODO: are we using these (from clojure.org)? If so, add the files -->
+    <script src="file/view/code_highlighter.js" type="text/javascript"></script>
+    <script src="file/view/clojure.js" type="text/javascript"></script>
+    <style>.menuWrapper{height: 36px;}</style>
+    <!--[if lte IE 6]>
+    <link rel="stylesheet" href="http://www.wikispaces.com/_/2009051601/s/internal_ie.css" type="text/css" />
+    <![endif]-->
+  </head>
+<!--
+This document was auto-generated from the source by the clojure autodoc system.
+To report errors or ask questions about the overall documentation structure, formatting,
+etc., contact Tom Faulhaber (google mail name: tomfaulhaber).
+For errors in the documentation of a particular namespace, contact the author of that
+namespace.
+-->
+  <body>
+    <div id="AllContentContainer">
+      <div id="Header">
+	<a id="Logo" href="index.html"><img alt="Clojure" height="100" width="100" src="static/clojure-icon.gif" /></a>
+	<h1><a title="page header title" id="page-header" href="index.html">fnparse</a></h1>
+      </div>
+      <div id="leftcolumn"><div style="text-align: center;"></div>
+<div class="menu">
+  <div class="WikiCustomNav WikiElement wiki">
+    <a class="wiki_link" href="index.html">Overview</a><br />
+    <a class="wiki_link" href="api-index.html">API Index</a><br />
+    <a class="wiki_link" href="#">Namespaces:</a>
+    <ul id="left-sidebar-list">
+      <li><a href="edu.arizona.fnparse.cat-api.html" class="wiki_link">edu.arizona.fnparse.cat</a></li><li><a href="edu.arizona.fnparse.clojure-api.html" class="wiki_link">edu.arizona.fnparse.clojure</a></li><li><a href="edu.arizona.fnparse.core-api.html" class="wiki_link">edu.arizona.fnparse.core</a></li><li><a href="edu.arizona.fnparse.hound-api.html" class="wiki_link">edu.arizona.fnparse.hound</a></li><li><a href="edu.arizona.fnparse.json-api.html" class="wiki_link">edu.arizona.fnparse.json</a></li><li><a href="edu.arizona.fnparse.math-api.html" class="wiki_link">edu.arizona.fnparse.math</a></li>
+    </ul>
+  </div>
+</div>
+</div>
+      <div id="rightcolumn">
+	<div id="Content">
+	  <div class="contentBox"><div class="innerContentBox">
+              <div id="content_view" class="wiki wikiPage">
+                <div id="right-sidebar"><div id="toc">
+  <h1 class="nopad">Table of Contents</h1>
+  <div style="margin-left: 1em;" class="toc-section">
+    <a href="#toc0">Overview</a>
+    <div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.core/*format-remainder-limit*">*format-remainder-limit*</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.core/AParseAnswer">AParseAnswer</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.core/AState">AState</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.core/apply">apply</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.core/failure?">failure?</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.core/find">find</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.core/format-parse-error">format-parse-error</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.core/match">match</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.core/matches-seq">matches-seq</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.core/substitute">substitute</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.core/substitute-1">substitute-1</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.core/success?">success?</a>
+    </div>
+    <br />
+  </div>
+</div>
+</div>
+                <div id="content-tag"><h1 id="overview">API for <span id="namespace-name">edu.arizona.fnparse.core</span></h1>
+by <span id="author">Joshua Choi</span><br />
+<br />Usage:
+<pre>
+(ns your-namespace
+  (:require <span id="long-name">edu.arizona.fnparse.core</span>))
+</pre><pre>
+</pre><h2>Overview</h2>
+<pre id="namespace-docstr"></pre>
+<br />
+<h2>Public Variables and Functions</h2>
+<div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.core/*format-remainder-limit*">*format-remainder-limit*</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">The limit at which `format-remainder`will cut off lengthy
+remainders at. Must be a positive integer.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.core/AParseAnswer">AParseAnswer</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">The protocol of FnParse Answers: what
+FnParse rules must return. Answers must
+contain a Result—i.e. a Success or Failure.
+This protocol is necessary for the parse
+function.
+  FnParse Cat rules return Successes or
+Failures, which are their own Answers.
+  FnParse Hound rules return Replies, which
+contain Results.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.core/AState">AState</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">The protocol of FnParse states, which must
+be able to return a position.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.core/apply">apply</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (apply rule state)
+</pre>
+  <pre id="var-docstr">Applies the given rule to the given state.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.core/failure?">failure?</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (failure? result)
+</pre>
+  <pre id="var-docstr">Is the given result a Failure?</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.core/find">find</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (find state rule &amp; {:keys #{flatten?}})
+</pre>
+  <pre id="var-docstr">Finds all occurrences of a rule in a sequence of tokens.
+Returns a lazy sequence of the rule's products at each
+occurence. The occurences do not overlap.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.core/format-parse-error">format-parse-error</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (format-parse-error error)
+</pre>
+  <pre id="var-docstr">Returns a formatted string from the given error.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.core/match">match</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (match state rule &amp; {:keys #{failure-fn success-fn}, :or {success-fn print-success, failure-fn print-failure}})
+</pre>
+  <pre id="var-docstr">The general matching function of FnParse. Attempts to
+match the given rule to at least the beginning of the given input.
+
+*   `rule`: The rule to match with.
+*   `state`: The initial state.
+*   `success-fn`: An optional function called when the rule
+    matches the input.
+    `(complete-fn final-product final-remainder)` is called.
+*   `failure-fn`: An optional function called when the rule does not
+    match the input. `(failure-fn final-error)` is called,
+    where `final-error` is an object of type
+    `:edu.arizona.fnparse.ParseError`.
+  
+If `success-fn` and `failure-fn` aren't included, then
+`match` will print out a report of the parsing result.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.core/matches-seq">matches-seq</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (matches-seq state rule &amp; {:keys #{flatten?}})
+</pre>
+  <pre id="var-docstr">Finds all *consecutive* occurrences of a rule in a
+sequence of tokens.
+Returns a lazy sequence of the rule's products at each
+occurence. The occurrences must come one after another,
+or else the last element of the sequence will be a ParseError.
+The occurrences also do not overlap.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.core/substitute">substitute</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (substitute state rule &amp; {:keys #{flatten?}})
+</pre>
+  <pre id="var-docstr">Substitutes all occurences of a rule in a sequence of tokens
+with their respective products. Returns a lazy sequence of
+tokens and products.
+
+`flatten?` is a boolean. If it is true, then the substituting
+products will be flattened into the input sequence; in that
+case the products must always be Seqables.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.core/substitute-1">substitute-1</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (substitute-1 state rule &amp; {:keys #{flatten?}})
+</pre>
+  <pre id="var-docstr">Substitutes the first occurence of a rule in a sequence of
+tokens with its respective product. Returns a lazy sequence
+of tokens and products.
+
+See `substitute`'s docs for information on `flatten?`.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.core/success?">success?</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (success? result)
+</pre>
+  <pre id="var-docstr">Is the given result is a Success?</pre>
+  
+</div>
+
+
+</div>
+              </div>
+            </div>
+          </div>
+	</div>
+	<div id="foot">
+	  <div style="text-align: center;" id="copyright">No copyright info </div>
+	</div>
+      </div>
+      <div id="DesignedBy">Logo &amp; site design by <a title="Visit Tom Hickey's website." href="http://www.tomhickey.com">Tom Hickey</a>.<br />
+      Clojure auto-documentation system by Tom Faulhaber.</div>
+    </div>
+    <!-- /AllContentContainer -->
+  </body>
+
+</html>
