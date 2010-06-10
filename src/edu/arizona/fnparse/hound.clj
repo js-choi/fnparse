@@ -217,8 +217,8 @@
   to validate a certain rule.
   
     (for [value <number>
-            _ (when (< odd 10)
-                \"number must be less than ten\")]
+          _ (when (< odd 10)
+              \"number must be less than ten\")]
         value)
   
   The rule given above succeeds only when `<number>`
