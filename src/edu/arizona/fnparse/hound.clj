@@ -5,6 +5,7 @@
             [clojure.contrib [monads :as m] [def :as d] [seq :as seq]
                              [except :as except] [core :as cljcore]]
             [clojure [template :as t] [set :as set]])
+  (:import java.util.Scanner)
   (:refer-clojure :rename {mapcat seq-mapcat, when if-when}
                   :exclude #{for + peek find}))
 
@@ -1118,3 +1119,20 @@
   {:product "The matching character itself."
    :consumes "One character."}
   (term "an ASCII control character" #(Character/isISOControl (char %))))
+
+(defrule <ws-substrings>
+  "A rule matching a string of whitespace-separated substrings."
+  {:product "A vector of strings."
+   :consumes "One string."}
+  (term* "a string of Java numbers"
+    (fn [^String s] (->> s Scanner. iterator-seq vec))))
+
+#_(defmaker rule-term
+  "A terminal rule matching the first single token
+  to the given FnParse rule (both Cat rules and
+  Hound rules work), using the `match` function."
+  {:product "The product of `<r>`."
+   :consumes "One token."}
+  []
+  (term* "TODO"
+    (c/match* ())))

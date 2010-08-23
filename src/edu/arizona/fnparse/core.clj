@@ -174,6 +174,9 @@
 (extend-protocol ALocation
   Integer (location-code [position] (format "position %s" position)))
 
+(defrecord LineLocation [line]
+  ALocation (location-code [this] (format "line %s" line)))
+
 (defprotocol ALineAndColumnLocation
   (location-inc-line [location])
   (location-inc-column [location]))
