@@ -230,9 +230,9 @@
   (binding [*remainder-accessor* remainder-a] ; this is completely
                                               ; optional
     (rule-match text
-      #(raise parse-error "invalid document \"%s\""
+      #(raise parse-error % "invalid document \"%s\""
          (apply-str (remainder-a %)))
-      #(raise parse-error "leftover data after a valid node \"%s\""
+      #(raise parse-error %2 "leftover data after a valid node \"%s\""
          (apply-str (remainder-a %2)))
       (struct state-s tokens 0 0))))
 ; The call to rule-match above is equivalent to the stuff below:
