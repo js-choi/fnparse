@@ -1,12 +1,9 @@
 (ns edu.arizona.fnparse.core
   {:author "Joshua Choi"}
-  (:require [clojure.contrib [string :as str] [def :as d]
-                             [core :as cljcore] [except :as except]]
-            [clojure [template :as temp] [set :as set]]
+  (:require [clojure.contrib [def :as d] [except :as except]]
+            [clojure [string :as str] [template :as temp] [set :as set]]
             [edu.arizona.fnparse.core-private :as cp])
   (:refer-clojure :rename {apply apply-seq}, :exclude #{find}))
-
-; (require '[clojure.stacktrace :as s] '[edu.arizona.fnparse :as fnparse] '[edu.arizona.fnparse [core :as c] [common :as k] [hound :as h] [json :as j] [cat :as cat] [clojure :as clj] [math :as math] [lojban :as l]] :reload)
 
 (defprotocol AState
   "The protocol of FnParse states, which must
@@ -233,7 +230,7 @@
   remainders at. Must be a positive integer.")
 
 (defn format-remainder [string-input? subinput]
-  {:pre #{(cljcore/seqable? subinput) (pos? *format-remainder-limit*)
+  {:pre #{(seq subinput) (pos? *format-remainder-limit*)
           (integer? *format-remainder-limit*)}}
   (let [remainder-size (count subinput)
         subinput (cond (= remainder-size 0) "the end of input"
