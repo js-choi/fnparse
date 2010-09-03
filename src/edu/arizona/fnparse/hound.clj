@@ -1,7 +1,7 @@
 (ns edu.arizona.fnparse.hound
   "This is *FnParse Hound*, which can create unambiguous
   LL(1) or LL(n) parsers."
-  (:require [edu.arizona.fnparse [core :as c] [common :as k]]
+  (:require [edu.arizona.fnparse [core :as c]]
             [clojure.contrib [monads :as m] [def :as d] [seq :as seq]
                              [except :as except] [core :as cljcore]]
             [clojure [template :as t] [set :as set]])
@@ -46,7 +46,7 @@
   ([rule-name form] `(defrule ~rule-name nil ~form))
   ([rule-name doc-string form] `(defrule ~rule-name ~doc-string nil ~form))
   ([rule-name doc-string meta-opts form]
-  `(k/general-defrule ~rule-name "FnParse Hound rule" ~doc-string ~meta-opts
+  `(c/general-defrule ~rule-name "FnParse Hound rule" ~doc-string ~meta-opts
      ::Rule ~form)))
 
 (defmacro defrule-
@@ -79,7 +79,7 @@
   that they save the arguments they receive and their
   corresponding results in a cache, and search the cache
   every time they are called for equal arguments. See
-  `clojure.k/memoize` for more information.
+  `clojure.c/memoize` for more information.
   
   95% of the time, you won't have to worry about the warning below.
   
@@ -90,7 +90,7 @@
   rule when given `[1 2 3]` versus `'(1 2 3)`, then you should
   give `{:no-memoize? true}` in your metadata."
   [fn-name & forms]
-  (list* `k/general-defmaker `defn "FnParse Hound rule-maker" fn-name forms))
+  (list* `c/general-defmaker `defn "FnParse Hound rule-maker" fn-name forms))
 
 (defmacro defmaker-
   "Like `defmaker`, but also makes the var private."
@@ -101,7 +101,7 @@
   "Like `defmaker`, but makes a macro rule-maker
   instead of a function rule-maker."
   [fn-name & forms]
-  (list* `k/general-defmaker `defmacro "FnParse Hound macro rule-maker"
+  (list* `c/general-defmaker `defmacro "FnParse Hound macro rule-maker"
     fn-name forms))
 
 (defrecord State
@@ -130,7 +130,7 @@
 
 (defmacro make-rule [rule-symbol [state-symbol :as args] & body]
   {:pre #{(symbol? rule-symbol) (symbol? state-symbol) (empty? (rest args))}}
- `(k/make-rule ::Rule ~rule-symbol ~state-symbol ~@body))
+ `(c/make-rule ::Rule ~rule-symbol ~state-symbol ~@body))
 
 (defn state?
   "Tests if the given object is a Hound State."
@@ -140,7 +140,7 @@
 (defn merge-replies [mergee merger]
   (assoc merger :result
     (update-in (-> merger :result force) [:error]
-      k/merge-parse-errors (-> mergee :result force :error))))
+      c/merge-parse-errors (-> mergee :result force :error))))
 
 (defmaker prod
   "Creates a rule that always returns the given `product`.
@@ -270,7 +270,7 @@
                   (let [{next-error :error, :as next-result}
                           (-> first-result apply-product-fn :result force)]
                     (assoc next-result :error
-                      (k/merge-parse-errors first-error next-error)))
+                      (c/merge-parse-errors first-error next-error)))
                   first-result))))
           (let [first-result (-> first-reply :result force)]
             (if (c/success? first-result)
@@ -281,7 +281,7 @@
                     (let [next-result (-> next-reply :result force)
                           next-error (:error next-result)]
                       (assoc next-result :error
-                        (k/merge-parse-errors first-error next-error))))))
+                        (c/merge-parse-errors first-error next-error))))))
               (Reply. false first-result))))))))
 
 (defmaker +
@@ -348,7 +348,7 @@
         error (:error result)]
     (if (-> error :position (<= initial-position))
       (assoc result :error
-        (update-in error [:descriptors] k/assoc-label-in-descriptors l))
+        (update-in error [:descriptors] c/assoc-label-in-descriptors l))
       result)))
 
 (defmaker label

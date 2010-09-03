@@ -1,5 +1,5 @@
 (ns edu.arizona.fnparse.cat
-  (:require [edu.arizona.fnparse [core :as c] [common :as k]]
+  (:require [edu.arizona.fnparse [core :as c]]
             [clojure.contrib [monads :as m] [def :as d] [except :as except]
                              [seq :as seq] [core :as cljcore]]
             [clojure.template :as template])
@@ -46,7 +46,7 @@
   ([rule-name doc-string meta-opts form]
    {:pre [(or (string? doc-string) (nil? doc-string))
           (or (map? meta-opts) (nil? meta-opts))]}
-  `(k/general-defrule ~rule-name "FnParse Hound rule" ~doc-string ~meta-opts
+  `(c/general-defrule ~rule-name "FnParse Hound rule" ~doc-string ~meta-opts
      ::Rule ~form)))
 
 (defmacro defrule-
@@ -79,7 +79,7 @@
   that they save the arguments they receive and their
   corresponding results in a cache, and search the cache
   every time they are called for equal arguments. See
-  `clojure.k/memoize` for more information.
+  `clojure.c/memoize` for more information.
   
   95% of the time, you won't have to worry about the warning below.
   
@@ -90,7 +90,7 @@
   rule when given `[1 2 3]` versus `'(1 2 3)`, then you should
   give `{:no-memoize? true}` in your metadata."
   [fn-name & forms]
-  (list* `k/general-defmaker `defn "FnParse Hound rule-maker" fn-name forms))
+  (list* `c/general-defmaker `defn "FnParse Hound rule-maker" fn-name forms))
 
 (defmacro defmaker-
   "Like `defmaker`, but also makes the var private."
@@ -101,7 +101,7 @@
   "Like `defmaker`, but makes a macro rule-maker
   instead of a function rule-maker."
   [fn-name & forms]
-  (list* `k/general-defmaker `defmacro "FnParse Hound macro rule-maker"
+  (list* `c/general-defmaker `defmacro "FnParse Hound macro rule-maker"
     fn-name forms))
 
 (defprotocol ABankable
@@ -166,7 +166,7 @@
 
 (defmacro make-rule [rule-symbol [state-symbol :as args] & body]
   {:pre #{(symbol? rule-symbol) (symbol? state-symbol) (empty? (rest args))}}
- `(k/make-rule ::Rule ~rule-symbol ~state-symbol ~@body))
+ `(c/make-rule ::Rule ~rule-symbol ~state-symbol ~@body))
 
 (defn- make-failure [state descriptors]
   (set-bank
@@ -284,7 +284,7 @@
               next-result (c/apply next-rule (:state first-result))
               next-error (:error next-result)]
           (assoc next-result :error
-            (k/merge-parse-errors first-error next-error)))
+            (c/merge-parse-errors first-error next-error)))
         first-result))))
 
 (defn- get-memory [bank subrule state-position]
@@ -428,7 +428,7 @@
   ([<first> <second> & rest-rules]
    {:pre [(rule? <first>) (rule? <second>) (every? rule? rest-rules)]}
    (letfn [(merge-result-errors [prev-result next-error]
-             (k/merge-parse-errors (:error prev-result) next-error))
+             (c/merge-parse-errors (:error prev-result) next-error))
            (apply-next-rule [state prev-result next-rule]
              (-> next-rule
                (c/apply (set-bank state (get-bank prev-result)))
@@ -480,7 +480,7 @@
         (let [result (c/apply rule state), initial-position (:position state)]
           (if (-> result :error :position (<= initial-position))
             (update-in result [:error :descriptors]
-              k/assoc-label-in-descriptors l)
+              c/assoc-label-in-descriptors l)
             result))))))
 
 (defmaker annotate-error
