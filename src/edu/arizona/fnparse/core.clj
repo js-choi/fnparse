@@ -14,31 +14,58 @@
   (state-warnings [state])
   (state-location [state]))
 
-(defprotocol RuleMeta
+#_(defprotocol RuleMeta
   (rule-meta-info [m]))
 
-(defn rule-meta? [obj]
+#_(defn rule-meta? [obj]
   #_(extends? RuleMeta (type obj))
   true)
 
-(defrecord NormalRuleMeta [type rule-kw labels unlabelled-rule]
+(defprotocol Rule
+  "A general FnParse rule, either Cat or Dog."
+  (rule-type [<r>] "Returns a keyword denoting the rule's type: Cat or Hound.")
+  (rule-labels [<r>] "Returns a set of `<r>`'s labels.")
+  (assoc-labels [<r> lbls <old>])
+  (apply [<r> state]
+    "Applies `<r>` to `state`, returning a `ParseAnswer` object.
+    The two arguments must be compatible."))
+
+(defn rule? [obj] (satisfies? Rule obj))
+
+#_(defrecord NormalRuleMeta [type rule-kw labels unlabelled-rule]
   RuleMeta (rule-meta-info [m] m))
 
-#_(deftype NormalRule [wrapper-fn type rule-kw labels unlabelled-rule])
+(defrecord NormalRule [wrapper-fn type rule-kw labels unlabelled-rule]
+  ; TODO determine if rule-kw is necessary.
+  Rule
+  (rule-type [<r>] type)
+  (rule-labels [<r>] labels)
+  (assoc-labels [<r> lbls <old>]
+    (assoc <r> :labels lbls, :unlabelled-rule <old>))
+  (apply [<r> state] ((wrapper-fn) state)))
 
-(defn make-normal-rule-meta [type rule-kw]
+#_(defn make-normal-rule-meta [type rule-kw]
   (NormalRuleMeta. type rule-kw nil nil))
 
-; (defn make-normal-rule [wrapper-fn type rule-kw
-
-(defrecord NamedRuleMeta [type info-delay]
+#_(defrecord NamedRuleMeta [type info-delay]
   RuleMeta (rule-meta-info [m] (rule-meta-info (force info-delay))))
 
-(defn make-named-rule-meta [type meta-delay]
+(defrecord NamedRule [wrapper-delay type]
+  Rule
+  (rule-type [<r>] type)
+  (rule-labels [<r>] (rule-labels @wrapper-delay))
+  (assoc-labels [<r> lbls <old>] (assoc-labels @wrapper-delay lbls <old>))
+  (apply [<r> state] (apply @wrapper-delay state)))
+
+#_(defn make-named-rule-meta [type meta-delay]
   (NamedRuleMeta. type meta-delay))
 
-(defn rule-labels [<r>]
+#_(defn rule-labels [<r>]
   (-> <r> meta rule-meta-info :labels))
+
+#_(defn rule-labels [<r>]
+  {:pre [(extends? Rule <r>)]}
+  (:labels <r>))
 
 (defn require-rule-labels [<r>]
   (or (rule-labels <r>) (except/throw-arg "rule must be labelled")))
@@ -201,30 +228,11 @@
   (if (standard-break-chars character)
     location-inc-line location-inc-column))
 
-(defn label-rule-meta [ls <old> <r>]
-  {:pre [(rule-meta? (meta <r>))
-         (or (nil? <old>) (rule-meta? (meta <old>)))
-         (set? ls)]}
-  (vary-meta <r> assoc :labels ls, :unlabelled-rule <old>))
-
-(defn self-label-rule-meta [subrules <r>]
-  {:pre [(rule-meta? (meta <r>))]}
-  (let [original-meta (meta <r>)]
-    (with-meta <r>
-      (make-named-rule-meta (:type original-meta)
-        (delay
-          (let [original-info (rule-meta-info original-meta)
-                subrule-labels (map rule-labels subrules)
-                subrule-labels (apply-seq set/union subrule-labels)]
-            (if-not (some nil? subrule-labels)
-              (assoc original-info :labels subrule-labels)
-              original-info)))))))
-
 (defn format-warning [warning]
   (format "[%s] %s" (location-code (or (:location warning) (:position warning)))
                     (:message warning)))
 
-(defn apply
+#_(defn apply
   "Applies the given rule to the given state."
   [rule state]
   ((rule) state))
@@ -461,18 +469,68 @@ Error: %s
         (apply-seq str doc-str rule-doc-summary-header "\n"))
       doc-str)))
 
-(defmacro make-normal-rule-wrapper [type rule-symbol inner-fn-body]
+#_(defn label-rule-meta [ls <old> <r>]
+  {:pre [(rule-meta? (meta <r>))
+         (or (nil? <old>) (rule-meta? (meta <old>)))
+         (set? ls)]}
+  (vary-meta <r> assoc :labels ls, :unlabelled-rule <old>))
+
+(defn label-rule-meta [ls <old> <r>]
+  {:pre [(rule? <r>) (rule? <old>) (set? ls) (every? string? ls)]}
+  (assoc-labels <r> ls <old>))
+
+#_(defn self-label-rule-meta [subrules <r>]
+  {:pre [(rule-meta? (meta <r>))]}
+  (let [original-meta (meta <r>)]
+    (with-meta <r>
+      (make-named-rule-meta (:type original-meta)
+        (delay
+          (let [original-info (rule-meta-info original-meta)
+                subrule-labels (map rule-labels subrules)
+                subrule-labels (apply-seq set/union subrule-labels)]
+            (if-not (some nil? subrule-labels)
+              (assoc original-info :labels subrule-labels)
+              original-info)))))))
+
+(defn self-label-rule-meta [subrules <r>]
+  {:pre [(rule? <r>) (every? rule? subrules)]}
+  (NamedRule.
+    (delay (let [subrule-labels (->> subrules (map rule-labels) concat)]
+             (if-not (some nil? subrule-labels) ; TODO Check if wrong.
+               (assoc-labels <r> subrule-labels <r>)
+               <r>)))
+    (:type <r>)))
+
+#_(defmacro make-normal-rule-wrapper [type rule-symbol inner-fn-body]
   {:pre [(keyword? type) (symbol? rule-symbol)]}
   (let [rule-kw (keyword rule-symbol)]
    `(let [inner-body-delay# (delay ~inner-fn-body)]
       (with-meta (fn [] (force inner-body-delay#))
         (make-normal-rule-meta ~type ~rule-kw)))))
 
-(defmacro make-named-rule-wrapper [type rule-form]
+(defmacro make-normal-rule-wrapper
+  "Creates a `NormalRule` instance. This is for rules
+  that are not defined with `defrule` or `defmaker`,
+  and thus cannot be recursive.
+  
+  The `wrapper-fn` must be a function with no parameters that returns a function
+  that takes a `State` and returns an `Answer`."
+  [type rule-symbol inner-fn-body]
+  {:pre [(keyword? type) (symbol? rule-symbol)]}
+  (let [rule-kw (keyword rule-symbol)]
+   `(let [inner-body-delay# (delay ~inner-fn-body)]
+      (NormalRule. (fn normal-rule [] @inner-body-delay#)
+                   ~type ~rule-kw nil nil))))
+
+#_(defmacro make-named-rule-wrapper [type rule-form]
   {:pre [(keyword? type)]}
  `(let [rule-delay# (delay ~rule-form)]
     (with-meta (fn named-rule [] (force ((force rule-delay#))))
       (make-named-rule-meta ~type (delay (meta (force rule-delay#)))))))
+
+(defmacro make-named-rule-wrapper [type rule-form]
+  {:pre [(keyword? type)]}
+ `(NamedRule. (delay ~rule-form) ~type))
 
 (defmacro make-rule [type rule-symbol state-symbol & body]
   {:pre [(symbol? rule-symbol) (keyword? type)]}

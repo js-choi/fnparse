@@ -18,7 +18,7 @@
 (defn rule?
   "Tests if the given object is a Hound Rule, or a var containing a Hound Rule."
   [obj]
-  (and (-> obj type (= ::Rule)) (c/rule-meta? (meta obj))))
+  (and (satisfies? c/Rule obj) (-> obj c/rule-type (= ::Rule))))
 
 (defmacro defrule
   "Defines a rule var. You really should use this instead of `def`
@@ -47,7 +47,7 @@
   ([rule-name doc-string form] `(defrule ~rule-name ~doc-string nil ~form))
   ([rule-name doc-string meta-opts form]
   `(c/general-defrule ~rule-name "FnParse Hound rule" ~doc-string ~meta-opts
-     ::Rule ~form)))
+                     ::Rule ~form)))
 
 (defmacro defrule-
   "Like `defrule`, but also makes the var private."
@@ -90,7 +90,7 @@
   rule when given `[1 2 3]` versus `'(1 2 3)`, then you should
   give `{:no-memoize? true}` in your metadata."
   [fn-name & forms]
-  (list* `c/general-defmaker `defn "FnParse Hound rule-maker" fn-name forms))
+  `(c/general-defmaker defn "FnParse Hound rule-maker" ~fn-name ~@forms))
 
 (defmacro defmaker-
   "Like `defmaker`, but also makes the var private."
@@ -376,7 +376,7 @@
   [l rule]
   {:pre #{(c/descriptor-content? l) (rule? rule)}}
   (let [rule (or (c/rule-unlabelled-base rule) rule)]
-    (c/label-rule-meta #{l} rule
+    (identity ; c/label-rule-meta #{l} rule
       (make-rule labelled-rule [state]
         (let [initial-position (:position state)
               reply (c/apply rule state)]

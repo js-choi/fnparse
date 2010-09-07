@@ -16,7 +16,7 @@
 (defn rule?
   "Tests if the given object is a Hound Rule, or a var containing a Hound Rule."
   [obj]
-  (-> obj type (= ::Rule)))
+  (and (satisfies? c/Rule obj) (-> obj c/rule-type (= ::Rule))))
 
 (defmacro defrule
   "Defines a rule var. You really should use this instead of `def`
