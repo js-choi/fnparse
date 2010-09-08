@@ -14,34 +14,38 @@
   (state-warnings [state])
   (state-location [state]))
 
-#_(defprotocol RuleMeta
-  (rule-meta-info [m]))
-
-#_(defn rule-meta? [obj]
-  #_(extends? RuleMeta (type obj))
-  true)
-
 (defprotocol Rule
   "A general FnParse rule, either Cat or Dog."
   (rule-type [<r>] "Returns a keyword denoting the rule's type: Cat or Hound.")
   (rule-labels [<r>] "Returns a set of `<r>`'s labels.")
-  (assoc-labels [<r> lbls <old>])
+  (rule-unlabelled-base [<r>]
+    "Returns either `nil`, if the rule has not been labelled, or
+    the base `Rule` inside `<r>` from before it was labelled.")
+  (assoc-labels [<r> lbls <old>]
+    "Given a newly made labelling rule `<r>`, and its
+    previous and base version `<old>`, returns a
+    new version of `<r>` associated with new data:
+    `(rule-labels %)` will return `lbls` and
+    `(rule-unlabelled-base %)` will return `<old>`.")
   (apply [<r> state]
     "Applies `<r>` to `state`, returning a `ParseAnswer` object.
-    The two arguments must be compatible."))
+    `state` must be must be compatible with `<r>`."))
 
-(defn rule? [obj] (satisfies? Rule obj))
+(defn rule?
+  "Returns true if `obj` satisfies the `Rule` protocol."
+  [obj] (satisfies? Rule obj))
 
 (defn rule-of-type?
-  "Tests if the given object is a Hound Rule, or a var containing a Hound Rule."
+  "Tests if `obj` is a `Rule` of the given `type` keyword."
   [type obj]
+  {:pre [(keyword? type)]}
   (and (satisfies? Rule obj) (-> obj rule-type (= type))))
 
-(defrecord NormalRule [wrapper-fn type rule-kw labels unlabelled-rule]
-  ; TODO determine if rule-kw is necessary.
+(defrecord NormalRule [wrapper-fn type labels unlabelled-rule]
   Rule
   (rule-type [<r>] type)
   (rule-labels [<r>] labels)
+  (rule-unlabelled-base [<r>] unlabelled-rule)
   (assoc-labels [<r> lbls <old>]
     (assoc <r> :labels lbls, :unlabelled-rule <old>))
   (apply [<r> state] ((wrapper-fn) state)))
@@ -50,14 +54,12 @@
   Rule
   (rule-type [<r>] type)
   (rule-labels [<r>] (rule-labels @wrapper-delay))
+  (rule-unlabelled-base [<r>] (rule-unlabelled-base @wrapper-delay))
   (assoc-labels [<r> lbls <old>] (assoc-labels @wrapper-delay lbls <old>))
   (apply [<r> state] (apply @wrapper-delay state)))
 
 (defn require-rule-labels [<r>]
   (or (rule-labels <r>) (except/throw-arg "rule must be labelled")))
-
-(defn rule-unlabelled-base [<r>]
-  (-> <r> meta :unlabelled-rule))
 
 (defprotocol ADescriptorContent
   (label-string [t]))
@@ -472,10 +474,8 @@ Error: %s
   that takes a `State` and returns an `Answer`."
   [type rule-symbol inner-fn-body]
   {:pre [(keyword? type) (symbol? rule-symbol)]}
-  (let [rule-kw (keyword rule-symbol)]
-   `(let [inner-body-delay# (delay ~inner-fn-body)]
-      (NormalRule. (fn normal-rule [] @inner-body-delay#)
-                   ~type ~rule-kw nil nil))))
+ `(let [inner-body-delay# (delay ~inner-fn-body)]
+    (NormalRule. (fn normal-rule [] @inner-body-delay#) ~type nil nil)))
 
 (defmacro make-named-rule-wrapper [type rule-form]
   {:pre [(keyword? type)]}

@@ -291,7 +291,7 @@
   The order of the sub-rules matters.
   
   This is the FnParse *Hound* version of +. It does *not*
-  backtrack. This is the heart of the LL(1) properties of
+  backtrack. This is at the heart of the LL(1) properties of
   FnParse Hound.
   
   This means that it *first* searches for a successful parse from its
