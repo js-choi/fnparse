@@ -376,7 +376,7 @@
   [l rule]
   {:pre #{(c/descriptor-content? l) (rule? rule)}}
   (let [rule (or (c/rule-unlabelled-base rule) rule)]
-    (identity ; c/label-rule-meta #{l} rule
+    (c/label-rule-meta #{l} rule
       (make-rule labelled-rule [state]
         (let [initial-position (:position state)
               reply (c/apply rule state)]

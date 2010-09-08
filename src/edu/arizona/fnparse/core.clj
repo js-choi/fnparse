@@ -32,6 +32,11 @@
 
 (defn rule? [obj] (satisfies? Rule obj))
 
+(defn rule-of-type?
+  "Tests if the given object is a Hound Rule, or a var containing a Hound Rule."
+  [type obj]
+  (and (satisfies? Rule obj) (-> obj rule-type (= type))))
+
 #_(defrecord NormalRuleMeta [type rule-kw labels unlabelled-rule]
   RuleMeta (rule-meta-info [m] m))
 
