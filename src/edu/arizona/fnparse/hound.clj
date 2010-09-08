@@ -200,7 +200,7 @@
   {:succeeds "Never."
    :error "An error with the given `message`."}
   [message]
-  {:pre #{(c/descriptor-content? message)}}
+  {:pre #{(c/string? message)}}
   (make-rule with-error-rule [state]
     (make-failed-reply state #{(c/make-message-descriptor message)})))
 
@@ -374,7 +374,7 @@
    :consumes "Whatever `rule` consumes."
    :error "Smartly determines the appropriate error message."}
   [l rule]
-  {:pre #{(c/descriptor-content? l) (rule? rule)}}
+  {:pre #{(c/string? l) (rule? rule)}}
   (let [rule (or (c/rule-unlabelled-base rule) rule)]
     (c/label-rule-meta #{l} rule
       (make-rule labelled-rule [state]
@@ -452,7 +452,7 @@
   "All terminal Hound rules, including `term` and
   `term*`, are based on this function."
   [pred-product? l f]
-  {:pre #{(c/descriptor-content? l) (ifn? f)}}
+  {:pre #{(c/string? l) (ifn? f)}}
   (label l
     (make-rule terminal-rule [state]
       (let [position (:position state)]
@@ -889,7 +889,7 @@
 (defmaker not-followed
   "See also `except`."
   [l <base> & following-rules]
-  {:pre [(c/descriptor-content? l) (rule? <base>) (every? rule? following-rules)]}
+  {:pre [(c/string? l) (rule? <base>) (every? rule? following-rules)]}
   (label l (suffix <base> (mapcat (partial not-followed- l) following-rules))))
 
 (defn- except- [base-lbl <subtrahend>]
@@ -916,7 +916,7 @@
    :consumes "Whatever `minuend` consumes."
    :error "Uses the `l` you provide."}
   [l <minuend> & subtrahends]
-  {:pre [(c/descriptor-content? l) (rule? <minuend>) (every? rule? subtrahends)]}
+  {:pre [(c/string? l) (rule? <minuend>) (every? rule? subtrahends)]}
   (label l (prefix (mapcat (partial except- l) subtrahends) <minuend>)))
 
 (defrule <end-of-input>

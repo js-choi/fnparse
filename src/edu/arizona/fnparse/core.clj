@@ -1,5 +1,8 @@
 (ns edu.arizona.fnparse.core
-  {:author "Joshua Choi"}
+  "This is the core of FnParse, containing code that is
+  common to both FnParse Hound and FnParse Cat. It is
+  *not* intended for end-users' usage."
+  {:author "Joshua Choi", :skip-wiki true}
   (:require [clojure.contrib [def :as d] [except :as except]]
             [clojure [string :as str] [template :as temp] [set :as set]]
             [edu.arizona.fnparse.core-private :as cp])
@@ -58,22 +61,17 @@
   (assoc-labels [<r> lbls <old>] (assoc-labels @wrapper-delay lbls <old>))
   (apply [<r> state] (apply @wrapper-delay state)))
 
-(defn require-rule-labels [<r>]
+(defn require-rule-labels
+  "Throws an exception if the given `<r>` is not labelled."
+  [<r>]
   (or (rule-labels <r>) (except/throw-arg "rule must be labelled")))
 
-(defprotocol ADescriptorContent
-  (label-string [t]))
-
-(extend-protocol ADescriptorContent
-  String (label-string [s] s))
-
-(defn descriptor-content? [object]
-  (extends? ADescriptorContent (class object)))
-
-(defn- join-labels [labels]
-  {:pre [(or (seq labels) (empty? labels))]}
+(defn- join-labels
+  "Joins the given collection of `labels` into a single string."
+  [labels]
+  {:pre [(every? string? labels)]}
   (if-let [labels (seq labels)]
-    (when-let [label-strs (->> labels (map label-string) sort)]
+    (when-let [label-strs (->> labels sort)]
       (if-not (= (count label-strs) 1)
         (format "%s, or %s"
           (->> label-strs drop-last (str/join ", "))
@@ -82,14 +80,24 @@
     "UNLABELED RULE"))
 
 (defprotocol ErrorDescriptor
-  (descriptor-message [first-d rest-ds]))
+  "The protocol for descriptors of errors. A parse error
+  consists of many descriptors, such as labels or generic messages."
+  (descriptor-message [first-descriptor rest-descriptors]
+    "Returns a message string from the given descriptors, which
+    must be of the same type. The `first-descriptor` is separate from
+    the `rest-descriptors` to dispatch on its type."))
 
 (defrecord LabelDescriptor [lbl]
   ErrorDescriptor
   (descriptor-message [first-d rest-ds]
     (->> rest-ds (cons first-d) (map :lbl) join-labels (str "expected "))))
 
-(defn make-label-descriptor [lbl]
+(defn make-label-descriptor
+  "Returns a `LabelDescriptor`. The sort of parse error it
+  represents is that a rule with the given label was expected
+  to match at a certain place, but did not."
+  [lbl]
+  {:pre [(string? lbl)]}
   (LabelDescriptor. lbl))
 
 (defn label-descriptor? [obj]
@@ -100,7 +108,11 @@
   (descriptor-message [first-d rest-ds]
     (->> rest-ds (cons first-d) (str/join "; "))))
 
-(defn make-message-descriptor [text]
+(defn make-message-descriptor
+  "Returns a `MessageDescriptor`. The sort of parse error
+  it represents is a generic sort of error with a message,
+  like '0/0 is an invalid fraction'."
+  [text]
   (MessageDescriptor. text))
 
 (defn- exception-descriptor-message [d]
@@ -315,9 +327,6 @@ Error: %s
 "
     (format-parse-error error))
   false)
-
-(defn rule-make-state [rule input location warnings context]
-  ((-> rule meta :make-state) input location warnings context))
 
 (defn- match*
   [rule success-fn failure-fn state]
