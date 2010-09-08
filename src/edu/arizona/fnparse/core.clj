@@ -37,9 +37,6 @@
   [type obj]
   (and (satisfies? Rule obj) (-> obj rule-type (= type))))
 
-#_(defrecord NormalRuleMeta [type rule-kw labels unlabelled-rule]
-  RuleMeta (rule-meta-info [m] m))
-
 (defrecord NormalRule [wrapper-fn type rule-kw labels unlabelled-rule]
   ; TODO determine if rule-kw is necessary.
   Rule
@@ -49,28 +46,12 @@
     (assoc <r> :labels lbls, :unlabelled-rule <old>))
   (apply [<r> state] ((wrapper-fn) state)))
 
-#_(defn make-normal-rule-meta [type rule-kw]
-  (NormalRuleMeta. type rule-kw nil nil))
-
-#_(defrecord NamedRuleMeta [type info-delay]
-  RuleMeta (rule-meta-info [m] (rule-meta-info (force info-delay))))
-
 (defrecord NamedRule [wrapper-delay type]
   Rule
   (rule-type [<r>] type)
   (rule-labels [<r>] (rule-labels @wrapper-delay))
   (assoc-labels [<r> lbls <old>] (assoc-labels @wrapper-delay lbls <old>))
   (apply [<r> state] (apply @wrapper-delay state)))
-
-#_(defn make-named-rule-meta [type meta-delay]
-  (NamedRuleMeta. type meta-delay))
-
-#_(defn rule-labels [<r>]
-  (-> <r> meta rule-meta-info :labels))
-
-#_(defn rule-labels [<r>]
-  {:pre [(extends? Rule <r>)]}
-  (:labels <r>))
 
 (defn require-rule-labels [<r>]
   (or (rule-labels <r>) (except/throw-arg "rule must be labelled")))
@@ -236,11 +217,6 @@
 (defn format-warning [warning]
   (format "[%s] %s" (location-code (or (:location warning) (:position warning)))
                     (:message warning)))
-
-#_(defn apply
-  "Applies the given rule to the given state."
-  [rule state]
-  ((rule) state))
 
 (d/defvar *format-remainder-limit*
   10
@@ -474,28 +450,9 @@ Error: %s
         (apply-seq str doc-str rule-doc-summary-header "\n"))
       doc-str)))
 
-#_(defn label-rule-meta [ls <old> <r>]
-  {:pre [(rule-meta? (meta <r>))
-         (or (nil? <old>) (rule-meta? (meta <old>)))
-         (set? ls)]}
-  (vary-meta <r> assoc :labels ls, :unlabelled-rule <old>))
-
 (defn label-rule-meta [ls <old> <r>]
   {:pre [(rule? <r>) (rule? <old>) (set? ls) (every? string? ls)]}
   (assoc-labels <r> ls <old>))
-
-#_(defn self-label-rule-meta [subrules <r>]
-  {:pre [(rule-meta? (meta <r>))]}
-  (let [original-meta (meta <r>)]
-    (with-meta <r>
-      (make-named-rule-meta (:type original-meta)
-        (delay
-          (let [original-info (rule-meta-info original-meta)
-                subrule-labels (map rule-labels subrules)
-                subrule-labels (apply-seq set/union subrule-labels)]
-            (if-not (some nil? subrule-labels)
-              (assoc original-info :labels subrule-labels)
-              original-info)))))))
 
 (defn self-label-rule-meta [subrules <r>]
   {:pre [(rule? <r>) (every? rule? subrules)]}
@@ -505,13 +462,6 @@ Error: %s
                (assoc-labels <r> subrule-labels <r>)
                <r>)))
     (:type <r>)))
-
-#_(defmacro make-normal-rule-wrapper [type rule-symbol inner-fn-body]
-  {:pre [(keyword? type) (symbol? rule-symbol)]}
-  (let [rule-kw (keyword rule-symbol)]
-   `(let [inner-body-delay# (delay ~inner-fn-body)]
-      (with-meta (fn [] (force inner-body-delay#))
-        (make-normal-rule-meta ~type ~rule-kw)))))
 
 (defmacro make-normal-rule-wrapper
   "Creates a `NormalRule` instance. This is for rules
@@ -526,12 +476,6 @@ Error: %s
    `(let [inner-body-delay# (delay ~inner-fn-body)]
       (NormalRule. (fn normal-rule [] @inner-body-delay#)
                    ~type ~rule-kw nil nil))))
-
-#_(defmacro make-named-rule-wrapper [type rule-form]
-  {:pre [(keyword? type)]}
- `(let [rule-delay# (delay ~rule-form)]
-    (with-meta (fn named-rule [] (force ((force rule-delay#))))
-      (make-named-rule-meta ~type (delay (meta (force rule-delay#)))))))
 
 (defmacro make-named-rule-wrapper [type rule-form]
   {:pre [(keyword? type)]}
@@ -582,7 +526,7 @@ Error: %s
   "Removes all labels from the given `descriptors` set, then adds the
   given `label-str`."
   [descriptors lbl]
-  {:pre #{(set? descriptors)}, #_:post #_ [(set? %)]}
+  {:pre #{(set? descriptors)}, :post [(set? %)]}
   (let [descriptors (set/select (complement label-descriptor?) descriptors)
         new-label-descriptor (make-label-descriptor lbl)
         descriptors (conj descriptors new-label-descriptor)]
