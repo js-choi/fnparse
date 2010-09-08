@@ -473,7 +473,7 @@
    :consumes "Whatever `rule` consumes."
    :error "Smartly determines the appropriate error message."}
   [l rule]
-  {:pre #{(c/descriptor-content? l)}}
+  {:pre #{(string? l)}}
   (let [rule (or (c/rule-unlabelled-base rule) rule)]
     (c/label-rule-meta #{l} rule
       (make-rule labelled-rule [state]
@@ -857,7 +857,7 @@
 (defmaker not-followed
   "See also `except`."
   [l <base> & following-rules]
-  {:pre [(c/descriptor-content? l) (rule? <base>) (every? rule? following-rules)]}
+  {:pre [(string? l) (rule? <base>) (every? rule? following-rules)]}
   (label l (suffix <base> (mapcat (partial not-followed- l) following-rules))))
 
 (defmaker- except- [base-lbl <subtrahend>]
@@ -884,7 +884,7 @@
    :consumes "Whatever `minuend` consumes."
    :error "Uses the `l` you provide."}
   [l <minuend> & subtrahends]
-  {:pre [(c/descriptor-content? l) (rule? <minuend>) (every? rule? subtrahends)]}
+  {:pre [(string? l) (rule? <minuend>) (every? rule? subtrahends)]}
   (label l (prefix (mapcat (partial except- l) subtrahends) <minuend>)))
 
 (defrule <end-of-input>
