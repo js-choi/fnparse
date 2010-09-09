@@ -1,3 +1,5 @@
+; TODO Vary anonymous function label symbol
+
 (ns edu.arizona.fnparse.clojure
   (:require [edu.arizona.fnparse [hound :as h] [core :as c]]
             [clojure [template :as t] [set :as set]]
@@ -64,7 +66,7 @@
 
 ;;; RULES START HERE.
 
-(declare <form>)
+(declare form>)
 
 ;; Whitespace.
 
@@ -83,7 +85,7 @@
 
 (h/defrule <discarded>
   "Consumes a discarded form (prefixed by `#_`), which counts as whitespace."
-  (h/prefix (h/lex (h/phrase "#_")) <form>))
+  (h/prefix (h/lex (h/phrase "#_")) (form>)))
 
 (h/defrule <normal-ws-char>
   "Consumes a normal whitespace character such as space or newline."
@@ -306,28 +308,40 @@
 
 ;; Circumflex compound forms: lists, vectors, maps, and sets.
 
-(h/defrule <form-series> (h/suffix (h/rep* <form>) <ws?>))
+(h/defmaker form-series> []
+  (h/suffix (h/rep* (form>)) <ws?>))
 
-(t/do-template [<rule> start-token end-token product-fn]
-  (def <rule>
+(t/do-template [rule-maker> start-token end-token product-fn]
+  (h/defmaker rule-maker> []
     (h/for [_ (h/lit start-token)
-            contents <form-series>
+            contents (form-series>)
             _ (h/lit end-token)]
       (product-fn contents)))
-  <list> \( \) #(apply list %)
-  <vector> \[ \] identity
-  <map> \{ \} #(apply hash-map %)
-  <set-inner> \{ \} set)
+  list> \( \) #(apply list %)
+  vector> \[ \] identity
+  map> \{ \} #(apply hash-map %)
+  set-inner> \{ \} set)
 
 ;; Simple prefix forms: syntax-quote, deref, etc.
 
 (h/defmaker padded-lit [token]
   (h/suffix (h/lit token) <ws?>))
 
+(t/do-template [rule-maker> prefix product-fn-symbol]
+  (h/defmaker rule-maker> []
+    (h/hook (prefix-list-fn product-fn-symbol)
+      (h/prefix (h/cat (padded-lit prefix) <ws?>) (form>))))
+  quoted> \' `quote
+  syntax-quoted> \` `syntax-quote
+  unquoted> \~ `unquote
+  derefed> \@ `deref
+  var-inner> \' `var
+  deprecated-meta> \^ `meta)
+
 (t/do-template [<rule> prefix product-fn-symbol]
   (h/defrule <rule>
     (h/hook (prefix-list-fn product-fn-symbol)
-      (h/prefix (h/cat (padded-lit prefix) <ws?>) <form>)))
+      (h/prefix (h/cat (padded-lit prefix) <ws?>) (form>))))
   <quoted> \' `quote
   <syntax-quoted> \` `syntax-quote
   <unquoted> \~ `unquote
@@ -337,9 +351,9 @@
 
 (h/defrule <unquote-spliced>
   (h/hook (prefix-list-fn `unquote-splicing)
-    (h/prefix (h/cat (h/lex (h/phrase "~@")) <ws?>) <form>)))
+    (h/prefix (h/cat (h/lex (h/phrase "~@")) <ws?>) (form>))))
 
-(def <deprecated-meta>
+#_(def <deprecated-meta>
   (h/prefix
     (h/add-warning
       "the '^' indicator has been deprecated since Clojure 1.1; use (meta ...) instead")
@@ -352,11 +366,11 @@
     (h/+ <keyword> <symbol>)))
 
 (def <metadata>
-  (h/+ <map> <tag>))
+  (h/+ (map>) <tag>))
 
 (h/defrule <with-meta-inner>
   (h/prefix (padded-lit \^)
-    (h/for [metadata <metadata>, _ <ws?>, content <form>]
+    (h/for [metadata <metadata>, _ <ws?>, content (form>)]
       (list `with-meta content metadata))))
 
 ;; Anonymous functions.
@@ -370,7 +384,7 @@
      context h/<fetch-context>
      :let [fn-context (:anonymous-fn-context context)]
      _ (h/when fn-context
-         "a parameter literals must be inside an anonymous function")
+         "parameter literals must be inside an anonymous function")
      suffix <anonymous-fn-parameter-suffix>
      :let [already-existing-symbol (get-already-existing-symbol fn-context
                                                                 suffix)
@@ -380,14 +394,14 @@
          h/<emptiness>)]
     parameter-symbol))
 
-(def <anonymous-fn-inner>
+(h/defmaker anonymous-fn-inner> []
   (h/for [_ (h/lit \()
           pre-context h/<fetch-context>
           _ (h/when (not (:anonymous-fn-context pre-context))
               "nested anonymous functions are not allowed")
           _ (h/alter-context assoc
               :anonymous-fn-context (AnonymousFnContext. [] nil))
-          content <form-series>
+          content (form-series>)
           post-context h/<fetch-context>
           _ (h/alter-context assoc :anonymous-fn-context nil)
           _ (h/lit \))]
@@ -408,7 +422,7 @@
           context h/<fetch-context>
           _ (h/when (:reader-eval? context)
               "EvalReader forms (i.e. #=(...)) have been prohibited.")
-          content <list>]
+          content (list>)]
     (eval content)))
 
 (def <unreadable-inner>
@@ -419,20 +433,21 @@
               (format "the data in #<%s> is unrecoverable" (str* content)))]
     nil))
 
-(def <dispatched-inner>
+(h/defmaker dispatched-inner> []
   ;; All forms put together. (The order of sub-rules matters for lexed rules.)
-  (h/+ <anonymous-fn-inner> <set-inner> <var-inner> <with-meta-inner>
+  (h/+ (anonymous-fn-inner>) (set-inner>) #_<var-inner> <with-meta-inner>
        <pattern-inner> <evaluated-inner> <unreadable-inner>))
 
-(def <dispatched>
-  (h/prefix (h/lit \#) <dispatched-inner>))
+(h/defmaker dispatched> []
+  (h/prefix (h/lit \#) (dispatched-inner>)))
 
-(def <form-content>
-  (h/+ <list> <vector> <map> <dispatched> <string> <syntax-quoted>
-       <unquote-spliced> <unquoted> <deprecated-meta> <character> <keyword>
+(h/defmaker form-content> []
+  (h/+ (list>) (vector>) (map>) (dispatched>) <string> #_<syntax-quoted>
+       <unquote-spliced> #_<unquoted> #_<deprecated-meta> <character> <keyword>
        <anonymous-fn-parameter> <symbol> <number>))
 
-(def <form> (h/label "a form" (h/prefix <ws?> <form-content>)))
+(h/defmaker form> []
+  (h/label "a form" (h/prefix <ws?> (form-content>))))
 
 ;;; THE FINAL READ FUNCTION.
 
@@ -457,7 +472,7 @@
     (h/match
       (h/make-state input
         :context (ClojureContext. ns-name ns-aliases nil reader-eval?))
-      <form>
+      (form>)
       :success-fn (fn [product position] product)
       :failure-fn (fn [error]
                     (except/throwf "Clojure parsing error: %s"
