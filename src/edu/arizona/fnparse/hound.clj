@@ -674,7 +674,7 @@
     (let [result (-> rule (c/apply state) :result force)]
       (if (c/failure? result)
         (Reply. false result)
-        ((prod (:product result)) state)))))
+        (c/apply (prod (:product result)) state)))))
 
 (defn- apply-reply-and-rule [f prev-reply next-rule]
   (c/apply

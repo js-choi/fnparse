@@ -419,9 +419,8 @@
               (format "the data in #<%s> is unrecoverable" (str* content)))]
     nil))
 
-;; All forms put together. (Order matters for lexed rules.)
-
 (def <dispatched-inner>
+  ;; All forms put together. (The order of sub-rules matters for lexed rules.)
   (h/+ <anonymous-fn-inner> <set-inner> <var-inner> <with-meta-inner>
        <pattern-inner> <evaluated-inner> <unreadable-inner>))
 
