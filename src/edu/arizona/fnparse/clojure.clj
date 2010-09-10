@@ -442,8 +442,8 @@
   (h/prefix (h/lit \#) (dispatched-inner>)))
 
 (h/defmaker form-content> []
-  (h/+ (list>) (vector>) (map>) (dispatched>) <string> #_<syntax-quoted>
-       <unquote-spliced> #_<unquoted> #_<deprecated-meta> <character> <keyword>
+  (h/+ (list>) (vector>) (map>) (dispatched>) <string> (syntax-quoted>)
+       <unquote-spliced> (unquoted>) (deprecated-meta>) <character> <keyword>
        <anonymous-fn-parameter> <symbol> <number>))
 
 (h/defmaker form> []

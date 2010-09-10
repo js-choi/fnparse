@@ -514,7 +514,8 @@ Error: %s
  `(let [maker-var# (~def-form ~fn-name ~@forms)]
     ; Wrap the rule-maker to return delayed NameRules
     ; in case of mutual recursion.
-    (alter-var-root maker-var# named-rule-maker ~rule-type-kw)
+    (when-not (= '~def-form `defmacro)
+      (alter-var-root maker-var# named-rule-maker ~rule-type-kw))
     ; Add extended documentation.
     (alter-meta! maker-var# update-in [:doc]
       rule-doc-str (meta maker-var#) ~description)
