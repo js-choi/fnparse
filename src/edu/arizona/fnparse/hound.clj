@@ -90,7 +90,7 @@
   rule when given `[1 2 3]` versus `'(1 2 3)`, then you should
   give `{:no-memoize? true}` in your metadata."
   [fn-name & forms]
-  `(c/general-defmaker defn "FnParse Hound rule-maker" ~fn-name ~@forms))
+  `(c/general-defmaker defn "FnParse Hound rule-maker" ::Rule ~fn-name ~@forms))
 
 (defmacro defmaker-
   "Like `defmaker`, but also makes the var private."
@@ -101,8 +101,8 @@
   "Like `defmaker`, but makes a macro rule-maker
   instead of a function rule-maker."
   [fn-name & forms]
-  (list* `c/general-defmaker `defmacro "FnParse Hound macro rule-maker"
-    fn-name forms))
+  `(c/general-defmaker defmacro "FnParse Hound rule-maker" ::Rule
+     ~fn-name ~@forms))
 
 (defrecord State
   [remainder position location warnings context alter-location]
@@ -423,6 +423,24 @@
   ([steps product-expr]
    {:pre #{(vector? steps) (even? (count steps))}}
   `(m/domonad parser-m ~steps ~product-expr)))
+
+(require '[clojure.pprint :as pp])
+
+(pp/pprint (macroexpand `(defmaker validate
+  "Creates a validating rule.
+  
+  A convenience function. Returns a new rule that
+  acts like the given `rule`, but also validates
+  `rule`'s products with the given predicate.
+  Basically just a shortcut for `for` and `when`."
+  {:success "When `rule` succeeds and its product fulfills `(pred product)`."
+   :product "`rule`'s product."
+   :consumes "What `rule` consumes."
+   :no-memoize? true}
+  [pred message rule]
+  {:pre #{(ifn? pred) (string? message) (rule? rule)}}
+  (for [product rule, _ (when (pred product) message)]
+    product))))
 
 (defmaker validate
   "Creates a validating rule.

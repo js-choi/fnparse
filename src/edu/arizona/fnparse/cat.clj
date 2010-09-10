@@ -90,7 +90,8 @@
   rule when given `[1 2 3]` versus `'(1 2 3)`, then you should
   give `{:no-memoize? true}` in your metadata."
   [fn-name & forms]
-  (list* `c/general-defmaker `defn "FnParse Hound rule-maker" fn-name forms))
+  (list* `c/general-defmaker `defn "FnParse Cat rule-maker" ::Rule fn-name
+    forms))
 
 (defmacro defmaker-
   "Like `defmaker`, but also makes the var private."

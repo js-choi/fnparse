@@ -506,13 +506,19 @@ Error: %s
       rule-doc-str ~meta-opts ~description)
     rule-var#))
 
-(defmacro general-defmaker [def-form description fn-name & forms]
+(defn named-rule-maker [rule-making-fn rule-type-kw]
+  (fn named-rule-maker [& args]
+    (NamedRule. (delay (apply-seq rule-making-fn args)) rule-type-kw)))
+
+(defmacro general-defmaker [def-form description rule-type-kw fn-name & forms]
  `(let [maker-var# (~def-form ~fn-name ~@forms)]
-    (alter-var-root maker-var# identity)
+    ; Wrap the rule-maker to return delayed NameRules
+    ; in case of mutual recursion.
+    (alter-var-root maker-var# named-rule-maker ~rule-type-kw)
     ; Add extended documentation.
     (alter-meta! maker-var# update-in [:doc]
       rule-doc-str (meta maker-var#) ~description)
-    ; Memoize unless the :no-memoize meta flag is true.
+    ; Memoize unless the :no-memoize? meta flag is true.
     (when-not (:no-memoize? (meta maker-var#))
       (alter-var-root maker-var# memoize))
     maker-var#))
