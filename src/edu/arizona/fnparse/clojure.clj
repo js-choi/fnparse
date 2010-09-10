@@ -66,7 +66,7 @@
 
 ;;; RULES START HERE.
 
-(declare form>)
+(declare >form<)
 
 ;; Whitespace.
 
@@ -85,7 +85,7 @@
 
 (h/defrule <discarded>
   "Consumes a discarded form (prefixed by `#_`), which counts as whitespace."
-  (h/prefix (h/lex (h/phrase "#_")) (form>)))
+  (h/prefix (h/lex (h/phrase "#_")) (>form< nil)))
 
 (h/defrule <normal-ws-char>
   "Consumes a normal whitespace character such as space or newline."
@@ -171,29 +171,29 @@
 
 (def <peek-ns-separator> (h/peek <ns-separator>))
 
-(h/defmaker fetch-referred-namespace [context namespace-alias]
+(h/defmaker >fetch-referred-namespace< [context namespace-alias]
   (h/when (get-in context [:ns-aliases namespace-alias])
     (format "no namespace with alias '%s'" namespace-alias)))
 
-(h/defmaker ns-qualified-keyword-end-with-slash [pre-slash]
+(h/defmaker >ns-qualified-keyword-end-with-slash< [pre-slash]
   (h/for [_ <peek-ns-separator>
           context h/<fetch-context>
-          prefix (fetch-referred-namespace context pre-slash)
+          prefix (>fetch-referred-namespace< context pre-slash)
           suffix <symbol-suffix>]
     [prefix suffix]))
 
-(h/defmaker ns-qualified-keyword-empty-end [pre-slash]
+(h/defmaker >ns-qualified-keyword-empty-end< [pre-slash]
   (h/for [context h/<fetch-context>]
     [(:ns-name context) pre-slash]))
 
-(h/defmaker ns-resolved-keyword-end [pre-slash]
-  (h/+ (ns-qualified-keyword-end-with-slash pre-slash)
-       (ns-qualified-keyword-empty-end pre-slash)))
+(h/defmaker >ns-resolved-keyword-end< [pre-slash]
+  (h/+ (>ns-qualified-keyword-end-with-slash< pre-slash)
+       (>ns-qualified-keyword-empty-end< pre-slash)))
 
 (def <ns-resolved-keyword>
   (h/for [_ (h/lex (h/factor= 2 <keyword-indicator>))
           pre-slash <symbol-char-series>
-          [prefix suffix] (ns-resolved-keyword-end pre-slash)
+          [prefix suffix] (>ns-resolved-keyword-end< pre-slash)
           _ <form-end>]
     (keyword prefix suffix)))
 
@@ -203,11 +203,11 @@
 
 ;; Numbers.
 
-(h/defmaker radix-natural-number [core]
+(h/defmaker >radix-natural-number< [core]
   (h/hooked-rep #(+ (* core %1) %2) 0 (h/radix-digit core)))
 
 (def <decimal-natural-number>
-  (radix-natural-number 10))
+  (>radix-natural-number< 10))
 
 (def <number-sign>
   (h/template-sum [label token product]
@@ -251,21 +251,21 @@
       (h/antivalidate zero? "a fraction's denominator cannot be zero"
         <decimal-natural-number>))))
 
-(h/defmaker radix-coefficient-tail [core]
+(h/defmaker >radix-coefficient-tail< [core]
   (h/hook constantly
     (h/prefix
       (h/case-insensitive-lit \r)
-      (radix-natural-number core))))
+      (>radix-natural-number< core))))
 
-(h/defmaker number-tail [core]
+(h/defmaker >number-tail< [core]
   (h/+ <imprecise-number-tail> <fraction-denominator-tail>
-       (radix-coefficient-tail core) <empty-number-tail>))
+       (>radix-coefficient-tail< core) <empty-number-tail>))
 
 (def <number>
   (h/for "a number"
     [sign (h/opt <number-sign>)
      prefix-number <decimal-natural-number>
-     tail-fn (number-tail prefix-number)
+     tail-fn (>number-tail< prefix-number)
      _ <form-end>]
     (tail-fn (* (or sign 1) prefix-number))))
 
@@ -308,50 +308,50 @@
 
 ;; Circumflex compound forms: lists, vectors, maps, and sets.
 
-(h/defmaker form-series> []
-  (h/suffix (h/rep* (form>)) <ws?>))
+(h/defmaker >form-series< [fn-info]
+  (h/suffix (h/rep* (>form< fn-info)) <ws?>))
 
-(t/do-template [rule-maker> start-token end-token product-fn]
-  (h/defmaker rule-maker> []
+(t/do-template [>rule-maker< start-token end-token product-fn]
+  (h/defmaker >rule-maker< [fn-info]
     (h/for [_ (h/lit start-token)
-            contents (form-series>)
+            contents (>form-series< fn-info)
             _ (h/lit end-token)]
       (product-fn contents)))
-  list> \( \) #(apply list %)
-  vector> \[ \] identity
-  map> \{ \} #(apply hash-map %)
-  set-inner> \{ \} set)
+  >list< \( \) #(apply list %)
+  >vector< \[ \] identity
+  >map< \{ \} #(apply hash-map %)
+  >set-inner< \{ \} set)
 
 ;; Simple prefix forms: syntax-quote, deref, etc.
 
-(h/defmaker padded-lit [token]
+(h/defmaker >padded-lit< [token]
   (h/suffix (h/lit token) <ws?>))
 
-(t/do-template [rule-maker> prefix product-fn-symbol]
-  (h/defmaker rule-maker> []
+(t/do-template [>rule-maker< prefix product-fn-symbol]
+  (h/defmaker >rule-maker< [fn-info]
     (h/hook (prefix-list-fn product-fn-symbol)
-      (h/prefix (h/cat (padded-lit prefix) <ws?>) (form>))))
-  quoted> \' `quote
-  syntax-quoted> \` `syntax-quote
-  unquoted> \~ `unquote
-  derefed> \@ `deref
-  var-inner> \' `var
-  deprecated-meta> \^ `meta)
+      (h/prefix (h/cat (>padded-lit< prefix) <ws?>) (>form< fn-info))))
+  >quoted< \' `quote
+  >syntax-quoted< \` `syntax-quote
+  >unquoted< \~ `unquote
+  >derefed< \@ `deref
+  >var-inner< \' `var
+  >deprecated-meta< \^ `meta)
 
-(t/do-template [<rule> prefix product-fn-symbol]
-  (h/defrule <rule>
+(t/do-template [>rule-maker< prefix product-fn-symbol]
+  (h/defmaker >rule-maker< [fn-info]
     (h/hook (prefix-list-fn product-fn-symbol)
-      (h/prefix (h/cat (padded-lit prefix) <ws?>) (form>))))
-  <quoted> \' `quote
-  <syntax-quoted> \` `syntax-quote
-  <unquoted> \~ `unquote
-  <derefed> \@ `deref
-  <var-inner> \' `var
-  <deprecated-meta> \^ `meta)
+      (h/prefix (h/cat (>padded-lit< prefix) <ws?>) (>form< fn-info))))
+  >quoted< \' `quote
+  >syntax-quoted< \` `syntax-quote
+  >unquoted< \~ `unquote
+  >derefed< \@ `deref
+  >var-inner< \' `var
+  >deprecated-meta< \^ `meta)
 
-(h/defrule <unquote-spliced>
+(h/defmaker >unquote-spliced< []
   (h/hook (prefix-list-fn `unquote-splicing)
-    (h/prefix (h/cat (h/lex (h/phrase "~@")) <ws?>) (form>))))
+    (h/prefix (h/cat (h/lex (h/phrase "~@")) <ws?>) (>form< nil))))
 
 #_(def <deprecated-meta>
   (h/prefix
@@ -366,11 +366,11 @@
     (h/+ <keyword> <symbol>)))
 
 (def <metadata>
-  (h/+ (map>) <tag>))
+  (h/+ (>map< nil) <tag>))
 
-(h/defrule <with-meta-inner>
-  (h/prefix (padded-lit \^)
-    (h/for [metadata <metadata>, _ <ws?>, content (form>)]
+(h/defmaker >with-meta-inner< [fn-info]
+  (h/prefix (>padded-lit< \^)
+    (h/for [metadata <metadata>, _ <ws?>, content (>form< fn-info)]
       (list `with-meta content metadata))))
 
 ;; Anonymous functions.
@@ -378,7 +378,7 @@
 (def <anonymous-fn-parameter-suffix>
   (h/+ <decimal-natural-number> (h/lit \&) (h/chook 1 h/<emptiness>)))
 
-(def <anonymous-fn-parameter>
+(h/defmaker >anonymous-fn-parameter< [fn-info]
   (h/for "a parameter"
     [_ (h/lit \%)
      context h/<fetch-context>
@@ -394,14 +394,14 @@
          h/<emptiness>)]
     parameter-symbol))
 
-(h/defmaker anonymous-fn-inner> []
+(h/defmaker >anonymous-fn-inner< [fn-info]
   (h/for [_ (h/lit \()
           pre-context h/<fetch-context>
           _ (h/when (not (:anonymous-fn-context pre-context))
               "nested anonymous functions are not allowed")
           _ (h/alter-context assoc
               :anonymous-fn-context (AnonymousFnContext. [] nil))
-          content (form-series>)
+          content (>form-series< fn-info)
           post-context h/<fetch-context>
           _ (h/alter-context assoc :anonymous-fn-context nil)
           _ (h/lit \))]
@@ -422,7 +422,7 @@
           context h/<fetch-context>
           _ (h/when (:reader-eval? context)
               "EvalReader forms (i.e. #=(...)) have been prohibited.")
-          content (list>)]
+          content (>list< nil)]
     (eval content)))
 
 (def <unreadable-inner>
@@ -433,21 +433,22 @@
               (format "the data in #<%s> is unrecoverable" (str* content)))]
     nil))
 
-(h/defmaker dispatched-inner> []
+(h/defmaker >dispatched-inner< [fn-info]
   ;; All forms put together. (The order of sub-rules matters for lexed rules.)
-  (h/+ (anonymous-fn-inner>) (set-inner>) #_<var-inner> <with-meta-inner>
+  (h/+ (>anonymous-fn-inner< fn-info) (>set-inner< fn-info) (>var-inner< fn-info) (>with-meta-inner< fn-info)
        <pattern-inner> <evaluated-inner> <unreadable-inner>))
 
-(h/defmaker dispatched> []
-  (h/prefix (h/lit \#) (dispatched-inner>)))
+(h/defmaker >dispatched< [fn-info]
+  (h/prefix (h/lit \#) (>dispatched-inner< fn-info)))
 
-(h/defmaker form-content> []
-  (h/+ (list>) (vector>) (map>) (dispatched>) <string> (syntax-quoted>)
-       <unquote-spliced> (unquoted>) (deprecated-meta>) <character> <keyword>
-       <anonymous-fn-parameter> <symbol> <number>))
+(h/defmaker >form-content< [fn-info]
+  (h/+ (>list< fn-info) (>vector< fn-info) (>map< fn-info) (>dispatched< fn-info)
+       <string> (>syntax-quoted< fn-info)
+       (>unquote-spliced< fn-info) (>unquoted< fn-info) (>deprecated-meta< fn-info) <character> <keyword>
+       (>anonymous-fn-parameter< fn-info) <symbol> <number>))
 
-(h/defmaker form> []
-  (h/label "a form" (h/prefix <ws?> (form-content>))))
+(h/defmaker >form< [fn-info]
+  (h/label "a form" (h/prefix <ws?> (>form-content< fn-info))))
 
 ;;; THE FINAL READ FUNCTION.
 
@@ -472,7 +473,7 @@
     (h/match
       (h/make-state input
         :context (ClojureContext. ns-name ns-aliases nil reader-eval?))
-      (form>)
+      (>form< nil)
       :success-fn (fn [product position] product)
       :failure-fn (fn [error]
                     (except/throwf "Clojure parsing error: %s"
