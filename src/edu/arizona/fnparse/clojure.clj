@@ -55,14 +55,17 @@
     (= suffix \&)
       (:slurping-parameter fn-context)))
 
-(defn update-fn-context [context parameter-suffix parameter-symbol]
-  (cond
-    (integer? parameter-suffix)
-      (update-in context [:anonymous-fn-context :normal-parameters] 
-        conj parameter-symbol)
-    (= parameter-suffix \&)
-      (update-in context [:anonymous-fn-context]
-        assoc :slurping-parameter parameter-symbol)))
+(defn merge-form-meta [meta-1 meta-2]
+  (assoc meta-1
+    :anonymous-fn-parameter-n
+    (max (or (:anonymous-fn-parameter-n meta-1) 0)
+         (or (:anonymous-fn-parameter-n meta-2) 0))
+    :anonymous-fn-slurping-parameter?
+    (or (:anonymous-fn-slurping-parameter? meta-1)
+        (:anonymous-fn-slurping-parameter? meta-2))))
+
+(defn parameter-symbol [fn-sym suffix]
+  (symbol (str fn-sym "-para-" suffix)))
 
 ;;; RULES START HERE.
 
@@ -125,26 +128,40 @@
   "Consumes a non-alphanumeric character allowed in Clojure symbols."
   (h/set-term "a non-alphanumeric symbol character" "*+!---?."))
 
-(def <symbol-first-char>
+(h/defrule <symbol-first-char>
+  "Symbols' first symbols have special limitations to distinguish them
+  from numbers, lists, etc."
   (h/+ h/<ascii-letter> <non-alphanumeric-symbol-char>))
 
-(def <symbol-char>
+(h/defrule <symbol-char>
+  "Symbols can contain whatever symbols they can start with as well as numbers."
   (h/label "a symbol character"
     (h/+ <symbol-first-char> h/<decimal-digit>)))
 
-(def <symbol-char-series>
+(h/defrule <symbol-char-series>
+  "A phrase of symbol characters. Its products are strings.
+  It itself *cannot* contain slashes."
+  {:product "A string."}
   (h/hook str* (h/rep <symbol-char>)))
 
-(def <symbol-end>
+(h/defrule <symbol-end>
+  "Matches the end of a symbol, but does not consume any tokens.
+  Equivalent to `<form-end>`, but annotates with special form-specific errors."
   (h/annotate-error annotate-symbol-end <form-end>))
 
-(def <slash-symbol-suffix>
+(h/defrule <slash-symbol-suffix>
+  "There is a special case for symbol suffixes: `namespace//`
+  is a symbol of name '/'. (This made it possible for division to
+  be represented by the `clojure.core/` function.)"
   (h/chook "/" <ns-separator>))
 
-(def <symbol-suffix>
+(h/defrule <symbol-suffix>
+  "A symbol suffix, i.e. a slash followed by
+  symbol characters or a single slash."
   (h/prefix <ns-separator> (h/+ <symbol-char-series> <slash-symbol-suffix>)))
 
-(def <symbol>
+(h/defrule <symbol>
+  "A symbol character. No whitespace padding."
   (h/for "a symbol"
     [first-char <symbol-first-char>
      rest-pre-slash (h/opt <symbol-char-series>)
@@ -308,15 +325,19 @@
 
 ;; Circumflex compound forms: lists, vectors, maps, and sets.
 
-(h/defmaker >form-series< [fn-info]
-  (h/suffix (h/rep* (>form< fn-info)) <ws?>))
+(h/defmaker >form-series< [fn-sym]
+  (h/suffix
+    (h/hook
+      (fn [forms] (with-meta forms (reduce merge-form-meta (map meta forms))))
+      (h/rep* (>form< fn-sym)))
+    <ws?>))
 
 (t/do-template [>rule-maker< start-token end-token product-fn]
-  (h/defmaker >rule-maker< [fn-info]
+  (h/defmaker >rule-maker< [fn-sym]
     (h/for [_ (h/lit start-token)
-            contents (>form-series< fn-info)
+            contents (>form-series< fn-sym)
             _ (h/lit end-token)]
-      (product-fn contents)))
+      (with-meta (product-fn contents) (meta contents))))
   >list< \( \) #(apply list %)
   >vector< \[ \] identity
   >map< \{ \} #(apply hash-map %)
@@ -328,9 +349,9 @@
   (h/suffix (h/lit token) <ws?>))
 
 (t/do-template [>rule-maker< prefix product-fn-symbol]
-  (h/defmaker >rule-maker< [fn-info]
+  (h/defmaker >rule-maker< [fn-sym]
     (h/hook (prefix-list-fn product-fn-symbol)
-      (h/prefix (h/cat (>padded-lit< prefix) <ws?>) (>form< fn-info))))
+      (h/prefix (h/cat (>padded-lit< prefix) <ws?>) (>form< fn-sym))))
   >quoted< \' `quote
   >syntax-quoted< \` `syntax-quote
   >unquoted< \~ `unquote
@@ -339,75 +360,72 @@
   >deprecated-meta< \^ `meta)
 
 (t/do-template [>rule-maker< prefix product-fn-symbol]
-  (h/defmaker >rule-maker< [fn-info]
+  (h/defmaker >rule-maker< [fn-sym]
     (h/hook (prefix-list-fn product-fn-symbol)
-      (h/prefix (h/cat (>padded-lit< prefix) <ws?>) (>form< fn-info))))
+      (h/prefix (h/cat (>padded-lit< prefix) <ws?>) (>form< fn-sym))))
   >quoted< \' `quote
   >syntax-quoted< \` `syntax-quote
   >unquoted< \~ `unquote
   >derefed< \@ `deref
-  >var-inner< \' `var
-  >deprecated-meta< \^ `meta)
+  >var-inner< \' `var)
 
-(h/defmaker >unquote-spliced< []
+(h/defmaker >unquote-spliced< [fn-sym]
   (h/hook (prefix-list-fn `unquote-splicing)
-    (h/prefix (h/cat (h/lex (h/phrase "~@")) <ws?>) (>form< nil))))
+    (h/prefix (h/cat (h/lex (h/phrase "~@")) <ws?>) (>form< fn-sym))))
 
-#_(def <deprecated-meta>
-  (h/prefix
-    (h/add-warning
-      "the '^' indicator has been deprecated since Clojure 1.1; use (meta ...) instead")
-    <deprecated-meta>))
-
-;; With-meta #^ forms.
+;; With-meta ^ forms.
 
 (def <tag>
   (h/hook #(hash-map :tag %)
     (h/+ <keyword> <symbol>)))
 
-(def <metadata>
-  (h/+ (>map< nil) <tag>))
+(h/defmaker >metadata< [fn-sym]
+  (h/+ (>map< fn-sym) <tag>))
 
-(h/defmaker >with-meta-inner< [fn-info]
+(h/defmaker >meta< [fn-sym]
   (h/prefix (>padded-lit< \^)
-    (h/for [metadata <metadata>, _ <ws?>, content (>form< fn-info)]
+    (h/for [metadata (>metadata< fn-sym), _ <ws?>, content (>form< fn-sym)]
       (list `with-meta content metadata))))
 
 ;; Anonymous functions.
 
+(defrecord AnonymousFnParameter [suffix])
+
 (def <anonymous-fn-parameter-suffix>
-  (h/+ <decimal-natural-number> (h/lit \&) (h/chook 1 h/<emptiness>)))
+  (h/+ (h/except "non-negative number" <decimal-natural-number> (h/lit \0))
+       (h/lit \&)
+       (h/chook 1 h/<emptiness>)))
 
-(h/defmaker >anonymous-fn-parameter< [fn-info]
+(h/defmaker >anonymous-fn-parameter< [fn-sym]
   (h/for "a parameter"
-    [_ (h/lit \%)
-     context h/<fetch-context>
-     :let [fn-context (:anonymous-fn-context context)]
-     _ (h/when fn-context
+    [prefix (h/lit \%)
+     _ (h/when fn-sym
          "parameter literals must be inside an anonymous function")
-     suffix <anonymous-fn-parameter-suffix>
-     :let [already-existing-symbol (get-already-existing-symbol fn-context
-                                                                suffix)
-           parameter-symbol (or already-existing-symbol (gensym "parameter"))]
-     _ (if (nil? already-existing-symbol)
-         (h/alter-context update-fn-context suffix parameter-symbol)
-         h/<emptiness>)]
-    parameter-symbol))
+     suffix <anonymous-fn-parameter-suffix>]
+    (with-meta (parameter-symbol fn-sym suffix)
+      (cond
+        (integer? suffix) {:anonymous-fn-parameter-n suffix}
+        (= \& suffix) {:anonymous-fn-slurping-parameter? true}))))
 
-(h/defmaker >anonymous-fn-inner< [fn-info]
+(h/defmaker >anonymous-fn-inner< [surrounding-fn-sym]
   (h/for [_ (h/lit \()
-          pre-context h/<fetch-context>
-          _ (h/when (not (:anonymous-fn-context pre-context))
-              "nested anonymous functions are not allowed")
-          _ (h/alter-context assoc
-              :anonymous-fn-context (AnonymousFnContext. [] nil))
-          content (>form-series< fn-info)
-          post-context h/<fetch-context>
-          _ (h/alter-context assoc :anonymous-fn-context nil)
-          _ (h/lit \))]
-    (let [anonymous-fn-context (:anonymous-fn-context post-context)
-          parameters (make-parameter-vector anonymous-fn-context)]
-      (list `fn 'anonymous-fn parameters (apply list content)))))
+          _ (h/when (not surrounding-fn-sym)
+              "nested anonymous functions are not allowed") 
+          :let [new-fn-sym (gensym "anonymous-fn")]
+          content (>form-series< new-fn-sym)
+          _ (h/lit \))
+          :let [content-meta (meta content)
+                parameter-n (:anonymous-fn-parameter-n content-meta)
+                parameters-before-slurping
+                (->> (range 1 (inc parameter-n))
+                     (map #(symbol (str new-fn-sym "-para-" %)))
+                     vec)
+                parameters
+                (if-not (:anonymous-fn-slurping-parameter? content-meta)
+                  parameters-before-slurping
+                  (conj parameters-before-slurping
+                    '& (parameter-symbol new-fn-sym \&)))]]
+    `(fn ~new-fn-sym ~parameters ~(apply list content))))
 
 ;; Regex patterns, EvalReaders, and unreadables.
 
@@ -417,12 +435,12 @@
                  (h/rep* <normal-string-char>)
                  <string-delimiter>)))
 
-(def <evaluated-inner>
+(h/defmaker >evaluated-inner< [fn-sym]
   (h/for [_ (h/lit \=)
           context h/<fetch-context>
           _ (h/when (:reader-eval? context)
               "EvalReader forms (i.e. #=(...)) have been prohibited.")
-          content (>list< nil)]
+          content (>list< fn-sym)]
     (eval content)))
 
 (def <unreadable-inner>
@@ -433,22 +451,22 @@
               (format "the data in #<%s> is unrecoverable" (str* content)))]
     nil))
 
-(h/defmaker >dispatched-inner< [fn-info]
+(h/defmaker >dispatched-inner< [fn-sym]
   ;; All forms put together. (The order of sub-rules matters for lexed rules.)
-  (h/+ (>anonymous-fn-inner< fn-info) (>set-inner< fn-info) (>var-inner< fn-info) (>with-meta-inner< fn-info)
-       <pattern-inner> <evaluated-inner> <unreadable-inner>))
+  (h/+ (>anonymous-fn-inner< fn-sym) (>set-inner< fn-sym) (>var-inner< fn-sym)
+       <pattern-inner> (>evaluated-inner< fn-sym) <unreadable-inner>))
 
-(h/defmaker >dispatched< [fn-info]
-  (h/prefix (h/lit \#) (>dispatched-inner< fn-info)))
+(h/defmaker >dispatched< [fn-sym]
+  (h/prefix (h/lit \#) (>dispatched-inner< fn-sym)))
 
-(h/defmaker >form-content< [fn-info]
-  (h/+ (>list< fn-info) (>vector< fn-info) (>map< fn-info) (>dispatched< fn-info)
-       <string> (>syntax-quoted< fn-info)
-       (>unquote-spliced< fn-info) (>unquoted< fn-info) (>deprecated-meta< fn-info) <character> <keyword>
-       (>anonymous-fn-parameter< fn-info) <symbol> <number>))
+(h/defmaker >form-content< [fn-sym]
+  (h/+ (>list< fn-sym) (>vector< fn-sym) (>map< fn-sym) (>dispatched< fn-sym)
+       <string> (>syntax-quoted< fn-sym)
+       (>unquote-spliced< fn-sym) (>unquoted< fn-sym) (>meta< fn-sym) <character> <keyword>
+       (>anonymous-fn-parameter< fn-sym) <symbol> <number>))
 
-(h/defmaker >form< [fn-info]
-  (h/label "a form" (h/prefix <ws?> (>form-content< fn-info))))
+(h/defmaker >form< [fn-sym]
+  (h/label "a form" (h/prefix <ws?> (>form-content< fn-sym))))
 
 ;;; THE FINAL READ FUNCTION.
 

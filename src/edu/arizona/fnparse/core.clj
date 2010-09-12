@@ -106,7 +106,7 @@
 (defrecord MessageDescriptor [text]
   ErrorDescriptor
   (descriptor-message [first-d rest-ds]
-    (->> rest-ds (cons first-d) (str/join "; "))))
+    (->> rest-ds (cons first-d) (map :text) (str/join "; "))))
 
 (defn make-message-descriptor
   "Returns a `MessageDescriptor`. The sort of parse error
