@@ -1,6 +1,20 @@
 ; TODO Vary anonymous function label symbol
 
 (ns edu.arizona.fnparse.clojure
+  "An almost pure Clojure parser in Clojure. The end result
+  is the `read-string` function, which reads a `String` and
+  returns the corresponding Clojure data structure or throws
+  an error.
+  
+  Rule-makers that take a `fn-sym` parameter make rules
+  that an anonymous function might contain. If `fn-sym`
+  is nil, then there is no anonymous function surrounding
+  the rule. If `fn-sym` is not nil, it must be the
+  generated symbol of the surrounding anonymous function.
+  
+  Rules that end with '-inner' are rules inside the
+  `<dispatch>` rule, and which lack the '#' that must
+  precede them."
   (:require [edu.arizona.fnparse [hound :as h] [core :as c]]
             [clojure [template :as t] [set :as set]]
             [clojure.contrib [except :as except]])
@@ -161,7 +175,8 @@
   (h/prefix <ns-separator> (h/+ <symbol-char-series> <slash-symbol-suffix>)))
 
 (h/defrule <symbol>
-  "A symbol character. No whitespace padding."
+  "A symbol character. No whitespace padding. Note that it also
+  matches `true`, `false`, and `nil`, the 'peculiar' symbols."
   (h/for "a symbol"
     [first-char <symbol-first-char>
      rest-pre-slash (h/opt <symbol-char-series>)
@@ -175,9 +190,11 @@
 
 ;; Keywords.
 
-(def <keyword-indicator> (h/lit \:))
+(h/defrule <keyword-indicator> "The colon." (h/lit \:))
 
-(def <normal-keyword>
+(h/defrule <normal-keyword>
+  "A normal keyword, e.g. `:integer` or `:com.tonio/strong`,
+  i.e. a keyword that is not doubly coloned."
   (h/for [_ <keyword-indicator>
           pre-slash (h/opt <symbol-char-series>)
           post-slash (h/opt <symbol-suffix>)
@@ -186,55 +203,86 @@
       (keyword pre-slash post-slash)
       (keyword pre-slash))))
 
-(def <peek-ns-separator> (h/peek <ns-separator>))
+(h/defrule <peek-ns-separator> (h/peek <ns-separator>))
 
-(h/defmaker >fetch-referred-namespace< [context namespace-alias]
-  (h/when (get-in context [:ns-aliases namespace-alias])
-    (format "no namespace with alias '%s'" namespace-alias)))
+(h/defmaker >fetch-referred-namespace<
+  "A rule that fetches from the context whatever namespace
+  is referred to by the given `namespace-alias`, or else
+  makes parsing fail."
+  [namespace-alias]
+  (h/for [context h/<fetch-context>
+          ns-name (h/when (get-in context [:ns-aliases namespace-alias])
+                    (format "no namespace with alias '%s'" namespace-alias))]
+    ns-name))
 
-(h/defmaker >ns-qualified-keyword-end-with-slash< [pre-slash]
+(h/defmaker >ns-qualified-keyword-end-with-slash<
+  "Matches a namespace-qualified keyword ending with a slash, like `::a//`."
+  [pre-slash]
   (h/for [_ <peek-ns-separator>
-          context h/<fetch-context>
-          prefix (>fetch-referred-namespace< context pre-slash)
+          prefix (>fetch-referred-namespace< pre-slash)
           suffix <symbol-suffix>]
     [prefix suffix]))
 
-(h/defmaker >ns-qualified-keyword-empty-end< [pre-slash]
+(h/defmaker >ns-qualified-keyword-empty-end<
+  "Matches emptiness, and gives, as a product, a vector pair of
+  the current namespace name (from the context) and whatever
+  `pre-slash` is."
+  [pre-slash]
   (h/for [context h/<fetch-context>]
     [(:ns-name context) pre-slash]))
 
-(h/defmaker >ns-resolved-keyword-end< [pre-slash]
+(h/defmaker >ns-resolved-keyword-end<
+  "Matches the two possible endings to a namespace-resolved keyword
+  (something starting with a slash or nothing). Given the `pre-slash`,
+  its product is a vector pair of the resolved namespace's name
+  along with the name proper to the keyword."
+  [pre-slash]
   (h/+ (>ns-qualified-keyword-end-with-slash< pre-slash)
        (>ns-qualified-keyword-empty-end< pre-slash)))
 
-(def <ns-resolved-keyword>
+(h/defrule <ns-resolved-keyword>
+  "Matches a namespace-resolved keyword, i.e. a keyword with two colons.
+  If there is a slash, what comes before the slash is a namespace-alias
+  that must be in the context."
   (h/for [_ (h/lex (h/factor= 2 <keyword-indicator>))
           pre-slash <symbol-char-series>
           [prefix suffix] (>ns-resolved-keyword-end< pre-slash)
           _ <form-end>]
     (keyword prefix suffix)))
 
-(def <keyword>
+(h/defrule <keyword>
+  "Any keyword. No whitespace padding."
   (h/label "a keyword"
     (h/+ <ns-resolved-keyword> <normal-keyword>)))
 
 ;; Numbers.
 
-(h/defmaker >radix-natural-number< [core]
+(h/defmaker >radix-natural-number<
+  "Matches a single natural number whose allowed digits (which are
+  alphanumeric) are determined by the `core`, a positive integer.
+  Its product is the integer represented."
+  [core]
   (h/hooked-rep #(+ (* core %1) %2) 0 (h/radix-digit core)))
 
-(def <decimal-natural-number>
+(h/defrule <decimal-natural-number>
+  "A series of decimal digits; the product is the corresponding integer."
   (>radix-natural-number< 10))
 
-(def <number-sign>
+(h/defrule <number-sign>
+  "A number sign, positive or negative. Its product can be `+1` or `-1`."
   (h/template-sum [label token product]
     (h/label label (h/chook product (h/lit token)))
     "positive sign" \+ 1, "negative sign" \- -1))
 
-(def <empty-number-tail>
+(h/defrule <empty-number-tail>
+  "An empty number tail. Returns the `identity` function."
   (h/chook identity h/<emptiness>))
 
-(def <imprecise-fractional-part>
+(h/defrule <imprecise-fractional-part>
+  "A '.' followed by an optional series of digits:
+  a fractional part of a number.
+  Its product is a function that takes a number and
+  adds the number indicated by the series of digits to it."
   (letfn [(reduce-digit-accumulator [[prev-num multiplier] next-digit]
             [(+ (* next-digit multiplier) prev-num) (/ multiplier 10)])]
     (h/prefix
@@ -245,22 +293,34 @@
            (h/hook #(partial + (/ % 10.)) <decimal-natural-number>)
            <empty-number-tail>))))
 
-(def <exponential-part>
+(h/defrule <exponential-part>
+  "An 'e' followed by a series of digits: the exponential part.
+  Its product is a function that takes a number
+  and raises it to whatever power indicated by the series of digits."
   (h/prefix
     (h/case-insensitive-lit \e)
     (h/hook #(partial * (expt-int 10 %)) <decimal-natural-number>)))
 
-(def <fractional-exponential-part>
+(h/defrule <fractional-exponential-part>
+  "A fractional part followed by an optional exponential part.
+  Its product is the functional composition of the two parts' products."
   (h/for [frac-fn <imprecise-fractional-part>
           exp-fn (h/+ <exponential-part> <empty-number-tail>)]
     (comp exp-fn frac-fn)))
 
-(def <imprecise-number-tail>
+(h/defrule <imprecise-number-tail>
+  "The tail of an imprecise number: that is, a number
+  that has a '.', 'e', or 'M'. Its product is a function that
+  transforms an integer according to the tail and also
+  turns it to a `double` (or a `BigDecimal` if it has an 'M')."
   (h/for [tail-fn (h/+ <fractional-exponential-part> <exponential-part>)
           big-dec? (h/opt (h/lit \M))]
     (comp (if big-dec? bigdec double) tail-fn)))
 
-(def <fraction-denominator-tail>
+(h/defrule <fraction-denominator-tail>
+  "The tail of a ratio number, i.e. a '/' followed by a denominator.
+  The denominator cannot be zero. Its product is a function that
+  takes an integer and divides it by the denominator."
   ; Product: a unary function on an integer.
   (h/prefix
     (h/lit \/)
@@ -268,17 +328,41 @@
       (h/antivalidate zero? "a fraction's denominator cannot be zero"
         <decimal-natural-number>))))
 
-(h/defmaker >radix-coefficient-tail< [core]
+(h/defmaker >radix-coefficient-tail<
+  "The tail of a radixed number. An integer prefixed with
+  a series of digits (the radix) and an 'r' can be suffixed
+  by a series of alphanumeric digits (the number's value);
+  which alphanumeric digits are allowed is determined by the radix.
+  
+  The `core` argument is the value of the radix. It is
+  required because it determines on the syntactic level
+  what digits are allowed.
+  The product is a function that constantly returns
+  the number represented."
+  [core]
   (h/hook constantly
     (h/prefix
       (h/case-insensitive-lit \r)
       (>radix-natural-number< core))))
 
-(h/defmaker >number-tail< [core]
+(h/defmaker >number-tail<
+  "The tail of a number. Its product is a function that takes
+  the integer given by the number's core (the digits before
+  any special character like '.' or 'r'), and returns a new
+  number: the number represented by the core and tail together.
+  
+  This is a rule-maker that takes the `core` integer. This
+  is necessary only because if the tail is a radix tail, then
+  the core is needed at the syntactic level to determine what
+  digits are allowed.
+  
+  I'm going to make that inelegance gone in the future."
+  [core]
   (h/+ <imprecise-number-tail> <fraction-denominator-tail>
        (>radix-coefficient-tail< core) <empty-number-tail>))
 
-(def <number>
+(h/defrule <number>
+  "Any Clojure number. Its product is a `Number`."
   (h/for "a number"
     [sign (h/opt <number-sign>)
      prefix-number <decimal-natural-number>
@@ -288,26 +372,33 @@
 
 ;; Unicode escape sequences for chars and strings.
 
-(def <unicode-escape-sequence>
+(h/defrule <unicode-escape-sequence>
+  "A Unicode escape sequence: 'u' followed by four
+  hexadecimal digits. Its product is the corresponding `Character`."
   (h/prefix (h/lit \u)
     (h/hook (comp char reduce-hexadecimal-digits)
       (h/factor= 4 h/<hexadecimal-digit>))))
 
 ;; Characters.
 
-(def <character-indicator> (h/lit \\))
+(h/defrule <character-indicator> (h/lit \\))
 
-(def <character-name>
+(h/defrule <character-name>
+  "The Clojure name of a `Character`, like 'newline' or 'u12A3'.
+  Uses `clojure.core/char-name-string` for special names. Also
+  accepts Unicode espace sequences.
+  Its product is the corresponding character."
   (h/+ (h/mapsum #(h/chook (key %) (h/phrase (val %))) char-name-string)
        <unicode-escape-sequence>))
 
-(def <character> (h/prefix <character-indicator> <character-name>))
+(h/defrule <character> (h/prefix <character-indicator> <character-name>))
 
 ;; Strings.
 
-(def <string-delimiter> (h/lit \"))
+(h/defrule <string-delimiter> (h/lit \"))
 
-(def <escaped-char>
+(h/defrule <escaped-char>
+  "A String escaped character. Its product is the corresponding `Character`."
   (h/prefix <character-indicator>
     (h/label "a valid escape sequence"
       (h/+ (h/template-sum [token character]
@@ -315,17 +406,25 @@
              \t \tab, \n \newline, \\ \\, \" \")
            <unicode-escape-sequence>))))
 
-(def <normal-string-char> (h/antilit \"))
+(h/defrule <normal-string-char> (h/antilit \"))
 
-(def <string-char> (h/+ <escaped-char> <normal-string-char>))
+(h/defrule <string-char> (h/+ <escaped-char> <normal-string-char>))
 
-(def <string>
+(h/defrule <string>
   (h/hook #(->> % flatten str*)
     (h/circumfix <string-delimiter> (h/rep* <string-char>) <string-delimiter>)))
 
 ;; Circumflex compound forms: lists, vectors, maps, and sets.
 
-(h/defmaker >form-series< [fn-sym]
+(h/defmaker >form-series<
+  "A series of forms, separated by whitespace or indicators.
+  Takes an optional `fn-sym` argument. `fn-sym` must be `nil`
+  if there is no surrounding anonymous function. `fn-sym`
+  otherwise is the symbol of the surrounding anonymous function.
+  Its product is a collection of the forms, with the metadata
+  of the collection the combination of the forms' metadata (see
+  `merge-form-meta`)."
+  [fn-sym]
   (h/suffix
     (h/hook
       (fn [forms] (with-meta forms (reduce merge-form-meta (map meta forms))))
@@ -345,7 +444,9 @@
 
 ;; Simple prefix forms: syntax-quote, deref, etc.
 
-(h/defmaker >padded-lit< [token]
+(h/defmaker >padded-lit<
+  "Makes a literal from the given `token` suffixed with optional whitespace."
+  [token]
   (h/suffix (h/lit token) <ws?>))
 
 (t/do-template [>rule-maker< prefix product-fn-symbol]
@@ -375,29 +476,36 @@
 
 ;; With-meta ^ forms.
 
-(def <tag>
+(h/defrule <tag> "A metadata tag."
   (h/hook #(hash-map :tag %)
     (h/+ <keyword> <symbol>)))
 
-(h/defmaker >metadata< [fn-sym]
+(h/defmaker >metadata< "A metadata tag or map." [fn-sym]
   (h/+ (>map< fn-sym) <tag>))
 
-(h/defmaker >meta< [fn-sym]
+(h/defmaker >with-meta< "Example: `^{:a 3} x`." [fn-sym]
   (h/prefix (>padded-lit< \^)
     (h/for [metadata (>metadata< fn-sym), _ <ws?>, content (>form< fn-sym)]
       (list `with-meta content metadata))))
 
 ;; Anonymous functions.
 
-(defrecord AnonymousFnParameter [suffix])
-
-(def <anonymous-fn-parameter-suffix>
-  (h/+ (h/except "non-negative number" <decimal-natural-number> (h/lit \0))
+(h/defrule <anonymous-fn-parameter-suffix>
+  "The optional suffix of an anonymous function parameter.
+  The product is an integer or `\&`."
+  (h/+ (h/antivalidate zero?
+         "anonymous function parameters cannot be suffixed with zero"
+         <decimal-natural-number>)
        (h/lit \&)
        (h/chook 1 h/<emptiness>)))
 
-(h/defmaker >anonymous-fn-parameter< [fn-sym]
-  (h/for "a parameter"
+(h/defmaker >anonymous-fn-parameter<
+  "Examples: '%', '%3', '%&'. Fails if `fn-sym` is `nil`, which is
+  tantamount to the absence of any surrounding anonymous function.
+  Its product is the symbol determined by `fn-sym` and the
+  parameter's suffix, with metadata expressing its presence."
+  [fn-sym]
+  (h/for "an anonymous function parameter"
     [prefix (h/lit \%)
      _ (h/when fn-sym
          "parameter literals must be inside an anonymous function")
@@ -407,9 +515,12 @@
         (integer? suffix) {:anonymous-fn-parameter-n suffix}
         (= \& suffix) {:anonymous-fn-slurping-parameter? true}))))
 
-(h/defmaker >anonymous-fn-inner< [surrounding-fn-sym]
+(h/defmaker >anonymous-fn-inner<
+  "Example: '#(+ % (- %& 3))'. Fails if `surrounding-fn-sym` is
+  *not* nil. Its product is the list of the function's code."
+  [surrounding-fn-sym]
   (h/for [_ (h/lit \()
-          _ (h/when (not surrounding-fn-sym)
+          _ (h/when (nil? surrounding-fn-sym)
               "nested anonymous functions are not allowed") 
           :let [new-fn-sym (gensym "anonymous-fn")]
           content (>form-series< new-fn-sym)
@@ -429,7 +540,8 @@
 
 ;; Regex patterns, EvalReaders, and unreadables.
 
-(def <pattern-inner>
+(h/defrule <pattern-inner>
+  "A regular expression `Pattern`."
   (h/hook (comp re-pattern str*)
     (h/circumfix <string-delimiter>
                  (h/rep* <normal-string-char>)
@@ -443,7 +555,8 @@
           content (>list< fn-sym)]
     (eval content)))
 
-(def <unreadable-inner>
+(h/defrule <unreadable-inner>
+  "Example: `#<unreadable>`. Never succeeds."
   (h/for [_ (h/lit \<)
           content (h/rep* (h/antilit \>))
           _ (h/opt (h/lit \>))
@@ -456,16 +569,23 @@
   (h/+ (>anonymous-fn-inner< fn-sym) (>set-inner< fn-sym) (>var-inner< fn-sym)
        <pattern-inner> (>evaluated-inner< fn-sym) <unreadable-inner>))
 
-(h/defmaker >dispatched< [fn-sym]
+(h/defmaker >dispatched<
+  "Any form that starts with '#', like `#(%)` and `#{a b c}`,
+  except the '#_', which counts as whitespace.
+  [fn-sym]
   (h/prefix (h/lit \#) (>dispatched-inner< fn-sym)))
 
-(h/defmaker >form-content< [fn-sym]
+(h/defmaker >form-content<
+  "Any form's content (without any preceding whitespace)."
+  [fn-sym]
   (h/+ (>list< fn-sym) (>vector< fn-sym) (>map< fn-sym) (>dispatched< fn-sym)
        <string> (>syntax-quoted< fn-sym)
-       (>unquote-spliced< fn-sym) (>unquoted< fn-sym) (>meta< fn-sym) <character> <keyword>
+       (>unquote-spliced< fn-sym) (>unquoted< fn-sym) (>with-meta< fn-sym) <character> <keyword>
        (>anonymous-fn-parameter< fn-sym) <symbol> <number>))
 
-(h/defmaker >form< [fn-sym]
+(h/defmaker >form<
+  "Any form, with optional preceding whitespace."
+  [fn-sym]
   (h/label "a form" (h/prefix <ws?> (>form-content< fn-sym))))
 
 ;;; THE FINAL READ FUNCTION.
