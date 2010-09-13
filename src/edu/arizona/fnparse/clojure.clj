@@ -211,7 +211,7 @@
   makes parsing fail."
   [namespace-alias]
   (h/for [context h/<fetch-context>
-          ns-name (h/when (get-in context [:ns-aliases namespace-alias])
+          ns-name (h/demand (get-in context [:ns-aliases namespace-alias])
                     (format "no namespace with alias '%s'" namespace-alias))]
     ns-name))
 
@@ -492,7 +492,7 @@
 
 (h/defrule <anonymous-fn-parameter-suffix>
   "The optional suffix of an anonymous function parameter.
-  The product is an integer or `\&`."
+  The product is an integer or `\\&`."
   (h/+ (h/antivalidate zero?
          "anonymous function parameters cannot be suffixed with zero"
          <decimal-natural-number>)
@@ -507,7 +507,7 @@
   [fn-sym]
   (h/for "an anonymous function parameter"
     [prefix (h/lit \%)
-     _ (h/when fn-sym
+     _ (h/demand fn-sym
          "parameter literals must be inside an anonymous function")
      suffix <anonymous-fn-parameter-suffix>]
     (with-meta (parameter-symbol fn-sym suffix)
@@ -520,7 +520,7 @@
   *not* nil. Its product is the list of the function's code."
   [surrounding-fn-sym]
   (h/for [_ (h/lit \()
-          _ (h/when (nil? surrounding-fn-sym)
+          _ (h/demand (nil? surrounding-fn-sym)
               "nested anonymous functions are not allowed") 
           :let [new-fn-sym (gensym "anonymous-fn")]
           content (>form-series< new-fn-sym)
@@ -550,7 +550,7 @@
 (h/defmaker >evaluated-inner< [fn-sym]
   (h/for [_ (h/lit \=)
           context h/<fetch-context>
-          _ (h/when (:reader-eval? context)
+          _ (h/demand (:reader-eval? context)
               "EvalReader forms (i.e. #=(...)) have been prohibited.")
           content (>list< fn-sym)]
     (eval content)))
@@ -571,7 +571,7 @@
 
 (h/defmaker >dispatched<
   "Any form that starts with '#', like `#(%)` and `#{a b c}`,
-  except the '#_', which counts as whitespace.
+  except the '#_', which counts as whitespace."
   [fn-sym]
   (h/prefix (h/lit \#) (>dispatched-inner< fn-sym)))
 

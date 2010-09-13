@@ -204,9 +204,8 @@
   (make-rule with-error-rule [state]
     (make-failed-reply state #{(c/make-message-descriptor message)})))
 
-(defmaker when
-  "Creates a maybe-failing rule—
-  an either succeeding or a failing rule—
+(defmaker demand
+  "Creates a maybe-failing rule—an either succeeding or a failing rule—
   depending on if `valid?` is logical true. If
   `valid?`, then the rule always succeeds and acts
   like `(prod valid?)`. If not `valid?`, then the
@@ -437,7 +436,7 @@
    :no-memoize? true}
   [pred message rule]
   {:pre #{(ifn? pred) (string? message) (rule? rule)}}
-  (for [product rule, _ (when (pred product) message)]
+  (for [product rule, _ (demand (pred product) message)]
     product))
 
 (defmaker antivalidate
