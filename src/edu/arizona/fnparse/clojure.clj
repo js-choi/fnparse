@@ -354,9 +354,7 @@
   This is a rule-maker that takes the `core` integer. This
   is necessary only because if the tail is a radix tail, then
   the core is needed at the syntactic level to determine what
-  digits are allowed.
-  
-  I'm going to make that inelegance gone in the future."
+  digits are allowed."
   [core]
   (h/+ <imprecise-number-tail> <fraction-denominator-tail>
        (>radix-coefficient-tail< core) <empty-number-tail>))

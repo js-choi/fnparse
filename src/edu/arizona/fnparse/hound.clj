@@ -1125,13 +1125,3 @@
    :consumes "One string."}
   (term* "a string of Java numbers"
     (fn [^String s] (->> s Scanner. iterator-seq vec))))
-
-#_(defmaker rule-term
-  "A terminal rule matching the first single token
-  to the given FnParse rule (both Cat rules and
-  Hound rules work), using the `match` function."
-  {:product "The product of `<r>`."
-   :consumes "One token."}
-  []
-  (term* "TODO"
-    (c/match* ())))
