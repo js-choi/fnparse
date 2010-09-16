@@ -19,6 +19,14 @@
         [clojure.contrib.except :as except])
   (:refer-clojure :exclude #{read-string}))
 
+(defn expt-int [core pow]
+  (loop [n (int pow), y 1, z core]
+    (let [t (bit-and n 1), n (bit-shift-right n 1)]
+      (cond
+        (zero? t) (recur n y (* z z))
+        (zero? n) (* z y)
+        :else (recur n (* z y) (* z z))))))
+
 (defn str* [objects]
   (apply str objects))
 
@@ -106,6 +114,8 @@
   (h/label "a string"
     (h/circumfix <str-delimiter> <str-content> <str-delimiter>)))
 
+; Numbers.
+
 (h/defmaker >radix-natural-number<
   "Matches a single natural number whose allowed digits (which are
   alphanumeric) are determined by the `core`, a positive integer.
@@ -177,44 +187,20 @@
       (h/antivalidate zero? "a fraction's denominator cannot be zero"
         <decimal-natural-number>))))
 
-(h/defmaker >radix-coefficient-tail<
-  "The tail of a radixed number. An integer prefixed with
-  a series of digits (the radix) and an 'r' can be suffixed
-  by a series of alphanumeric digits (the number's value);
-  which alphanumeric digits are allowed is determined by the radix.
-  
-  The `core` argument is the value of the radix. It is
-  required because it determines on the syntactic level
-  what digits are allowed.
-  The product is a function that constantly returns
-  the number represented."
-  [core]
-  (h/hook constantly
-    (h/prefix
-      (h/case-insensitive-lit \r)
-      (>radix-natural-number< core))))
-
-(h/defmaker >number-tail<
+(h/defrule <number-tail>
   "The tail of a number. Its product is a function that takes
   the integer given by the number's core (the digits before
   any special character like '.' or 'r'), and returns a new
-  number: the number represented by the core and tail together.
-  
-  This is a rule-maker that takes the `core` integer. This
-  is necessary only because if the tail is a radix tail, then
-  the core is needed at the syntactic level to determine what
-  digits are allowed."
-  [core]
+  number: the number represented by the core and tail together."
   (h/+ <imprecise-number-tail> <fraction-denominator-tail>
-       (>radix-coefficient-tail< core) <empty-number-tail>))
+       <empty-number-tail>))
 
 (h/defrule <number>
   "Any Clojure number. Its product is a `Number`."
   (h/for "a number"
     [sign (h/opt <number-sign>)
      prefix-number <decimal-natural-number>
-     tail-fn (>number-tail< prefix-number)
-     _ <form-end>]
+     tail-fn <number-tail>]
     (tail-fn (* (or sign 1) prefix-number))))
 
 ; Recursive data structures.
@@ -253,7 +239,7 @@
   "Consumes a general JSON value, optionally padded
   with whitespace on the front."
   {:product "A vector, map, number, true, false, or nil."}
-  (h/prefix <ws?> (h/+ <object> <array> <str> <true> <false> <null>)))
+  (h/prefix <ws?> (h/+ <object> <array> <str> <number> <true> <false> <null>)))
 
 (h/defrule <document>
   "Consumes a general JSON document, optionally padded
