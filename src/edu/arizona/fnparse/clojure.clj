@@ -1,5 +1,3 @@
-; TODO Vary anonymous function label symbol
-
 (ns edu.arizona.fnparse.clojure
   "An almost pure Clojure parser in Clojure. The end result
   is the `read-string` function, which reads a `String` and
@@ -19,8 +17,6 @@
             [clojure [template :as t] [set :as set]]
             [clojure.contrib [except :as except]])
   (:refer-clojure :exclude #{read-string}))
-
-; TODO: Fix implementation of decimal numbers.
 
 ;;; HELPER FUNCTIONS AND TYPES.
 
