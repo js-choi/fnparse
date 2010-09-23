@@ -116,17 +116,6 @@
 
 ; Numbers.
 
-(h/defmaker >radix-natural-number<
-  "Matches a single natural number whose allowed digits (which are
-  alphanumeric) are determined by the `core`, a positive integer.
-  Its product is the integer represented."
-  [core]
-  (h/hooked-rep #(+ (* core %1) %2) 0 (h/radix-digit core)))
-
-(h/defrule <decimal-natural-number>
-  "A series of decimal digits; the product is the corresponding integer."
-  (>radix-natural-number< 10))
-
 (h/defrule <number-sign>
   "A number sign, positive or negative. Its product can be `+1` or `-1`."
   (h/template-sum [label token product]
@@ -149,7 +138,6 @@
       (h/+ (->> h/<decimal-digit>
              (h/hooked-rep reduce-digit-accumulator [0 0.1])
              (h/hook #(partial + (get % 0))))
-           (h/hook #(partial + (/ % 10.)) <decimal-natural-number>)
            <empty-number-tail>))))
 
 (h/defrule <exponential-part>

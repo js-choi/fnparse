@@ -1,18 +1,21 @@
 (ns edu.arizona.fnparse.math
+  "A parser for general math expressions in the form accepted by
+  things like [Google Calculator](google.com/calculator) or the
+  [Python programming language](python.org), e.g. `1 + -3 * sin(0)`."
   (:require [edu.arizona.fnparse.cat :as k] [clojure.template :as template]))
-
-(set! *warn-on-reflection* true)
 
 (declare <expr> <ws> <number> <symbol-content>
          <multiplication-level> <addition-level>)
 
-(def <digit>
+(k/defrule <digit>
   (k/hook #(Integer/parseInt (str %))
     (k/term "a decimal digit" #(Character/isDigit (char %)))))
 
-(def <ws-char> (k/set-term "a whitespace character" " \n\t"))
+(k/defrule <ws-char> (k/set-term "a whitespace character" " \n\t"))
+
 (k/defrule <ws>
   (k/label "whitespace" (k/+ (k/cat <ws> <ws-char>) <ws-char>)))
+
 (def <ws?> (k/opt <ws>))
 
 (k/defmaker ws-suffix [<r>]

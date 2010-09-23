@@ -6,8 +6,8 @@
                              [except :as except] [core :as cljcore]]
             [clojure [template :as t] [set :as set]])
   (:import java.util.Scanner)
-  (:refer-clojure :rename {mapcat seq-mapcat, when if-when}
-                  :exclude #{for + peek find}))
+  (:refer-clojure :rename {mapcat seq-mapcat, when if-when, + num+}
+                  :exclude #{for peek find}))
 
 (d/defalias match c/match)
 (d/defalias find c/find)
@@ -1126,3 +1126,15 @@
   (term* "a string of Java numbers"
     (fn [^String s] (->> s Scanner. iterator-seq vec))))
 
+(defmaker <decimal-integer>
+
+(defmaker radix-natural-number
+  "Matches a single natural number whose allowed digits (which are
+  alphanumeric) are determined by the `base`, a positive integer.
+  Its product is the integer represented."
+  [base]
+  (hooked-rep #(+ (* base %1) %2) 0 (radix-digit base)))
+
+(defrule <decimal-natural-number>
+  "A series of decimal digits; the product is the corresponding integer."
+  (radix-natural-number 10))
