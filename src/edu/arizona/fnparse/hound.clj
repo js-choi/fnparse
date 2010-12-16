@@ -429,7 +429,7 @@
   A convenience function. Returns a new rule that
   acts like the given `rule`, but also validates
   `rule`'s products with the given predicate.
-  Basically just a shortcut for `for` and `when`."
+  Basically just a shortcut for `for` and `demand`."
   {:success "When `rule` succeeds and its product fulfills `(pred product)`."
    :product "`rule`'s product."
    :consumes "What `rule` consumes."
@@ -1024,10 +1024,6 @@
   the `edu.arizona.fnparse.core.ALineAndColumnLocation` protocol."
   (alter-location c/location-inc-line))
 
-(def ascii-digits "0123456789")
-(def lowercase-ascii-alphabet "abcdefghijklmnopqrstuvwxyz")
-(def uppercase-ascii-alphabet "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
-
 (defn radix-label
   "The function used by radix-digit to smartly
   create digit labels for the given `core`."
@@ -1037,7 +1033,98 @@
     16 "a hexadecimal digit"
     8 "an octal digit"
     2 "a binary digit"
-    (format "a core-%s digit" core)))
+    (format "a base-%s digit" core)))
+
+(defmaker radix-digit
+  "Makes a rule that matches any ASCII alphanumeric `Character`
+  that is a valid digit under the given `radix`. `radix` must
+  be an integer between `Character/MIN_RADIX` and `MAX_RADIX`,
+  i.e. 2 and 36.
+  
+  For radixes above 10, digits above 9 are case-insensitive
+  letters starting from `\\A`/`\\a` for 10."
+  {:product "The corresponding integer, from `0` to `(dec radix)`."}
+  [radix]
+  {:pre [(integer? radix) (<= Character/MIN_RADIX radix Character/MAX_RADIX)]}
+  (term* (radix-label radix)
+    #(let [digit-int (Character/digit (int %) radix)]
+       (if-not (neg? digit-int) digit-int false))))
+
+(defrule <decimal-digit>
+  "Matches an ASCII decimal digit `Character`, between `\\0` and `\\9`."
+  {:product "The corresponding integer, from `0` to `9`."}
+  (radix-digit 10))
+
+(defrule <hexadecimal-digit>
+  "Matches an ASCII hexadecimal digit `Character`, between `\\0` and `\\9`."
+  {:product "The corresponding integer, from `0` to `15`."}
+  (radix-digit 16))
+
+(defrule <space-char>
+  "Matches any `Character` that is a Unicode space character.
+  A character is considered to be a space character if and
+  only if it is specified to be a space character by the
+  Unicode standard. This method returns true if the character's
+  general category type is any of the following.
+  
+  * `Character/SPACE_SEPARATOR`
+  * `Character/LINE_SEPARATOR`
+  * `Character/PARAGRAPH_SEPARATOR`"
+  {:product "The matched `Character`."}
+  (term "a Unicode space character" #(Character/isSpaceChar (char %))))
+
+(defrule <ws-char>
+  "Matches any `Character` if it is white space
+  (a.k.a. whitespace) according to Java. A character is
+  a Java whitespace character if and only if it satisfies
+  one of the following criteria. (Terms in all-caps indicate
+  constants in the `Character` namespace.)
+  
+  * It is a Unicode space character (`SPACE_SEPARATOR`, `LINE_SEPARATOR`, or
+    `PARAGRAPH_SEPARATOR`) but is not also a non-breaking space ('\\u00A0',
+    '\\u2007', '\\u202F').
+  * It is '\\u0009', HORIZONTAL TABULATION.
+  * It is '\\u000A', LINE FEED.
+  * It is '\\u000B', VERTICAL TABULATION.
+  * It is '\\u000C', FORM FEED.
+  * It is '\\u000D', CARRIAGE RETURN.
+  * It is '\\u001C', FILE SEPARATOR.
+  * It is '\\u001D', GROUP SEPARATOR.
+  * It is '\\u001E', RECORD SEPARATOR.
+  * It is '\\u001F', UNIT SEPARATOR."
+  {:product "The matched `Character`."}
+  (term "a Java white space character" #(Character/isSpaceChar (int %))))
+
+(defrule <iso-control-char>
+  "Matches any `Character` if it is an ISO control character. A
+  character is considered to be an ISO control character if its code is in the
+  range '\\u0000' through '\\u001F' or in the range '\\u007F' through '\\u009F'."
+  {:product "The matched `Character`."}
+  (term "an ISO control character" #(Character/isISOControl (int %))))
+
+(defrule <unicode-defined-char>
+  "Matches any `Character` if is defined in Unicode.
+  A character is defined if at least one of the following is true.
+
+  * It has an entry in the Java `UnicodeData` file.
+  * It has a value in a range defined by the Java `UnicodeData` file."
+  {:product "The matched `Character`."}
+  (term "a Unicode-defined character" #(Character/isDefined (int %))))
+
+(defrule <unicode-defined-char>
+  "Matches any `Character` if is defined in Unicode.
+  A character is defined if at least one of the following is true.
+
+  * It has an entry in the Java `UnicodeData` file.
+  * It has a value in a range defined by the Java `UnicodeData` file."
+  {:product "The matched `Character`."}
+  (term "a Unicode-defined character" #(Character/isDefined (int %))))
+
+(comment
+
+(def ascii-digits "0123456789")
+(def lowercase-ascii-alphabet "abcdefghijklmnopqrstuvwxyz")
+(def uppercase-ascii-alphabet "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
 (defmaker radix-digit
   "Returns a rule that accepts one digit character
@@ -1126,8 +1213,6 @@
   (term* "a string of Java numbers"
     (fn [^String s] (->> s Scanner. iterator-seq vec))))
 
-(defmaker <decimal-integer>
-
 (defmaker radix-natural-number
   "Matches a single natural number whose allowed digits (which are
   alphanumeric) are determined by the `base`, a positive integer.
@@ -1138,3 +1223,5 @@
 (defrule <decimal-natural-number>
   "A series of decimal digits; the product is the corresponding integer."
   (radix-natural-number 10))
+
+)
