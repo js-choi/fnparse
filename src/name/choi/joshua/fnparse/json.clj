@@ -1,6 +1,5 @@
 (ns name.choi.joshua.fnparse.json
-  (:use name.choi.joshua.fnparse clojure.contrib.error-kit
-        [clojure.contrib.seq-utils :only [flatten]]))
+  (:use name.choi.joshua.fnparse clojure.contrib.error-kit))
 
 ;; These are some functions that the rules will use. A lot of these are
 ;; optional.
