@@ -1,0 +1,1339 @@
+<html>
+  <head>
+    <title>edu.arizona.fnparse.cat API reference (fnparse)</title>
+    <link href="static/favicon.png" rel="icon" />
+    <link href="static/favicon.png" rel="shortcut icon" />
+    <link media="all" type="text/css" href="static/clojure.css" rel="stylesheet" />
+    <link media="all" type="text/css" href="static/wiki.css" rel="stylesheet" />
+    <link media="all" type="text/css" href="static/internal.css" rel="stylesheet" />
+    <!-- TODO: are we using these (from clojure.org)? If so, add the files -->
+    <script src="file/view/code_highlighter.js" type="text/javascript"></script>
+    <script src="file/view/clojure.js" type="text/javascript"></script>
+    <style>.menuWrapper{height: 36px;}</style>
+    <!--[if lte IE 6]>
+    <link rel="stylesheet" href="http://www.wikispaces.com/_/2009051601/s/internal_ie.css" type="text/css" />
+    <![endif]-->
+  </head>
+<!--
+This document was auto-generated from the source by the clojure autodoc system.
+To report errors or ask questions about the overall documentation structure, formatting,
+etc., contact Tom Faulhaber (google mail name: tomfaulhaber).
+For errors in the documentation of a particular namespace, contact the author of that
+namespace.
+-->
+  <body>
+    <div id="AllContentContainer">
+      <div id="Header">
+	<a id="Logo" href="index.html"><img alt="Clojure" height="100" width="100" src="static/clojure-icon.gif" /></a>
+	<h1><a title="page header title" id="page-header" href="index.html">fnparse</a></h1>
+      </div>
+      <div id="leftcolumn"><div style="text-align: center;"></div>
+<div class="menu">
+  <div class="WikiCustomNav WikiElement wiki">
+    <a class="wiki_link" href="index.html">Overview</a><br />
+    <a class="wiki_link" href="api-index.html">API Index</a><br />
+    <a class="wiki_link" href="#">Namespaces:</a>
+    <ul id="left-sidebar-list">
+      <li><a href="edu.arizona.fnparse.cat-api.html" class="wiki_link">edu.arizona.fnparse.cat</a></li><li><a href="edu.arizona.fnparse.clojure-api.html" class="wiki_link">edu.arizona.fnparse.clojure</a></li><li><a href="edu.arizona.fnparse.core-api.html" class="wiki_link">edu.arizona.fnparse.core</a></li><li><a href="edu.arizona.fnparse.hound-api.html" class="wiki_link">edu.arizona.fnparse.hound</a></li><li><a href="edu.arizona.fnparse.json-api.html" class="wiki_link">edu.arizona.fnparse.json</a></li><li><a href="edu.arizona.fnparse.math-api.html" class="wiki_link">edu.arizona.fnparse.math</a></li>
+    </ul>
+  </div>
+</div>
+</div>
+      <div id="rightcolumn">
+	<div id="Content">
+	  <div class="contentBox"><div class="innerContentBox">
+              <div id="content_view" class="wiki wikiPage">
+                <div id="right-sidebar"><div id="toc">
+  <h1 class="nopad">Table of Contents</h1>
+  <div style="margin-left: 1em;" class="toc-section">
+    <a href="#toc0">Overview</a>
+    <div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/+">+</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/&lt;anything&gt;">&lt;anything&gt;</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/&lt;ascii-alphanumeric&gt;">&lt;ascii-alphanumeric&gt;</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/&lt;ascii-control&gt;">&lt;ascii-control&gt;</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/&lt;ascii-digit&gt;">&lt;ascii-digit&gt;</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/&lt;ascii-letter&gt;">&lt;ascii-letter&gt;</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/&lt;decimal-digit&gt;">&lt;decimal-digit&gt;</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/&lt;emptiness&gt;">&lt;emptiness&gt;</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/&lt;end-of-input&gt;">&lt;end-of-input&gt;</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/&lt;fetch-location&gt;">&lt;fetch-location&gt;</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/&lt;fetch-warnings&gt;">&lt;fetch-warnings&gt;</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/&lt;hexadecimal-digit&gt;">&lt;hexadecimal-digit&gt;</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/&lt;lowercase-ascii-letter&gt;">&lt;lowercase-ascii-letter&gt;</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/&lt;nothing&gt;">&lt;nothing&gt;</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/&lt;uppercase-ascii-letter&gt;">&lt;uppercase-ascii-letter&gt;</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/add-warning">add-warning</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/alter-location">alter-location</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/annotate-error">annotate-error</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/antilit">antilit</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/antiset-term">antiset-term</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/antiterm">antiterm</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/antivalidate">antivalidate</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/case-insensitive-lit">case-insensitive-lit</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/cat">cat</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/chook">chook</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/circumfix">circumfix</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/combine">combine</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/defmaker">defmaker</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/defmaker-">defmaker-</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/defmaker-macro">defmaker-macro</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/defrule">defrule</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/defrule-">defrule-</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/effects">effects</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/except">except</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/find">find</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/for">for</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/hook">hook</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/label">label</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/lit">lit</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/mapcat">mapcat</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/mapsum">mapsum</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/match">match</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/matches-seq">matches-seq</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/not-followed">not-followed</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/opt">opt</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/parser-m">parser-m</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/peek">peek</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/phrase">phrase</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/prefix">prefix</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/prod">prod</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/radix-digit">radix-digit</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/radix-label">radix-label</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/rule?">rule?</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/set-term">set-term</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/state?">state?</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/substitute">substitute</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/substitute-1">substitute-1</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/suffix">suffix</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/suffix-peek">suffix-peek</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/template-sum">template-sum</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/term">term</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/term*">term*</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/term-">term-</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/validate">validate</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/vcat">vcat</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/when">when</a>
+    </div><div style="margin-left: 1em;" class="toc-entry">
+      <a href="#edu.arizona.fnparse.cat/with-error">with-error</a>
+    </div>
+    <br />
+  </div>
+</div>
+</div>
+                <div id="content-tag"><h1 id="overview">API for <span id="namespace-name">edu.arizona.fnparse.cat</span></h1>
+by <span id="author">Unknown</span><br />
+<br />Usage:
+<pre>
+(ns your-namespace
+  (:require <span id="long-name">edu.arizona.fnparse.cat</span>))
+</pre><pre>
+</pre><h2>Overview</h2>
+<pre id="namespace-docstr"></pre>
+<br />
+<h2>Public Variables and Functions</h2>
+<div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/+">+</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (+)
+       (+ &lt;first&gt;)
+       (+ &lt;first&gt; &lt;second&gt; &amp; rest-rules)
+</pre>
+  <pre id="var-docstr">Creates a summed rule.
+
+Adds the given sub-rules together, forming a new rule.
+The order of the sub-rules matters.
+
+This is the FnParse *Cat* version of +. Unlike
+FnParse Hound's `+` rule-maker, Cat's *does* backtrack.
+
+This means that it searches for the *first successful*
+match from its sub-rules, regardless of whether they
+consume tokens or not.
+
+Otherwise, if every sub-rule failed, then a failure
+is returned with the proper error descriptors.
+
+This is the plus monadic operator of the `parser-m` monad.
+
+Rule Summary
+============
+* Consumes: Whatever the succeeding sub-rule consumes.
+* Description: FnParse Hound rule-maker
+* Error: An intelligent combination of the errors
+              from all the failed sub-rules.
+* Product: The product of the succeeding sub-rule.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/&lt;anything&gt;">&lt;anything&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">The generic terminal rule that matches any one token.
+
+Rule Summary
+============
+* Consumes: One token, any type.
+* Description: FnParse Hound rule
+* Error: "Expected anything."
+* Product: The token it consumes.
+* Success: If there are any tokens left, i.e.
+ not at the end of input.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/&lt;ascii-alphanumeric&gt;">&lt;ascii-alphanumeric&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">A rule matching a single alphanumeric ASCII letter.
+
+Rule Summary
+============
+* Consumes: One character.
+* Description: FnParse Hound rule
+* Product: The matching character itself.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/&lt;ascii-control&gt;">&lt;ascii-control&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">A rule matching a single ASCII control character,
+i.e. a character within Unicode points 0000 and 001F.
+
+Rule Summary
+============
+* Consumes: One character.
+* Description: FnParse Hound rule
+* Product: The matching character itself.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/&lt;ascii-digit&gt;">&lt;ascii-digit&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">A rule matching a single ASCII numeric digit. You may
+want to use instead `decimal-digit`, which automatically
+converts digits to Integer objects.
+
+Rule Summary
+============
+* Consumes: One character.
+* Description: FnParse Hound rule
+* Product: The matching character itself.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/&lt;ascii-letter&gt;">&lt;ascii-letter&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">A rule matching a single uppercase or lowercase ASCII letter.
+
+Rule Summary
+============
+* Consumes: One character.
+* Description: FnParse Hound rule
+* Product: The matching character itself.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/&lt;decimal-digit&gt;">&lt;decimal-digit&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">A rule matching a single core-10 digit
+character token (i.e. \0 through \9).
+
+Rule Summary
+============
+* Consumes: One character.
+* Description: FnParse Hound rule
+* Product: The matching digit's corresponding Integer object, 0 through 9.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/&lt;emptiness&gt;">&lt;emptiness&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">The general emptiness rule. (Actually just `(prod nil)`).
+
+Rule Summary
+============
+* Consumes: No tokens.
+* Description: FnParse Hound rule
+* Product: `nil`.
+* Success: Always.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/&lt;end-of-input&gt;">&lt;end-of-input&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">The standard end-of-input rule.
+
+Rule Summary
+============
+* Consumes: No tokens.
+* Description: FnParse Hound rule
+* Product: `true`.
+* Success: If there are no tokens left.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/&lt;fetch-location&gt;">&lt;fetch-location&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">A rule that fetches the current state's location.
+
+Rule Summary
+============
+* Consumes: Zero tokens.
+* Description: FnParse Hound rule
+* Product: The current location.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/&lt;fetch-warnings&gt;">&lt;fetch-warnings&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">A rule that fetches the current state's warnings.
+
+Rule Summary
+============
+* Consumes: Zero tokens.
+* Description: FnParse Hound rule
+* Product: The current warnings.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/&lt;hexadecimal-digit&gt;">&lt;hexadecimal-digit&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">A rule matching a single core-16 digit
+character token (i.e. \0 through \F).
+
+Rule Summary
+============
+* Consumes: One character.
+* Description: FnParse Hound rule
+* Product: The matching digit's corresponding Integer object, 0 through 15.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/&lt;lowercase-ascii-letter&gt;">&lt;lowercase-ascii-letter&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">A rule matching a single lowercase ASCII letter.
+
+Rule Summary
+============
+* Consumes: One character.
+* Description: FnParse Hound rule
+* Product: The matching character itself.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/&lt;nothing&gt;">&lt;nothing&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">The general failing rule.
+
+Use `with-error` or `when` in preference to `&lt;nothing&gt;`,
+because the first two rule-makers can attach meaningful
+error messages.
+
+Is the zero monadic value of the `parser-m` monad.
+
+Rule Summary
+============
+* Description: FnParse Hound rule
+* Error: `"Expected: absolutely nothing"`.
+* Success: Never.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/&lt;uppercase-ascii-letter&gt;">&lt;uppercase-ascii-letter&gt;</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">A rule matching a single uppercase ASCII letter.
+
+Rule Summary
+============
+* Consumes: One character.
+* Description: FnParse Hound rule
+* Product: The matching character itself.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/add-warning">add-warning</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (add-warning message)
+</pre>
+  <pre id="var-docstr">A rule that adds a new warning with the given message.
+
+Rule Summary
+============
+* Consumes: Zero tokens.
+* Description: FnParse Hound rule-maker
+* Product: `nil`.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/alter-location">alter-location</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (alter-location f &amp; args)
+</pre>
+  <pre id="var-docstr">A rule that alters the current location.
+
+Rule Summary
+============
+* Consumes: Zero tokens.
+* Description: FnParse Hound rule-maker
+* Product: The new location.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/annotate-error">annotate-error</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (annotate-error message-fn rule)
+</pre>
+  <pre id="var-docstr">Creates an error-annotating rule. Whenever
+the given `rule` fails, the error is passed
+into the `message-fn` function. This can be
+useful to add a message with more info to an
+error when certain conditions are met.
+
+`message-fn` must return a string when given
+the original `ParseError`, which will be added
+to the `ParseError`, or `nil` for no message.
+(`ParseError`s are maps of type
+`:edu.arizona.fnparse.c/ParseError`.
+See its documentation for more information.)</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/antilit">antilit</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (antilit token)
+</pre>
+  <pre id="var-docstr">Creates a rule of an antiliteral.
+A shortcut for `term`.
+It automatically adds an appropriate label.
+
+Rule Summary
+============
+* Consumes: One token, any type (so long as it doesn't equal `token`).
+* Description: FnParse Hound rule-maker
+* Error: When `(antilit \a) fails, its error
+         says, "Expected anything except 'a'."
+* Product: The consumed token.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/antiset-term">antiset-term</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (antiset-term l tokens)
+</pre>
+  <pre id="var-docstr">Creates a terminal rule with an antiset.
+A shortcut for `(antiterm l (set tokens))`.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/antiterm">antiterm</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (antiterm l pred)
+</pre>
+  <pre id="var-docstr">Exactly like term, only uses the complement of the
+given predicate instead.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/antivalidate">antivalidate</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (antivalidate pred message rule)
+</pre>
+  <pre id="var-docstr">Exactly like the `validate` function, except that
+it uses the complement of `pred` instead.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/case-insensitive-lit">case-insensitive-lit</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (case-insensitive-lit token)
+</pre>
+  <pre id="var-docstr">Creates a case-insensitive rule using Java's
+`Character/toLowerCase` and `Character/toUpperCase`
+methods. Only works with `Character`-type tokens.
+
+Rule Summary
+============
+* Consumes: One character.
+* Description: FnParse Hound rule-maker
+* Success: If there is a next token and it's equal to either
+            the upper or lowercase of the given `token`.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/cat">cat</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (cat &amp; rules)
+</pre>
+  <pre id="var-docstr">Creates a concatenated rule out of many given `rules`.
+
+Rule Summary
+============
+* Consumes: All tokens that the `rules` sequentially consume.
+* Description: FnParse Hound rule-maker
+* Error: The error of whatever sub-rule failed.
+* Product: The sequence (not lazy) of all the `rules`'s respective products.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/chook">chook</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (chook product rule)
+</pre>
+  <pre id="var-docstr">Creates a rule with a constant semantic hook.
+A shortcut for the `for` macro. The name
+stands for 'constant-hook'. It's exactly like
+`hook`, only the product is a constant; its
+product is always the given `product` object.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/circumfix">circumfix</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (circumfix prefix-rule body-rule suffix-rule)
+</pre>
+  <pre id="var-docstr">Creates a circumfixed rule. Use when you want to
+concatenate three rules, but you don't care about
+the first and third rules' products.
+Its product is always the body-rule's product.
+A shortcut for `(prefix prefix-rule (suffix body-rule suffix-rule))`.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/combine">combine</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (combine rule product-fn)
+</pre>
+  <pre id="var-docstr">Creates a rule combining the given `rule` into the
+`product-fn`.
+
+*Use `cat` or `for`* instead of this function.
+You *shouldn't have to use this function*
+at all, unless you're doing something special.
+
+The product-fn must return a rule when given the
+product of the first rule. `combine` is the bind
+monadic function of the parser monad.
+
+Below, the rule returned by `(product-fn
+state-after-first-rule)` will be referred to as
+`second-rule`.
+
+Rule Summary
+============
+* Consumes: All tokens that `rule` and then `(product-fn
+           state-after-first-rule)` consume.
+* Description: FnParse Hound rule-maker
+* Product: The product of `(product-fn state-after-first-rule)`.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/defmaker">defmaker</h2>
+  <span id="var-type">macro</span><br />
+  <pre id="var-usage">Usage: (defmaker fn-name &amp; forms)
+</pre>
+  <pre id="var-docstr">Creates a rule-making function. Use this instead of
+`clojure.core/defn` whenever you make a rule-making
+function. (It does other stuff like memoization and
+and stuff.) Also see `defmaker-` and `defmaker-macro`.
+
+Arguments
+=========
+`defmaker` requires exactly the same arguments as
+`clojure.core/defn`. Particularly important is being
+able to give metadata easily.
+
+Metadata options
+================
+`defmaker` accepts all special metadata options that
+`defrule` does; see `defrule` for more information.
+There is also a `:no-memoize?` option
+that does something special, detailed below.
+
+Memoization
+===========
+`defmaker` rule-makers *memoize by default*. This means
+that they save the arguments they receive and their
+corresponding results in a cache, and search the cache
+every time they are called for equal arguments. See
+`clojure.k/memoize` for more information.
+
+95% of the time, you won't have to worry about the warning below.
+
+A warning: memoization uses *Clojure equality*. This
+means that giving vector arguments must always return the
+same rule as giving list arguments, because vectors can
+be equal to lists. If your function must return a different
+rule when given `[1 2 3]` versus `'(1 2 3)`, then you should
+give `{:no-memoize? true}` in your metadata.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/defmaker-">defmaker-</h2>
+  <span id="var-type">macro</span><br />
+  <pre id="var-usage">Usage: (defmaker- fn-name &amp; forms)
+</pre>
+  <pre id="var-docstr">Like `defmaker`, but also makes the var private.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/defmaker-macro">defmaker-macro</h2>
+  <span id="var-type">macro</span><br />
+  <pre id="var-usage">Usage: (defmaker-macro fn-name &amp; forms)
+</pre>
+  <pre id="var-docstr">Like `defmaker`, but makes a macro rule-maker
+instead of a function rule-maker.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/defrule">defrule</h2>
+  <span id="var-type">macro</span><br />
+  <pre id="var-usage">Usage: (defrule rule-name form)
+       (defrule rule-name doc-string form)
+       (defrule rule-name doc-string meta-opts form)
+</pre>
+  <pre id="var-docstr">Defines a rule var. You really should use this instead of `def`
+whenever you define rules, because:
+1. It gives you cool shortcuts to write rule-related documentation.
+2. It allows you to use not-yet defined rules in mutually
+   recursive rules.
+
+Metadata documentation options
+==============================
+The `meta-opts` parameter expects a map argument,
+and makes it the new var's metadata. Giving certain
+options in the metadata also does appends certain
+things to the rule's `doc-string`.
+
+*  `:succeeds` expects a short description on when
+   the rule succeeds.
+*  `:product` expects a short description on what
+   products the rule gives when it succeeds.
+*  `:consumes` expects a short description on how
+   many and what kinds of tokens the rule consumes
+   when it succeeds.
+*  `:error` expects a short description on the
+   error that the rule gives when it fails.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/defrule-">defrule-</h2>
+  <span id="var-type">macro</span><br />
+  <pre id="var-usage">Usage: (defrule- fn-name &amp; forms)
+</pre>
+  <pre id="var-docstr">Like `defrule`, but also makes the var private.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/effects">effects</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (effects f &amp; args)
+</pre>
+  <pre id="var-docstr">Creates a side-effect rule. Applies the given
+arguments to the given function. You may prefer `prod`.
+
+Rule Summary
+============
+* Consumes: No tokens.
+* Description: FnParse Hound rule-maker
+* Product: The result of `(apply f args)`.
+* Success: Always.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/except">except</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (except l &lt;minuend&gt; &amp; subtrahends)
+</pre>
+  <pre id="var-docstr">Creates a subtracted rule. Matches using
+the given minuend rule, but only when the
+subtrahend rule does not also match. You
+must provide a custom `l`.
+
+`message-fn`, if given, creates a detailed error
+message when the `subtrahend` succeeds. `message-fn`
+should be a function that takes one argument: `subtrahend`'s
+product, and returns a string.
+
+Rule Summary
+============
+* Consumes: Whatever `minuend` consumes.
+* Description: FnParse Hound rule-maker
+* Error: Uses the `l` you provide.
+* Product: `minuend`'s product.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/find">find</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (find state rule &amp; {:keys #{flatten?}})
+</pre>
+  <pre id="var-docstr">Finds all occurrences of a rule in a sequence of tokens.
+Returns a lazy sequence of the rule's products at each
+occurence. The occurences do not overlap.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/for">for</h2>
+  <span id="var-type">macro</span><br />
+  <pre id="var-usage">Usage: (for l steps product-expr)
+       (for steps product-expr)
+</pre>
+  <pre id="var-docstr">Creates a rule comprehension, very much like
+`clojure.core/for`. If it succeeds or fails and
+also how many tokens it consumes is similar to `cat`.
+How the final product is calculated is similar to `hook`.
+
+If you want to know, this macro is equivalent to the
+`clojure.contrib.monads/domonad` form of the `parser-m` monad.
+
+Arguments
+=========
+*   `l`: An optional label string. See the
+    `label` function for more info.
+*   `steps`: A binding vector containing *binding-form/
+    rule pairs* optionally followed by *modifiers*.
+    The given rules in each pair are concatenated
+    together one after another to create
+    the new rule. Each binding-form is bound
+    to the product of its corresponding rule.
+    The rule expressions can refer to any
+    symbol bound to in a previous pair.
+    The only current recommended modifier
+    is `:let`, which works like how it does it
+    `clojure.core/for`.
+*   `product-expr`: The final product of the new rule.
+    Only is reached after every sub-rule
+    succeeds. The expression can refer
+    to any symbol bound to in the `steps`.
+
+Rule Summary
+============
+* Consumes: All tokens that each step consecutively consumes.
+* Description: FnParse Hound macro rule-maker
+* Error: Whatever error the failed rule returns.
+* Product: Whatever is calculated by `product-expr`.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/hook">hook</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (hook semantic-hook rule)
+</pre>
+  <pre id="var-docstr">Creates a rule with a semantic hook.
+A shortcut for the `for` macro.
+
+Rule Summary
+============
+* Consumes: Whatever `rule` consumes.
+* Description: FnParse Hound rule-maker
+* Product: `(semantic-hook product-from-rule)`.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/label">label</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (label l rule)
+</pre>
+  <pre id="var-docstr">Creates a labelled rule.
+
+Labels the given rule with the given string, returning
+a new rule. The given label will appear in the descriptors
+of any parse errors that expected the given rule to
+succeed.
+
+Personally, I label rules with articles like "a" or "an".
+For instance, I'd label a rule representing Clojure
+vectors "a vector".
+
+You don't have to understand the details, but...
+If `rule` consumed *no* tokens, then all error labels
+from `rule`'s result are overrided with the
+given `l`. Otherwise, the old labels are
+untouched, as they contain information from
+further down the input.
+
+Rule Summary
+============
+* Consumes: Whatever `rule` consumes.
+* Description: FnParse Hound rule-maker
+* Error: Smartly determines the appropriate error message.
+* Product: `rule`'s product.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/lit">lit</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (lit token)
+</pre>
+  <pre id="var-docstr">Creates a rule of a literal. A shortcut for
+`(term (partial = token))`. It automatically adds an
+appropriate label.
+
+Rule Summary
+============
+* Consumes: One token, equal to the given `token`.
+* Description: FnParse Hound rule-maker
+* Error: When `(lit \a) fails, its error says, "Expected 'a'."
+* Product: Always the consumed `token`.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/mapcat">mapcat</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (mapcat f &amp; token-colls)
+</pre>
+  <pre id="var-docstr">Creates a rule that is the result of
+applying `cat` to the result of applying map
+to `f` and `token-colls`.
+Use the `phrase` function instead of this
+function when `f` is just `lit`.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/mapsum">mapsum</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (mapsum f &amp; token-colls)
+</pre>
+  <pre id="var-docstr">Creates a rule that is the result of applying `+` to the
+result of applying map to `f` and `token-colls`.
+Use the `set-term` function instead of this
+function when `f` is just `lit`.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/match">match</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (match state rule &amp; {:keys #{failure-fn success-fn}, :or {success-fn print-success, failure-fn print-failure}})
+</pre>
+  <pre id="var-docstr">The general matching function of FnParse. Attempts to
+match the given rule to at least the beginning of the given input.
+
+*   `rule`: The rule to match with.
+*   `state`: The initial state.
+*   `success-fn`: An optional function called when the rule
+    matches the input.
+    `(complete-fn final-product final-remainder)` is called.
+*   `failure-fn`: An optional function called when the rule does not
+    match the input. `(failure-fn final-error)` is called,
+    where `final-error` is an object of type
+    `:edu.arizona.fnparse.ParseError`.
+  
+If `success-fn` and `failure-fn` aren't included, then
+`match` will print out a report of the parsing result.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/matches-seq">matches-seq</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (matches-seq state rule &amp; {:keys #{flatten?}})
+</pre>
+  <pre id="var-docstr">Finds all *consecutive* occurrences of a rule in a
+sequence of tokens.
+Returns a lazy sequence of the rule's products at each
+occurence. The occurrences must come one after another,
+or else the last element of the sequence will be a ParseError.
+The occurrences also do not overlap.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/not-followed">not-followed</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (not-followed l &lt;base&gt; &amp; following-rules)
+</pre>
+  <pre id="var-docstr">See also `except`.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/opt">opt</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (opt rule)
+</pre>
+  <pre id="var-docstr">Creates an optional rule. It is equivalent to `(+ rule emptiness)`.
+
+Rule Summary
+============
+* Consumes: Either whatever `rule` consumes (if it succeeds) or no tokens.
+* Description: FnParse Hound rule-maker
+* Product: Either `rule`'s product (if it succeeds) or `nil` if it fails.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/parser-m">parser-m</h2>
+  <span id="var-type">var</span><br />
+  <pre id="var-usage"></pre>
+  <pre id="var-docstr">The monad that FnParse Cat uses.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/peek">peek</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (peek rule)
+</pre>
+  <pre id="var-docstr">Creates a lookahead rule. Checks if the given
+`rule` succeeds, but doesn't actually consume
+any tokens.
+
+Rule Summary
+============
+* Consumes: No tokens.
+* Description: FnParse Hound rule-maker</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/phrase">phrase</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (phrase tokens)
+</pre>
+  <pre id="var-docstr">Creates a phrase rule, which succeeds
+only when the next few tokens all
+consecutively match the given tokens.
+(Actually, it's just `(mapcat lit tokens)`.)</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/prefix">prefix</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (prefix prefix-rule body-rule)
+</pre>
+  <pre id="var-docstr">Creates a prefixed rule. Use when you want to
+concatenate two rules, but you don't care about
+the first rule's product.
+Its product is always the body-rule's product.
+A shortcut for `(for [_ prefix-rule, content body-rule] content)`.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/prod">prod</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (prod product)
+</pre>
+  <pre id="var-docstr">Creates a rule that always returns the given `product`.
+
+Use the `:let` modifier in preference to this function
+when you use this inside rule comprehensions from the
+`for` macro.
+
+Is the result monadic function of the `parser-m` monad.
+
+Rule Summary
+============
+* Consumes: No tokens.
+* Description: FnParse Hound rule-maker
+* Product: The given `product`.
+* Success: Always.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/radix-digit">radix-digit</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (radix-digit core)
+</pre>
+  <pre id="var-docstr">Returns a rule that accepts one digit character
+token in the number system with the given `core`.
+For instance, `(radix-digit 12)` is a rule
+of a single duodecimal digit.
+
+Digits past 9 are case-insensitive letters:
+11, for instance, is \b or \B. cores above
+36 are accepted, but there's no way to use
+digits beyond \Z (which corresponds to 36).
+
+The rules `&lt;decimal-digit&gt;` and
+`&lt;hexadecimal-digit&gt;` are already provided.
+
+Rule Summary
+============
+* Consumes: One character.
+* Description: FnParse Hound rule-maker
+* Product: The digit's corresponding integer.
+* Success: If the next token is a digit
+  character in the given `core`'s number
+  system.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/radix-label">radix-label</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (radix-label core)
+</pre>
+  <pre id="var-docstr">The function used by radix-digit to smartly
+create digit labels for the given `core`.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/rule?">rule?</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (rule? obj)
+</pre>
+  <pre id="var-docstr">Tests if the given object is a Hound Rule, or a var containing a Hound Rule.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/set-term">set-term</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (set-term l tokens)
+</pre>
+  <pre id="var-docstr">Creates a terminal rule with a set.
+A shortcut for `(term l (set tokens))`.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/state?">state?</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (state? obj)
+</pre>
+  <pre id="var-docstr">Tests if the given object is a Hound State.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/substitute">substitute</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (substitute state rule &amp; {:keys #{flatten?}})
+</pre>
+  <pre id="var-docstr">Substitutes all occurences of a rule in a sequence of tokens
+with their respective products. Returns a lazy sequence of
+tokens and products.
+
+`flatten?` is a boolean. If it is true, then the substituting
+products will be flattened into the input sequence; in that
+case the products must always be Seqables.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/substitute-1">substitute-1</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (substitute-1 state rule &amp; {:keys #{flatten?}})
+</pre>
+  <pre id="var-docstr">Substitutes the first occurence of a rule in a sequence of
+tokens with its respective product. Returns a lazy sequence
+of tokens and products.
+
+See `substitute`'s docs for information on `flatten?`.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/suffix">suffix</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (suffix body-rule suffix-rule)
+</pre>
+  <pre id="var-docstr">Creates a suffixed rule. Use when you want to
+concatenate two rules, but you don't care about
+the second rule's product.
+Its product is always the body-rule's product.
+A shortcut for `(for [content body-rule, _ suffix-rule] content)`.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/suffix-peek">suffix-peek</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (suffix-peek &lt;main&gt; &lt;following&gt;)
+</pre>
+  <pre id="var-docstr">No description available.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/template-sum">template-sum</h2>
+  <span id="var-type">macro</span><br />
+  <pre id="var-usage">Usage: (template-sum argv expr &amp; values)
+</pre>
+  <pre id="var-docstr">Creates a summed rule using a template.
+Acts very similarly to `clojure.template/do-template`,
+but instead sums each rule together.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/term">term</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (term l predicate)
+</pre>
+  <pre id="var-docstr">Creates a terminal rule.
+
+The new rule either consumes one token or fails.
+It must have a `l` that describes it
+and a `predicate` to test if the token it consumes is
+valid.
+
+Do you really need to use `term`?
+=================================
+* If you just want to make sure that the consumed
+  token equals something, use `lit` instead.
+* If you just want to make sure that the consumed
+  token equals one of a bunch of things, use `term`
+  on a set of tokens, or `set-term` on a sequence of
+  tokens.
+* If you want to use the complement of the predicate,
+  use `antiterm`.
+* If you don't care about what token is consumed,
+  just as long as a token is consumed, use `-anything-`.
+* If you want a terminal rule, but you want the result
+  of the predicate to be the rule's product instead of
+  the token itself, use `term*`. This is useful if
+  you have a map of tokens and their products (e.g.
+  string escape sequences).
+
+Rule Summary
+============
+* Consumes: One token, any type that fulfills `pred`.
+* Description: FnParse Hound rule-maker
+* Error: When `(term "number" num?)` fails,
+         its error is "Expected number."
+* Product: The consumed token itself.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/term*">term*</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (term* l f)
+</pre>
+  <pre id="var-docstr">Exactly like `term`, only its product is the result of
+`(f token)` rather than `token`.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/term-">term-</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (term- pred-product? l f)
+</pre>
+  <pre id="var-docstr">All terminal Cat rules, including `term` and
+`term*`, are based on this function.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/validate">validate</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (validate pred message rule)
+</pre>
+  <pre id="var-docstr">Creates a validating rule.
+
+A convenience function. Returns a new rule that
+acts like the given `rule`, but also validates
+`rule`'s products with the given predicate.
+Basically just a shortcut for `for` and `when`.
+
+Rule Summary
+============
+* Consumes: What `rule` consumes.
+* Description: FnParse Hound rule-maker
+* Product: `rule`'s product.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/vcat">vcat</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (vcat &amp; subrules)
+</pre>
+  <pre id="var-docstr">Exactly like cat, only applies `vec` to its product.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/when">when</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (when valid? message)
+</pre>
+  <pre id="var-docstr">Creates a maybe-failing rule—
+an either succeeding or a failing rule—
+depending on if `valid?` is logical true. If
+`valid?`, then the rule always succeeds and acts
+like `(prod valid?)`. If not `valid?`, then the
+rule always fails and acts like `(with-error message)`.
+
+Examples
+========
+This function is very useful for when you want
+to validate a certain rule.
+
+  (for [value &lt;number&gt;
+          _ (when (&lt; odd 10)
+              "number must be less than ten")]
+      value)
+
+The rule given above succeeds only when `&lt;number&gt;`
+matches and `&lt;number&gt;`'s product is less than 10.
+
+Rule Summary
+============
+* Consumes: No tokens.
+* Description: FnParse Hound rule-maker
+* Product: The value of `valid?`.
+* Success: If `valid?` is a true value.</pre>
+  
+</div><div id="var-entry">
+  <br />
+  <hr />
+  <h2 id="edu.arizona.fnparse.cat/with-error">with-error</h2>
+  <span id="var-type">function</span><br />
+  <pre id="var-usage">Usage: (with-error message)
+</pre>
+  <pre id="var-docstr">Creates an always-failing rule with the given
+message. Use this in preference to `&lt;nothing&gt;`.
+
+Rule Summary
+============
+* Description: FnParse Hound rule-maker
+* Error: An error with the given `message`.
+* Success: Never.</pre>
+  
+</div>
+
+
+</div>
+              </div>
+            </div>
+          </div>
+	</div>
+	<div id="foot">
+	  <div style="text-align: center;" id="copyright">No copyright info </div>
+	</div>
+      </div>
+      <div id="DesignedBy">Logo &amp; site design by <a title="Visit Tom Hickey's website." href="http://www.tomhickey.com">Tom Hickey</a>.<br />
+      Clojure auto-documentation system by Tom Faulhaber.</div>
+    </div>
+    <!-- /AllContentContainer -->
+  </body>
+
+</html>
