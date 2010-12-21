@@ -1,1 +1,5 @@
 autodoc/**
+pom.xml
+lib/clojure-1.2.0.jar
+lib/clojure-contrib-1.2.0.jar
+fnparse.jar
