@@ -1,5 +1,5 @@
 (ns name.choi.joshua.fnparse.test-parse-json
-  (:use clojure.contrib.test-is)
+  (:use clojure.test)
   (:require [name.choi.joshua.fnparse.json :as j]))
 
 (defstruct node-s :kind :content)

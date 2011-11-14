@@ -1,14 +1,12 @@
 (ns name.choi.joshua.fnparse.test-parse
-  (:use clojure.contrib.test-is clojure.contrib.monads clojure.contrib.error-kit
-        [clojure.contrib.except :only [throw-arg]])
+  (:use clojure.test clojure.algo.monads) 
   (:require [name.choi.joshua.fnparse :as p]))
 
 (defstruct state-s :remainder :column)
 (def make-state (partial struct state-s))
-(deferror parse-error [] []
-  {:msg "WHEEE", :unhandled (throw-msg IllegalArgumentException)})
-(deferror weird-error [] []
-  {:msg "BOOM", :unhandled (throw-msg Exception)})
+
+(defn throw-arg [fmt & args]
+  (throw (IllegalArgumentException. (apply format fmt args))))
 
 (deftest emptiness
   (is (= (p/emptiness {:remainder (list "A" "B" "C")})
