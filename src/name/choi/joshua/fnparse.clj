@@ -1,6 +1,5 @@
 (ns name.choi.joshua.fnparse
-  [:use clojure.contrib.monads clojure.contrib.except
-        clojure.contrib.error-kit])
+  [:use clojure.set clojure.algo.monads]) 
 
 ; A rule is a delay object that contains a function that:
 ; - Takes a collection of tokens.
@@ -32,6 +31,7 @@
      rebindable, so that you can use different kinds of state objects in your
      parsing application. Myself, I usually put a struct-map accessor for
      :remainder in here."}
+  ^:dynamic
   *remainder-accessor*
   :remainder)
 (def
@@ -43,6 +43,7 @@
      maps containing :remainder. But the accessor is rebindable, so that you can
      use different kinds of state objects in your parsing application. Myself, I
      usually leave this variable alone."}
+  ^:dynamic
   *remainder-setter*
   #(assoc %1 :remainder %2))
 
